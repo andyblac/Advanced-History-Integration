@@ -1,0 +1,14 @@
+{
+  "domain": "advanced_history",
+  "name": "Advanced History",
+  "codeowners": ["@andyblac"],
+  "config_flow": true,
+  "dependencies": ["frontend", "http", "panel_custom"],
+  "documentation": "https://github.com/andyblac/Advanced-History-Integration",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/andyblac/Advanced-History-Integration/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "1.9.6"
+}

@@ -1,0 +1,91 @@
+{
+  "title": "Advanced History",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurar Advanced History",
+        "description": "Crea un panel lateral de Historial configurable mediante Statistics Graph Chart Card.",
+        "data": {
+          "title": "Título del panel",
+          "sidebar_icon": "Icono de la barra lateral",
+          "max_entities": "Máximo de entidades",
+          "default_hours": "Horas predeterminadas",
+          "graph_height": "Altura del gráfico",
+          "include_hidden": "Incluir entidades ocultas",
+          "redirect_show_more": "Abrir Mostrar más en Advanced History",
+          "card_module_url": "URL del módulo de la tarjeta de gráfico",
+          "card_options": "Valores predeterminados de la tarjeta",
+          "compare": "Comparación predeterminada",
+          "require_admin": "Solo administradores"
+        },
+        "data_description": {
+          "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
+          "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
+          "card_options": "Ajustes predeterminados de Statistics Graph Chart Card para gráficos nuevos. Edita el YAML directamente o usa el botón Abrir editor visual situado debajo."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigurar Advanced History",
+        "description": "Actualiza el panel lateral y los valores predeterminados del gráfico. Al guardar, Advanced History se recarga automáticamente.",
+        "data": {
+          "title": "Título del panel",
+          "sidebar_icon": "Icono de la barra lateral",
+          "max_entities": "Máximo de entidades",
+          "default_hours": "Horas predeterminadas",
+          "graph_height": "Altura del gráfico",
+          "include_hidden": "Incluir entidades ocultas",
+          "redirect_show_more": "Abrir Mostrar más en Advanced History",
+          "card_module_url": "URL del módulo de la tarjeta de gráfico",
+          "card_options": "Valores predeterminados de la tarjeta",
+          "compare": "Comparación predeterminada",
+          "require_admin": "Solo administradores"
+        },
+        "data_description": {
+          "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
+          "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
+          "card_options": "Ajustes predeterminados de Statistics Graph Chart Card para gráficos nuevos. Edita el YAML directamente o usa el botón Abrir editor visual situado debajo."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Advanced History ya está configurado.",
+      "reconfigure_successful": "Advanced History se reconfiguró correctamente."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Ajustes de Advanced History",
+        "description": "Al guardar, el panel se recarga automáticamente; no es necesario reiniciar Home Assistant.",
+        "data": {
+          "title": "Título del panel",
+          "sidebar_icon": "Icono de la barra lateral",
+          "max_entities": "Máximo de entidades",
+          "default_hours": "Horas predeterminadas",
+          "graph_height": "Altura del gráfico",
+          "include_hidden": "Incluir entidades ocultas",
+          "redirect_show_more": "Abrir Mostrar más en Advanced History",
+          "card_module_url": "URL del módulo de la tarjeta de gráfico",
+          "card_options": "Valores predeterminados de la tarjeta",
+          "compare": "Comparación predeterminada",
+          "require_admin": "Solo administradores"
+        },
+        "data_description": {
+          "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
+          "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
+          "card_options": "Ajustes predeterminados de Statistics Graph Chart Card para gráficos nuevos. Edita el YAML directamente o usa el botón Abrir editor visual situado debajo."
+        }
+      }
+    }
+  },
+  "selector": {
+    "compare_mode": {
+      "options": {
+        "follow_energy": "Seguir el selector de Energía",
+        "previous_period": "Periodo anterior",
+        "last_year": "Año anterior",
+        "disabled": "Desactivado"
+      }
+    }
+  }
+}

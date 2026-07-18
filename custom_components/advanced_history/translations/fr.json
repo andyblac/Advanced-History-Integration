@@ -1,0 +1,91 @@
+{
+  "title": "Advanced History",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configurer Advanced History",
+        "description": "Crée un panneau latéral Historique configurable basé sur Statistics Graph Chart Card.",
+        "data": {
+          "title": "Titre du panneau",
+          "sidebar_icon": "Icône de la barre latérale",
+          "max_entities": "Nombre maximal d’entités",
+          "default_hours": "Nombre d’heures par défaut",
+          "graph_height": "Hauteur du graphique",
+          "include_hidden": "Inclure les entités masquées",
+          "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
+          "card_module_url": "URL du module de la carte graphique",
+          "card_options": "Valeurs par défaut de la carte",
+          "compare": "Comparaison par défaut",
+          "require_admin": "Administrateurs uniquement"
+        },
+        "data_description": {
+          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
+          "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
+          "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigurer Advanced History",
+        "description": "Met à jour le panneau latéral et les valeurs par défaut du graphique. L’enregistrement recharge automatiquement Advanced History.",
+        "data": {
+          "title": "Titre du panneau",
+          "sidebar_icon": "Icône de la barre latérale",
+          "max_entities": "Nombre maximal d’entités",
+          "default_hours": "Nombre d’heures par défaut",
+          "graph_height": "Hauteur du graphique",
+          "include_hidden": "Inclure les entités masquées",
+          "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
+          "card_module_url": "URL du module de la carte graphique",
+          "card_options": "Valeurs par défaut de la carte",
+          "compare": "Comparaison par défaut",
+          "require_admin": "Administrateurs uniquement"
+        },
+        "data_description": {
+          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
+          "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
+          "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Advanced History est déjà configuré.",
+      "reconfigure_successful": "Advanced History a été reconfiguré avec succès."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Paramètres d’Advanced History",
+        "description": "L’enregistrement recharge automatiquement le panneau ; Home Assistant n’a pas besoin d’être redémarré.",
+        "data": {
+          "title": "Titre du panneau",
+          "sidebar_icon": "Icône de la barre latérale",
+          "max_entities": "Nombre maximal d’entités",
+          "default_hours": "Nombre d’heures par défaut",
+          "graph_height": "Hauteur du graphique",
+          "include_hidden": "Inclure les entités masquées",
+          "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
+          "card_module_url": "URL du module de la carte graphique",
+          "card_options": "Valeurs par défaut de la carte",
+          "compare": "Comparaison par défaut",
+          "require_admin": "Administrateurs uniquement"
+        },
+        "data_description": {
+          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
+          "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
+          "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous."
+        }
+      }
+    }
+  },
+  "selector": {
+    "compare_mode": {
+      "options": {
+        "follow_energy": "Suivre le sélecteur Énergie",
+        "previous_period": "Période précédente",
+        "last_year": "Année précédente",
+        "disabled": "Désactivé"
+      }
+    }
+  }
+}

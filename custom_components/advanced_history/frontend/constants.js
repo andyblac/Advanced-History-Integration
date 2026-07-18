@@ -1,0 +1,9 @@
+export const CARD_TAG = "statistics-graph-chart-card";
+export const STORAGE_KEY = "advanced-history-panel.targets";
+export const BOOKMARKS_STORAGE_KEY = "advanced-history-panel.bookmarks.v1";
+export const HISTORY_STORAGE_KEY = "advanced-history-panel.history.v1";
+export const HISTORY_LIMIT = 10;
+export const CURRENT_SNAPSHOT_STORAGE_KEY = "advanced-history-panel.current-snapshot.v1";
+export const UNDO_STORAGE_KEY = "advanced-history-panel.undo.v1";
+export const REDO_STORAGE_KEY = "advanced-history-panel.redo.v1";
+export const UNDO_LIMIT = 50;

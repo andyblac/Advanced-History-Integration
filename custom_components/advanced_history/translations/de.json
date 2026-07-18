@@ -1,0 +1,91 @@
+{
+  "title": "Advanced History",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Advanced History einrichten",
+        "description": "Erstellt eine konfigurierbare Verlaufsseitenleiste auf Basis der Statistics Graph Chart Card.",
+        "data": {
+          "title": "Paneltitel",
+          "sidebar_icon": "Seitenleistensymbol",
+          "max_entities": "Maximale Anzahl Entitäten",
+          "default_hours": "Standardstunden",
+          "graph_height": "Diagrammhöhe",
+          "include_hidden": "Ausgeblendete Entitäten einbeziehen",
+          "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
+          "card_module_url": "Modul-URL der Diagrammkarte",
+          "card_options": "Kartenstandards",
+          "compare": "Standardvergleich",
+          "require_admin": "Nur Administratoren"
+        },
+        "data_description": {
+          "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
+          "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
+          "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen."
+        }
+      },
+      "reconfigure": {
+        "title": "Advanced History neu konfigurieren",
+        "description": "Aktualisiert das Seitenleistenpanel und die Diagrammstandards. Beim Speichern wird Advanced History automatisch neu geladen.",
+        "data": {
+          "title": "Paneltitel",
+          "sidebar_icon": "Seitenleistensymbol",
+          "max_entities": "Maximale Anzahl Entitäten",
+          "default_hours": "Standardstunden",
+          "graph_height": "Diagrammhöhe",
+          "include_hidden": "Ausgeblendete Entitäten einbeziehen",
+          "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
+          "card_module_url": "Modul-URL der Diagrammkarte",
+          "card_options": "Kartenstandards",
+          "compare": "Standardvergleich",
+          "require_admin": "Nur Administratoren"
+        },
+        "data_description": {
+          "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
+          "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
+          "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Advanced History ist bereits konfiguriert.",
+      "reconfigure_successful": "Advanced History wurde erfolgreich neu konfiguriert."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Advanced-History-Einstellungen",
+        "description": "Beim Speichern wird das Panel automatisch neu geladen; Home Assistant muss nicht neu gestartet werden.",
+        "data": {
+          "title": "Paneltitel",
+          "sidebar_icon": "Seitenleistensymbol",
+          "max_entities": "Maximale Anzahl Entitäten",
+          "default_hours": "Standardstunden",
+          "graph_height": "Diagrammhöhe",
+          "include_hidden": "Ausgeblendete Entitäten einbeziehen",
+          "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
+          "card_module_url": "Modul-URL der Diagrammkarte",
+          "card_options": "Kartenstandards",
+          "compare": "Standardvergleich",
+          "require_admin": "Nur Administratoren"
+        },
+        "data_description": {
+          "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
+          "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
+          "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen."
+        }
+      }
+    }
+  },
+  "selector": {
+    "compare_mode": {
+      "options": {
+        "follow_energy": "Energieauswahl folgen",
+        "previous_period": "Vorheriger Zeitraum",
+        "last_year": "Vorheriges Jahr",
+        "disabled": "Deaktiviert"
+      }
+    }
+  }
+}

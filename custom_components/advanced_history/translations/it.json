@@ -1,0 +1,91 @@
+{
+  "title": "Advanced History",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configura Advanced History",
+        "description": "Crea un pannello laterale Cronologia configurabile basato su Statistics Graph Chart Card.",
+        "data": {
+          "title": "Titolo del pannello",
+          "sidebar_icon": "Icona della barra laterale",
+          "max_entities": "Numero massimo di entità",
+          "default_hours": "Ore predefinite",
+          "graph_height": "Altezza del grafico",
+          "include_hidden": "Includi entità nascoste",
+          "redirect_show_more": "Apri Mostra altro in Advanced History",
+          "card_module_url": "URL del modulo della scheda grafico",
+          "card_options": "Impostazioni predefinite della scheda",
+          "compare": "Confronto predefinito",
+          "require_admin": "Solo amministratori"
+        },
+        "data_description": {
+          "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
+          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
+          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante."
+        }
+      },
+      "reconfigure": {
+        "title": "Riconfigura Advanced History",
+        "description": "Aggiorna il pannello laterale e le impostazioni predefinite del grafico. Il salvataggio ricarica automaticamente Advanced History.",
+        "data": {
+          "title": "Titolo del pannello",
+          "sidebar_icon": "Icona della barra laterale",
+          "max_entities": "Numero massimo di entità",
+          "default_hours": "Ore predefinite",
+          "graph_height": "Altezza del grafico",
+          "include_hidden": "Includi entità nascoste",
+          "redirect_show_more": "Apri Mostra altro in Advanced History",
+          "card_module_url": "URL del modulo della scheda grafico",
+          "card_options": "Impostazioni predefinite della scheda",
+          "compare": "Confronto predefinito",
+          "require_admin": "Solo amministratori"
+        },
+        "data_description": {
+          "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
+          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
+          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Advanced History è già configurato.",
+      "reconfigure_successful": "Advanced History è stato riconfigurato correttamente."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Impostazioni di Advanced History",
+        "description": "Il salvataggio ricarica automaticamente il pannello; non è necessario riavviare Home Assistant.",
+        "data": {
+          "title": "Titolo del pannello",
+          "sidebar_icon": "Icona della barra laterale",
+          "max_entities": "Numero massimo di entità",
+          "default_hours": "Ore predefinite",
+          "graph_height": "Altezza del grafico",
+          "include_hidden": "Includi entità nascoste",
+          "redirect_show_more": "Apri Mostra altro in Advanced History",
+          "card_module_url": "URL del modulo della scheda grafico",
+          "card_options": "Impostazioni predefinite della scheda",
+          "compare": "Confronto predefinito",
+          "require_admin": "Solo amministratori"
+        },
+        "data_description": {
+          "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
+          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
+          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante."
+        }
+      }
+    }
+  },
+  "selector": {
+    "compare_mode": {
+      "options": {
+        "follow_energy": "Segui il selettore Energia",
+        "previous_period": "Periodo precedente",
+        "last_year": "Anno precedente",
+        "disabled": "Disabilitato"
+      }
+    }
+  }
+}

@@ -1,0 +1,91 @@
+{
+  "title": "Advanced History",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Advanced History instellen",
+        "description": "Maak een configureerbaar zijbalkpaneel Geschiedenis met Statistics Graph Chart Card.",
+        "data": {
+          "title": "Paneeltitel",
+          "sidebar_icon": "Zijbalkpictogram",
+          "max_entities": "Maximum aantal entiteiten",
+          "default_hours": "Standaard aantal uren",
+          "graph_height": "Grafiekhoogte",
+          "include_hidden": "Verborgen entiteiten opnemen",
+          "redirect_show_more": "Meer weergeven openen in Advanced History",
+          "card_module_url": "Module-URL van grafiekkaart",
+          "card_options": "Standaardwaarden van de kaart",
+          "compare": "Standaardvergelijking",
+          "require_admin": "Alleen beheerders"
+        },
+        "data_description": {
+          "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
+          "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
+          "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder."
+        }
+      },
+      "reconfigure": {
+        "title": "Advanced History opnieuw configureren",
+        "description": "Werk het zijbalkpaneel en de grafiekstandaarden bij. Opslaan herlaadt Advanced History automatisch.",
+        "data": {
+          "title": "Paneeltitel",
+          "sidebar_icon": "Zijbalkpictogram",
+          "max_entities": "Maximum aantal entiteiten",
+          "default_hours": "Standaard aantal uren",
+          "graph_height": "Grafiekhoogte",
+          "include_hidden": "Verborgen entiteiten opnemen",
+          "redirect_show_more": "Meer weergeven openen in Advanced History",
+          "card_module_url": "Module-URL van grafiekkaart",
+          "card_options": "Standaardwaarden van de kaart",
+          "compare": "Standaardvergelijking",
+          "require_admin": "Alleen beheerders"
+        },
+        "data_description": {
+          "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
+          "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
+          "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Advanced History is al geconfigureerd.",
+      "reconfigure_successful": "Advanced History is opnieuw geconfigureerd."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Instellingen van Advanced History",
+        "description": "Opslaan herlaadt het paneel automatisch; Home Assistant hoeft niet opnieuw te worden gestart.",
+        "data": {
+          "title": "Paneeltitel",
+          "sidebar_icon": "Zijbalkpictogram",
+          "max_entities": "Maximum aantal entiteiten",
+          "default_hours": "Standaard aantal uren",
+          "graph_height": "Grafiekhoogte",
+          "include_hidden": "Verborgen entiteiten opnemen",
+          "redirect_show_more": "Meer weergeven openen in Advanced History",
+          "card_module_url": "Module-URL van grafiekkaart",
+          "card_options": "Standaardwaarden van de kaart",
+          "compare": "Standaardvergelijking",
+          "require_admin": "Alleen beheerders"
+        },
+        "data_description": {
+          "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
+          "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
+          "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder."
+        }
+      }
+    }
+  },
+  "selector": {
+    "compare_mode": {
+      "options": {
+        "follow_energy": "Energiekiezer volgen",
+        "previous_period": "Vorige periode",
+        "last_year": "Vorig jaar",
+        "disabled": "Uitgeschakeld"
+      }
+    }
+  }
+}

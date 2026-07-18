@@ -1,0 +1,91 @@
+{
+  "title": "Advanced History",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Set up Advanced History",
+        "description": "Create a configurable History sidebar panel powered by Statistics Graph Chart Card.",
+        "data": {
+          "title": "Panel title",
+          "sidebar_icon": "Sidebar icon",
+          "max_entities": "Maximum entities",
+          "default_hours": "Default hours",
+          "graph_height": "Graph height",
+          "include_hidden": "Include hidden entities",
+          "redirect_show_more": "Open Show more in Advanced History",
+          "card_module_url": "Graph card module URL",
+          "card_options": "Card Defaults",
+          "compare": "Default comparison",
+          "require_admin": "Administrators only"
+        },
+        "data_description": {
+          "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
+          "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
+          "card_options": "Default Statistics Graph Chart Card settings for new charts. Edit the YAML directly or use the Open visual editor button below it."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure Advanced History",
+        "description": "Update the sidebar panel and graph defaults. Saving reloads Advanced History automatically.",
+        "data": {
+          "title": "Panel title",
+          "sidebar_icon": "Sidebar icon",
+          "max_entities": "Maximum entities",
+          "default_hours": "Default hours",
+          "graph_height": "Graph height",
+          "include_hidden": "Include hidden entities",
+          "redirect_show_more": "Open Show more in Advanced History",
+          "card_module_url": "Graph card module URL",
+          "card_options": "Card Defaults",
+          "compare": "Default comparison",
+          "require_admin": "Administrators only"
+        },
+        "data_description": {
+          "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
+          "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
+          "card_options": "Default Statistics Graph Chart Card settings for new charts. Edit the YAML directly or use the Open visual editor button below it."
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "Advanced History is already configured.",
+      "reconfigure_successful": "Advanced History was reconfigured successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Advanced History settings",
+        "description": "Saving reloads the panel automatically; Home Assistant does not need to restart.",
+        "data": {
+          "title": "Panel title",
+          "sidebar_icon": "Sidebar icon",
+          "max_entities": "Maximum entities",
+          "default_hours": "Default hours",
+          "graph_height": "Graph height",
+          "include_hidden": "Include hidden entities",
+          "redirect_show_more": "Open Show more in Advanced History",
+          "card_module_url": "Graph card module URL",
+          "card_options": "Card Defaults",
+          "compare": "Default comparison",
+          "require_admin": "Administrators only"
+        },
+        "data_description": {
+          "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
+          "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
+          "card_options": "Default Statistics Graph Chart Card settings for new charts. Edit the YAML directly or use the Open visual editor button below it."
+        }
+      }
+    }
+  },
+  "selector": {
+    "compare_mode": {
+      "options": {
+        "follow_energy": "Follow Energy selector",
+        "previous_period": "Previous period",
+        "last_year": "Previous year",
+        "disabled": "Disabled"
+      }
+    }
+  }
+}
