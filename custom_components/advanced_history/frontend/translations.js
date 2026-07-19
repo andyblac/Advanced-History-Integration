@@ -37,7 +37,9 @@ const TRANSLATIONS = {
     "card_defaults": "Card Defaults",
     "card_defaults_editor_note": "These settings are the defaults for new charts. Saving updates the integration configuration but does not change the current chart.",
     "open_card_defaults_editor": "Open visual editor",
-    "card_defaults_config_flow_note": "Saving here updates the Card Defaults YAML field below. Submit the config flow to apply the defaults."
+    "card_defaults_config_flow_note": "Saving here updates the Card Defaults YAML field below. Submit the config flow to apply the defaults.",
+    "hide_target": "Hide {target} from the chart",
+    "show_target": "Show {target} on the chart"
   },
   "en-GB": {
     "bookmarks": "Bookmarks",
@@ -77,7 +79,9 @@ const TRANSLATIONS = {
     "card_defaults": "Card Defaults",
     "card_defaults_editor_note": "These settings are the defaults for new charts. Saving updates the integration configuration but does not change the current chart.",
     "open_card_defaults_editor": "Open visual editor",
-    "card_defaults_config_flow_note": "Saving here updates the Card Defaults YAML field below. Submit the config flow to apply the defaults."
+    "card_defaults_config_flow_note": "Saving here updates the Card Defaults YAML field below. Submit the config flow to apply the defaults.",
+    "hide_target": "Hide {target} from the chart",
+    "show_target": "Show {target} on the chart"
   },
   "de": {
     "bookmarks": "Lesezeichen",
@@ -117,7 +121,9 @@ const TRANSLATIONS = {
     "card_defaults": "Kartenstandards",
     "card_defaults_editor_note": "Diese Einstellungen sind die Standards für neue Diagramme. Beim Speichern wird die Integrationskonfiguration aktualisiert, das aktuelle Diagramm jedoch nicht geändert.",
     "open_card_defaults_editor": "Visuellen Editor öffnen",
-    "card_defaults_config_flow_note": "Das Speichern hier aktualisiert das YAML-Feld Kartenstandards darunter. Sende den Konfigurationsablauf ab, um die Standards anzuwenden."
+    "card_defaults_config_flow_note": "Das Speichern hier aktualisiert das YAML-Feld Kartenstandards darunter. Sende den Konfigurationsablauf ab, um die Standards anzuwenden.",
+    "hide_target": "{target} im Diagramm ausblenden",
+    "show_target": "{target} im Diagramm anzeigen"
   },
   "es": {
     "bookmarks": "Marcadores",
@@ -157,7 +163,9 @@ const TRANSLATIONS = {
     "card_defaults": "Valores predeterminados de la tarjeta",
     "card_defaults_editor_note": "Estos ajustes son los valores predeterminados para los gráficos nuevos. Al guardar se actualiza la configuración de la integración, pero no cambia el gráfico actual.",
     "open_card_defaults_editor": "Abrir editor visual",
-    "card_defaults_config_flow_note": "Guardar aquí actualiza el campo YAML Valores predeterminados de la tarjeta. Envía el flujo de configuración para aplicar los valores."
+    "card_defaults_config_flow_note": "Guardar aquí actualiza el campo YAML Valores predeterminados de la tarjeta. Envía el flujo de configuración para aplicar los valores.",
+    "hide_target": "Ocultar {target} del gráfico",
+    "show_target": "Mostrar {target} en el gráfico"
   },
   "fr": {
     "bookmarks": "Favoris",
@@ -197,7 +205,9 @@ const TRANSLATIONS = {
     "card_defaults": "Valeurs par défaut de la carte",
     "card_defaults_editor_note": "Ces paramètres sont les valeurs par défaut des nouveaux graphiques. L’enregistrement met à jour la configuration de l’intégration sans modifier le graphique actuel.",
     "open_card_defaults_editor": "Ouvrir l’éditeur visuel",
-    "card_defaults_config_flow_note": "L’enregistrement ici met à jour le champ YAML Valeurs par défaut de la carte ci-dessous. Validez le flux de configuration pour appliquer les valeurs."
+    "card_defaults_config_flow_note": "L’enregistrement ici met à jour le champ YAML Valeurs par défaut de la carte ci-dessous. Validez le flux de configuration pour appliquer les valeurs.",
+    "hide_target": "Masquer {target} du graphique",
+    "show_target": "Afficher {target} sur le graphique"
   },
   "it": {
     "bookmarks": "Segnalibri",
@@ -237,7 +247,9 @@ const TRANSLATIONS = {
     "card_defaults": "Impostazioni predefinite della scheda",
     "card_defaults_editor_note": "Queste impostazioni sono i valori predefiniti per i nuovi grafici. Il salvataggio aggiorna la configurazione dell’integrazione senza modificare il grafico corrente.",
     "open_card_defaults_editor": "Apri editor visuale",
-    "card_defaults_config_flow_note": "Il salvataggio qui aggiorna il campo YAML Impostazioni predefinite della scheda. Invia il flusso di configurazione per applicare i valori."
+    "card_defaults_config_flow_note": "Il salvataggio qui aggiorna il campo YAML Impostazioni predefinite della scheda. Invia il flusso di configurazione per applicare i valori.",
+    "hide_target": "Nascondi {target} dal grafico",
+    "show_target": "Mostra {target} nel grafico"
   },
   "nl": {
     "bookmarks": "Bladwijzers",
@@ -277,7 +289,9 @@ const TRANSLATIONS = {
     "card_defaults": "Standaardwaarden van de kaart",
     "card_defaults_editor_note": "Deze instellingen zijn de standaardwaarden voor nieuwe grafieken. Opslaan werkt de integratieconfiguratie bij, maar wijzigt de huidige grafiek niet.",
     "open_card_defaults_editor": "Visuele editor openen",
-    "card_defaults_config_flow_note": "Hier opslaan werkt het YAML-veld Standaardwaarden van de kaart hieronder bij. Dien de configuratiestroom in om de waarden toe te passen."
+    "card_defaults_config_flow_note": "Hier opslaan werkt het YAML-veld Standaardwaarden van de kaart hieronder bij. Dien de configuratiestroom in om de waarden toe te passen.",
+    "hide_target": "{target} in de grafiek verbergen",
+    "show_target": "{target} in de grafiek tonen"
   },
   "pt-BR": {
     "bookmarks": "Favoritos",
@@ -317,7 +331,9 @@ const TRANSLATIONS = {
     "card_defaults": "Padrões do cartão",
     "card_defaults_editor_note": "Estas configurações são os padrões para novos gráficos. Ao salvar, a configuração da integração é atualizada sem alterar o gráfico atual.",
     "open_card_defaults_editor": "Abrir editor visual",
-    "card_defaults_config_flow_note": "Salvar aqui atualiza o campo YAML Padrões do cartão abaixo. Envie o fluxo de configuração para aplicar os padrões."
+    "card_defaults_config_flow_note": "Salvar aqui atualiza o campo YAML Padrões do cartão abaixo. Envie o fluxo de configuração para aplicar os padrões.",
+    "hide_target": "Ocultar {target} do gráfico",
+    "show_target": "Mostrar {target} no gráfico"
   }
 };
 

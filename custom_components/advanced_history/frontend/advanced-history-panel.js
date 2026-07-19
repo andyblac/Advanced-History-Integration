@@ -10,7 +10,7 @@ import { panelStyles as css } from "./styles.js";
 import { TargetPickerMethods } from "./target-picker.js";
 import { customLocalize } from "./translations.js";
 
-const PANEL_VERSION = "0.5.4";
+const PANEL_VERSION = "0.5.5";
 
 class AdvancedHistoryPanel extends HTMLElement {
   constructor() {
@@ -22,6 +22,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._devices = [];
     this._entities = [];
     this._targets = { area_id: [], device_id: [], entity_id: [] };
+    this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
     this._draftTargets = null;
     this._activeTab = "area_id";
     this._dialogSearch = "";
@@ -51,7 +52,10 @@ class AdvancedHistoryPanel extends HTMLElement {
 
   set hass(value) {
     this._hass = value;
-    if (this._nativeTargetPicker) this._nativeTargetPicker.hass = this._targetPickerHass();
+    if (this._nativeTargetPicker) {
+      this._nativeTargetPicker.hass = this._targetPickerHass();
+      this._syncNativeTargetVisibility();
+    }
     for (const card of this._cards) card.hass = value;
     if (!this._loaded && value) this._initialize();
   }
@@ -217,7 +221,7 @@ class AdvancedHistoryPanel extends HTMLElement {
       ${dependencyMissing ? "" : `<div id="date-controller" class="energy-nav-floating"></div>`}`;
     const menu = this.shadowRoot.getElementById("menu");
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
-    this.shadowRoot.getElementById("remove-all")?.addEventListener("click", () => { this._archiveCurrentChart(); this._activeSnapshot = null; this._targets = { area_id: [], device_id: [], entity_id: [] }; this._resetEnergySelection(); this._saveTargets(); this._recordChange(); this._notice = ""; this._render(); });
+    this.shadowRoot.getElementById("remove-all")?.addEventListener("click", () => { this._archiveCurrentChart(); this._activeSnapshot = null; this._targets = { area_id: [], device_id: [], entity_id: [] }; this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] }; this._resetEnergySelection(); this._saveTargets(); this._recordChange(); this._notice = ""; this._render(); });
     this.shadowRoot.getElementById("bookmarks")?.addEventListener("click", () => this._openLibrary());
     this.shadowRoot.getElementById("chart-history")?.addEventListener("click", () => this._openLibrary("history"));
     this.shadowRoot.getElementById("undo")?.addEventListener("click", () => this._undo());

@@ -32,6 +32,7 @@ export class StorageMethods {
         this._incomingTargetOverride = true;
       }
       this._targets = fromUrl;
+      this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
     }
     else {
       try {
@@ -47,6 +48,8 @@ export class StorageMethods {
       this._currentSnapshot = this._clone(previous);
       this._activeSnapshot = this._clone(previous.chart);
       this._pendingPeriodRestore = this._clone(previous.period);
+      this._hiddenTargets = this._normalizeTargets(previous.hidden_targets || {});
+      this._pruneHiddenTargets();
     }
   }
 
@@ -220,6 +223,7 @@ export class StorageMethods {
       name,
       saved_at: new Date().toISOString(),
       targets: this._clone(this._targets),
+      hidden_targets: this._clone(this._hiddenTargets),
       chart: {
         card_options: this._clone(this._effectiveCardOptionsConfig()),
         entity_options: this._clone(this._effectiveEntityOptionsConfig()),
@@ -234,6 +238,7 @@ export class StorageMethods {
   _snapshotFingerprint(snapshot) {
     return JSON.stringify({
       targets: snapshot.targets,
+      hidden_targets: snapshot.hidden_targets,
       chart: snapshot.chart,
       period: snapshot.period,
     });
@@ -375,6 +380,8 @@ export class StorageMethods {
       );
     }
     this._targets = this._normalizeTargets(snapshot.targets);
+    this._hiddenTargets = this._normalizeTargets(snapshot.hidden_targets || {});
+    this._pruneHiddenTargets();
     if (!this._targetCount()) this._resetEnergySelection();
     this._saveTargets();
     this._notice = "";

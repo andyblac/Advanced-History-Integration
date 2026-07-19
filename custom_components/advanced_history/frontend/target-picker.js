@@ -85,8 +85,11 @@ export class TargetPickerMethods {
       picker.setAttribute("add-on-top", "");
       picker.setAttribute("compact", "");
       picker.addEventListener("value-changed", (event) => this._nativeTargetsChanged(event));
+      picker.addEventListener("click", (event) => this._nativeTargetChipClicked(event));
       host.replaceChildren(picker);
       this._nativeTargetPicker = picker;
+      await picker.updateComplete;
+      this._syncNativeTargetVisibility();
     } catch (error) {
       console.error("Advanced History: native target picker could not be loaded", error);
       if (host.isConnected) {
@@ -103,6 +106,7 @@ export class TargetPickerMethods {
       this._activeSnapshot = null;
     }
     this._targets = nextTargets;
+    this._pruneHiddenTargets();
     if (!this._targetCount()) this._resetEnergySelection();
     if (this._nativeTargetPicker) {
       this._nativeTargetPicker.value = structuredClone(this._targets);
@@ -113,6 +117,7 @@ export class TargetPickerMethods {
     this._notice = "";
     const removeAll = this.shadowRoot.getElementById("remove-all");
     if (removeAll) removeAll.hidden = !this._targetCount();
+    this._syncNativeTargetVisibility();
     this.shadowRoot.querySelector(".notice")?.remove();
     this._renderGraphs();
   }
@@ -159,25 +164,77 @@ export class TargetPickerMethods {
     return { ...hass, states };
   }
 
-  _renderChips() {
-    const chips = [];
-    for (const id of this._targets.area_id) chips.push(this._chip("area_id", id, this._areaName(id), "mdi:texture-box"));
-    for (const id of this._targets.device_id) chips.push(this._chip("device_id", id, this._deviceName(id), "mdi:devices"));
-    for (const id of this._targets.entity_id) chips.push(this._chip("entity_id", id, this._entityName(id), this._hass.states[id]?.attributes?.icon || "mdi:checkbox-blank-circle-outline"));
-    return chips.join("");
+  _nativeTargetChipClicked(event) {
+    const path = event.composedPath();
+    const chipIndex = path.findIndex(
+      (node) => node?.localName === "ha-target-picker-value-chip"
+    );
+    if (chipIndex < 0) return;
+    const usedChipControl = path.slice(0, chipIndex).some((node) =>
+      node?.localName === "button" ||
+      node?.localName === "ha-icon-button" ||
+      node?.classList?.contains("expand-btn") ||
+      String(node?.getAttribute?.("part") || "").includes("remove")
+    );
+    if (usedChipControl) return;
+    const chip = path[chipIndex];
+    if (!chip?.type || !chip.itemId) return;
+    const kind = `${chip.type}_id`;
+    if (!this._targets[kind]) return;
+    this._toggleTargetVisibility(kind, chip.itemId);
   }
 
-  _chip(kind, id, name, icon) {
-    const remove = this._localize(`ui.components.target-picker.remove_${kind}`, this._localize("ui.common.remove", "Remove"));
-    return `<span class="chip"><ha-icon icon="${this._escape(icon)}"></ha-icon><span class="chip-name">${this._escape(name)}</span><button data-kind="${kind}" data-remove-target="${this._escape(id)}" title="${this._escape(remove)}"><ha-icon icon="mdi:close"></ha-icon></button></span>`;
+  _syncNativeTargetVisibility() {
+    const picker = this._nativeTargetPicker;
+    if (!picker) return;
+    const apply = () => {
+      if (picker !== this._nativeTargetPicker || !picker.shadowRoot) return;
+      picker.shadowRoot.querySelectorAll("ha-target-picker-value-chip").forEach((chip) => {
+        const kind = `${chip.type}_id`;
+        const hidden = Boolean(this._hiddenTargets[kind]?.includes(chip.itemId));
+        const name = kind === "area_id"
+          ? this._areaName(chip.itemId)
+          : kind === "device_id"
+            ? this._deviceName(chip.itemId)
+            : this._entityName(chip.itemId);
+        chip.style.cursor = "pointer";
+        chip.style.opacity = hidden ? ".45" : "";
+        chip.style.filter = hidden ? "grayscale(1)" : "";
+        chip.setAttribute("role", "button");
+        chip.setAttribute("aria-pressed", hidden ? "true" : "false");
+        chip.setAttribute("title", this._customLocalize(hidden ? "show_target" : "hide_target", { target: name }));
+      });
+    };
+    if (picker.updateComplete?.then) picker.updateComplete.then(apply);
+    else queueMicrotask(apply);
+  }
+
+  _toggleTargetVisibility(kind, id) {
+    if (!this._targets[kind]?.includes(id)) return;
+    const hidden = new Set(this._hiddenTargets[kind] || []);
+    if (hidden.has(id)) hidden.delete(id);
+    else hidden.add(id);
+    this._hiddenTargets[kind] = [...hidden];
+    this._recordChange();
+    this._syncNativeTargetVisibility();
+    this._renderGraphs();
+  }
+
+  _pruneHiddenTargets() {
+    const hidden = this._normalizeTargets(this._hiddenTargets || {});
+    for (const kind of ["area_id", "device_id", "entity_id"]) {
+      hidden[kind] = hidden[kind].filter((id) => this._targets[kind].includes(id));
+    }
+    this._hiddenTargets = hidden;
   }
 
   _targetCount(targets = this._targets) { return targets.area_id.length + targets.device_id.length + targets.entity_id.length; }
 
   _resolvedEntityIds() {
-    const ids = new Set(this._targets.entity_id);
-    const selectedDevices = new Set(this._targets.device_id);
-    const selectedAreas = new Set(this._targets.area_id);
+    const hidden = this._normalizeTargets(this._hiddenTargets || {});
+    const ids = new Set(this._targets.entity_id.filter((id) => !hidden.entity_id.includes(id)));
+    const selectedDevices = new Set(this._targets.device_id.filter((id) => !hidden.device_id.includes(id)));
+    const selectedAreas = new Set(this._targets.area_id.filter((id) => !hidden.area_id.includes(id)));
     const deviceById = new Map(this._devices.map((device) => [device.id, device]));
     for (const entity of this._entities) {
       if (entity.disabled_by || (!this.config.include_hidden && entity.hidden_by)) continue;
@@ -225,7 +282,7 @@ export class TargetPickerMethods {
     const search = backdrop.querySelector(".search");
     search.addEventListener("input", () => { this._dialogSearch = search.value; backdrop.querySelector(".target-list").innerHTML = this._dialogRows(); this._bindDialogRows(backdrop); });
     backdrop.querySelector('[data-action="cancel"]').addEventListener("click", () => backdrop.remove());
-    backdrop.querySelector('[data-action="apply"]').addEventListener("click", () => { const nextTargets = this._normalizeTargets(this._draftTargets); if (this._targetCount(this._targets) && !this._targetCount(nextTargets)) { this._archiveCurrentChart(); this._activeSnapshot = null; } this._targets = nextTargets; if (!this._targetCount()) this._resetEnergySelection(); this._saveTargets(); this._recordChange(); this._notice = ""; backdrop.remove(); this._render(); });
+    backdrop.querySelector('[data-action="apply"]').addEventListener("click", () => { const nextTargets = this._normalizeTargets(this._draftTargets); if (this._targetCount(this._targets) && !this._targetCount(nextTargets)) { this._archiveCurrentChart(); this._activeSnapshot = null; } this._targets = nextTargets; this._pruneHiddenTargets(); if (!this._targetCount()) this._resetEnergySelection(); this._saveTargets(); this._recordChange(); this._notice = ""; backdrop.remove(); this._render(); });
     this.shadowRoot.append(backdrop);
     this._bindDialogRows(backdrop);
     search.focus();
@@ -254,7 +311,7 @@ export class TargetPickerMethods {
     }));
   }
 
-  _removeTarget(kind, id) { if (this._targetCount() === 1) { this._archiveCurrentChart(); this._activeSnapshot = null; } this._targets[kind] = this._targets[kind].filter((value) => value !== id); if (!this._targetCount()) this._resetEnergySelection(); this._saveTargets(); this._recordChange(); this._notice = ""; this._render(); }
+  _removeTarget(kind, id) { if (this._targetCount() === 1) { this._archiveCurrentChart(); this._activeSnapshot = null; } this._targets[kind] = this._targets[kind].filter((value) => value !== id); this._pruneHiddenTargets(); if (!this._targetCount()) this._resetEnergySelection(); this._saveTargets(); this._recordChange(); this._notice = ""; this._render(); }
   _areaName(id) { return this._areas.find((area) => area.area_id === id)?.name || id || this._localize("ui.components.device-picker.no_area", "No area"); }
   _deviceName(id) { const device = this._devices.find((item) => item.id === id); return device?.name_by_user || device?.name || id; }
   _entityName(id) { const state = this._hass.states[id]; const registry = this._entities.find((item) => item.entity_id === id); return registry?.name || state?.attributes?.friendly_name || id; }

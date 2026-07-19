@@ -11,7 +11,7 @@
 <p align="center">
   <img alt="Home Assistant custom integration" src="https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-18BCF2?logo=home-assistant&logoColor=white">
   <img alt="HACS custom repository" src="https://img.shields.io/badge/HACS-Custom%20Repository-41BDF5">
-  <img alt="Version 0.5.4" src="https://img.shields.io/badge/version-0.5.4-blue">
+  <img alt="Version 0.5.5" src="https://img.shields.io/badge/version-0.5.5-blue">
   <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-green">
 </p>
 
