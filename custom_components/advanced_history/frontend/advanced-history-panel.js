@@ -1,4 +1,8 @@
-import { CARD_TAG } from "./constants.js";
+import {
+  CARD_DEFAULT_MODULE_URLS,
+  CARD_RESOURCE_MATCH,
+  CARD_TAG,
+} from "./constants.js";
 import { EnergyMethods } from "./energy.js";
 import { GraphMethods } from "./graphs.js";
 import { StorageMethods } from "./storage.js";
@@ -6,7 +10,7 @@ import { panelStyles as css } from "./styles.js";
 import { TargetPickerMethods } from "./target-picker.js";
 import { customLocalize } from "./translations.js";
 
-const PANEL_VERSION = "1.9.6";
+const PANEL_VERSION = "0.5.0";
 
 class AdvancedHistoryPanel extends HTMLElement {
   constructor() {
@@ -36,6 +40,11 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._pendingPeriodRestore = null;
     this._currentSnapshot = null;
     this._incomingTargetOverride = false;
+    this._bookmarkSyncReady = false;
+    this._bookmarkSaveQueue = Promise.resolve();
+    this._periodRestoreLoading = false;
+    this._periodRestoreExpected = null;
+    this._periodRestoreTimer = null;
   }
 
   set hass(value) {
@@ -65,6 +74,8 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;
     this._energyCollection = null;
+    if (this._periodRestoreTimer) window.clearTimeout(this._periodRestoreTimer);
+    this._periodRestoreTimer = null;
   }
 
   async _initialize() {
@@ -84,6 +95,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     await Promise.all([
       this._loadEnergyTranslations(),
       this._ensureCardLoaded(),
+      this._loadSyncedBookmarks(),
       this._loadNativeHistoryPicker().catch((error) => {
         console.error("Advanced History: native target picker preload failed", error);
       }),
@@ -107,19 +119,47 @@ class AdvancedHistoryPanel extends HTMLElement {
     }
   }
 
-  async _ensureCardLoaded() {
-    if (customElements.get(CARD_TAG)) return;
-    const candidates = this.config.card_module_url ? [this.config.card_module_url] : [
-      "/hacsfiles/Statistics-Graph-Chart-Card/statistics-graph-chart-card.js",
-      "/hacsfiles/statistics-graph-chart-card/statistics-graph-chart-card.js",
-    ];
-    for (const url of candidates) {
+  async _ensureCardLoaded(cacheBust = false) {
+    this._cardLoadError = "";
+    if (customElements.get(CARD_TAG)) return true;
+
+    const configured = this.config.card_module_url;
+    const candidates = configured ? [configured] : [];
+    if (!configured) {
+      try {
+        const resources = await this._hass.callWS({ type: "lovelace/resources" });
+        for (const resource of Array.isArray(resources) ? resources : []) {
+          const url = resource?.url;
+          if (typeof url === "string" && url.toLowerCase().includes(CARD_RESOURCE_MATCH)) {
+            candidates.push(url);
+          }
+        }
+      } catch (error) {
+        console.debug("Advanced History: dashboard resources could not be inspected", error);
+      }
+      candidates.push(...CARD_DEFAULT_MODULE_URLS);
+    }
+
+    for (const candidate of [...new Set(candidates)]) {
+      const separator = candidate.includes("?") ? "&" : "?";
+      const url = cacheBust ? `${candidate}${separator}advanced_history_retry=${Date.now()}` : candidate;
       try {
         await import(/* @vite-ignore */ url);
-        if (customElements.get(CARD_TAG)) return;
+        if (customElements.get(CARD_TAG)) return true;
       } catch (error) { console.debug(`Advanced History: unable to import ${url}`, error); }
     }
     this._cardLoadError = this._customLocalize("card_load_error");
+    return false;
+  }
+
+  async _retryCardLoad(button) {
+    if (button) {
+      button.disabled = true;
+      const label = button.querySelector("span");
+      if (label) label.textContent = `${this._localize("ui.common.loading", "Loading")}…`;
+    }
+    await this._ensureCardLoaded(true);
+    this._render();
   }
 
   _loadingView() {
@@ -136,6 +176,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     const graphSettings = this._customLocalize("graph_settings");
     const undo = this._localize("ui.common.undo", "Undo");
     const redo = this._localize("ui.common.redo", "Redo");
+    const dependencyMissing = Boolean(this._cardLoadError);
     this._nativeTargetPicker = null;
     this.shadowRoot.innerHTML = `
       <style>${css}</style>
@@ -149,16 +190,20 @@ class AdvancedHistoryPanel extends HTMLElement {
         <button id="remove-all" class="icon-button" title="${this._escape(removeAll)}" ${this._targetCount() ? "" : "hidden"}><ha-icon icon="mdi:filter-remove-outline"></ha-icon></button>
       </header>
       <main class="content">
-        <section class="filters">
+        ${dependencyMissing ? "" : `<section class="filters">
           <div id="target-picker-host" class="native-target-picker">
             <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
           </div>
         </section>
-        <section id="compare-banner" class="compare-banner" hidden></section>
+        <section id="compare-banner" class="compare-banner" hidden></section>`}
+        <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
+          <ha-circular-progress active size="small"></ha-circular-progress>
+          <span>${this._escape(this._customLocalize("loading_saved_range"))}</span>
+        </section>
         ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
         <section id="charts" class="charts"></section>
       </main>
-      <div id="date-controller" class="energy-nav-floating"></div>`;
+      ${dependencyMissing ? "" : `<div id="date-controller" class="energy-nav-floating"></div>`}`;
     const menu = this.shadowRoot.getElementById("menu");
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
     this.shadowRoot.getElementById("remove-all")?.addEventListener("click", () => { this._archiveCurrentChart(); this._activeSnapshot = null; this._targets = { area_id: [], device_id: [], entity_id: [] }; this._saveTargets(); this._recordChange(); this._notice = ""; this._render(); });
@@ -168,7 +213,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this.shadowRoot.getElementById("redo")?.addEventListener("click", () => this._redo());
     this.shadowRoot.getElementById("settings")?.addEventListener("click", () => this._openGraphEditor());
     this._updateUndoRedoButtons();
-    this._renderNativeTargetPicker();
+    if (!dependencyMissing) this._renderNativeTargetPicker();
     this._renderContent();
   }
 
@@ -177,6 +222,10 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._energyUnsubscribe = null;
     this._cards = [];
     this._graphCards = [];
+    if (this._cardLoadError) {
+      this._renderGraphs();
+      return;
+    }
     this._renderEnergyController();
     this._renderGraphs();
   }

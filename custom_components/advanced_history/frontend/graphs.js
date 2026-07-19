@@ -1,4 +1,4 @@
-import { CARD_TAG } from "./constants.js";
+import { CARD_HACS_INSTALL_URL, CARD_TAG } from "./constants.js";
 
 export class GraphMethods {
   _renderGraphs() {
@@ -8,7 +8,20 @@ export class GraphMethods {
     this._graphCards = [];
     host.replaceChildren();
     if (this._cardLoadError) {
-      host.innerHTML = `<div class="error"><ha-icon icon="mdi:alert-circle-outline"></ha-icon><p>${this._escape(this._cardLoadError)}</p></div>`;
+      const title = this._customLocalize("card_missing_title");
+      const install = this._customLocalize("install_with_hacs");
+      const retry = this._localize("ui.common.retry", "Retry");
+      host.innerHTML = `<div class="error dependency-error">
+        <ha-icon icon="mdi:puzzle-outline"></ha-icon>
+        <h2>${this._escape(title)}</h2>
+        <p>${this._escape(this._cardLoadError)}</p>
+        <div class="dependency-actions">
+          <a class="primary" href="${CARD_HACS_INSTALL_URL}" target="_blank" rel="noopener noreferrer"><ha-icon icon="mdi:open-in-new"></ha-icon><span>${this._escape(install)}</span></a>
+          <button data-action="retry-card"><ha-icon icon="mdi:refresh"></ha-icon><span>${this._escape(retry)}</span></button>
+        </div>
+      </div>`;
+      const retryButton = host.querySelector('[data-action="retry-card"]');
+      retryButton?.addEventListener("click", () => this._retryCardLoad(retryButton));
       return;
     }
     const entityIds = this._resolvedEntityIds();

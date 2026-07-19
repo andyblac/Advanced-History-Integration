@@ -80,6 +80,7 @@ export class EnergyMethods {
     applyMode();
     this._energyUnsubscribe = collection.subscribe((data) => {
       applyMode(data?.compareMode);
+      this._completePeriodRestoreFromData(data, collection);
       if (data?.start) this._recordChange();
     });
     this._recordChange();

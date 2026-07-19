@@ -1,4 +1,4 @@
-import { CARD_TAG } from "./constants.js";
+import { CARD_DEFAULT_MODULE_URLS, CARD_TAG } from "./constants.js";
 import { customLocalize } from "./translations.js";
 
 const INSTALLED_KEY = "__advancedHistoryConfigFlowDefaultsInstalled";
@@ -44,10 +44,7 @@ function findCardDefaultsSelector(root = document) {
 async function ensureCardLoaded(hass) {
   if (customElements.get(CARD_TAG)) return;
   const configured = hass?.panels?.["advanced-history"]?.config?.card_module_url;
-  const candidates = configured ? [configured] : [
-    "/hacsfiles/Statistics-Graph-Chart-Card/statistics-graph-chart-card.js",
-    "/hacsfiles/statistics-graph-chart-card/statistics-graph-chart-card.js",
-  ];
+  const candidates = configured ? [configured] : CARD_DEFAULT_MODULE_URLS;
   for (const url of candidates) {
     try {
       await import(/* @vite-ignore */ url);

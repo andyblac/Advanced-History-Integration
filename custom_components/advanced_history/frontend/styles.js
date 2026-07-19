@@ -52,6 +52,14 @@ export const panelStyles = `
   .charts { display:grid; gap:16px; }
   .compare-banner { margin:-4px 0 16px; }
   .compare-banner[hidden] { display:none; }
+  .loading-banner {
+    min-height:48px; margin:0 0 16px; padding:8px 14px; display:flex; align-items:center; gap:12px;
+    color:var(--primary-text-color); background:var(--card-background-color);
+    border-left:4px solid var(--primary-color); border-radius:4px;
+    box-shadow:var(--ha-card-box-shadow,none);
+  }
+  .loading-banner[hidden] { display:none; }
+  .loading-banner ha-circular-progress { --mdc-theme-primary:var(--primary-color); flex:0 0 auto; }
   .start, .error {
     padding:32px 16px; color:var(--secondary-text-color); text-align:center;
     background:var(--card-background-color); border-radius:var(--ha-card-border-radius,12px);
@@ -59,6 +67,18 @@ export const panelStyles = `
   .start ha-icon, .error ha-icon { width:42px; height:42px; margin-bottom:8px; opacity:.65; }
   .start p, .error p { margin:4px auto; max-width:680px; line-height:1.5; }
   .error { color:var(--error-color); border:1px solid var(--error-color); }
+  .dependency-error { margin-top:16px; }
+  .dependency-error h2 { margin:2px 0 8px; color:var(--primary-text-color); font-size:20px; font-weight:500; }
+  .dependency-error > p { color:var(--secondary-text-color); }
+  .dependency-actions { margin-top:20px; display:flex; justify-content:center; flex-wrap:wrap; gap:10px; }
+  .dependency-actions a, .dependency-actions button {
+    min-height:40px; padding:0 16px; display:inline-flex; align-items:center; justify-content:center; gap:8px;
+    border:1px solid var(--primary-color); border-radius:20px; cursor:pointer; color:var(--primary-color);
+    background:transparent; font:inherit; font-weight:500; text-decoration:none;
+  }
+  .dependency-actions a.primary { color:var(--text-primary-color,white); background:var(--primary-color); }
+  .dependency-actions a ha-icon, .dependency-actions button ha-icon { width:18px; height:18px; margin:0; opacity:1; }
+  .dependency-actions button:disabled { opacity:.55; cursor:default; }
   .notice { margin:0 0 12px; padding:10px 12px; color:var(--warning-color); background:var(--card-background-color); border-left:4px solid var(--warning-color); }
   .backdrop { position:fixed; inset:0; z-index:100; display:grid; place-items:center; padding:20px; background:rgba(0,0,0,.54); }
   .dialog {

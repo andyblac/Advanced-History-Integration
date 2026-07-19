@@ -1,4 +1,6 @@
 import {
+  BOOKMARKS_DIRTY_STORAGE_KEY,
+  BOOKMARKS_LIMIT,
   BOOKMARKS_STORAGE_KEY,
   CURRENT_SNAPSHOT_STORAGE_KEY,
   HISTORY_LIMIT,
@@ -74,7 +76,18 @@ export class StorageMethods {
       : JSON.parse(JSON.stringify(value));
   }
 
-  _loadLibrary(key) {
+  _storageKey(key) {
+    if (key !== BOOKMARKS_STORAGE_KEY) return key;
+    const userId = this._hass?.user?.id;
+    return userId ? `${key}.${userId}` : key;
+  }
+
+  _bookmarkDirtyKey() {
+    const userId = this._hass?.user?.id;
+    return userId ? `${BOOKMARKS_DIRTY_STORAGE_KEY}.${userId}` : BOOKMARKS_DIRTY_STORAGE_KEY;
+  }
+
+  _loadRawLibrary(key) {
     try {
       const value = JSON.parse(localStorage.getItem(key) || "[]");
       return Array.isArray(value) ? value : [];
@@ -83,14 +96,110 @@ export class StorageMethods {
     }
   }
 
-  _saveLibrary(key, items) {
+  _loadLibrary(key) {
+    return this._loadRawLibrary(this._storageKey(key));
+  }
+
+  _saveLocalLibrary(key, items) {
     try {
-      localStorage.setItem(key, JSON.stringify(items));
+      localStorage.setItem(this._storageKey(key), JSON.stringify(items));
       return true;
     } catch (error) {
       console.error("Advanced History: unable to save chart library", error);
       this._notice = this._customLocalize("save_library_error");
       return false;
+    }
+  }
+
+  _bookmarksDirty() {
+    try {
+      return localStorage.getItem(this._bookmarkDirtyKey()) === "1";
+    } catch (_) {
+      return false;
+    }
+  }
+
+  _setBookmarksDirty(dirty) {
+    try {
+      if (dirty) localStorage.setItem(this._bookmarkDirtyKey(), "1");
+      else localStorage.removeItem(this._bookmarkDirtyKey());
+    } catch (_) { /* Server sync can continue without a local dirty marker. */ }
+  }
+
+  async _saveBookmarksToServer(items) {
+    this._setBookmarksDirty(true);
+    await this._hass.callWS({
+      type: "advanced_history/bookmarks/save",
+      bookmarks: this._clone(items),
+    });
+    this._setBookmarksDirty(false);
+  }
+
+  _queueBookmarkSync(items) {
+    const bookmarks = this._clone(items);
+    this._bookmarkSaveQueue = this._bookmarkSaveQueue
+      .catch(() => undefined)
+      .then(() => this._saveBookmarksToServer(bookmarks))
+      .catch((error) => {
+        console.error("Advanced History: unable to sync bookmarks", error);
+        this._notice = this._customLocalize("bookmark_sync_error");
+      });
+  }
+
+  _saveLibrary(key, items) {
+    const savedItems = key === BOOKMARKS_STORAGE_KEY
+      ? items.slice(0, BOOKMARKS_LIMIT)
+      : items;
+    const saved = this._saveLocalLibrary(key, savedItems);
+    if (saved && key === BOOKMARKS_STORAGE_KEY) {
+      if (this._bookmarkSyncReady) this._queueBookmarkSync(savedItems);
+      else this._setBookmarksDirty(true);
+    }
+    return saved;
+  }
+
+  async _loadSyncedBookmarks() {
+    const localBookmarks = this._loadLibrary(BOOKMARKS_STORAGE_KEY)
+      .slice(0, BOOKMARKS_LIMIT);
+
+    try {
+      const result = await this._hass.callWS({ type: "advanced_history/bookmarks/get" });
+      const remoteBookmarks = Array.isArray(result?.bookmarks)
+        ? result.bookmarks.slice(0, BOOKMARKS_LIMIT)
+        : [];
+      const useLocal = this._bookmarksDirty() || !result?.initialized;
+      const bookmarks = useLocal ? localBookmarks : remoteBookmarks;
+      if (useLocal) await this._saveBookmarksToServer(bookmarks);
+      this._saveLocalLibrary(BOOKMARKS_STORAGE_KEY, bookmarks);
+      this._bookmarkSyncReady = true;
+    } catch (error) {
+      console.warn("Advanced History: bookmark sync is unavailable; using this device", error);
+      if (localBookmarks.length) this._setBookmarksDirty(true);
+      this._bookmarkSyncReady = false;
+    }
+  }
+
+  async _refreshSyncedBookmarks() {
+    if (!this._bookmarkSyncReady) {
+      await this._loadSyncedBookmarks();
+      return;
+    }
+
+    await this._bookmarkSaveQueue;
+    try {
+      if (this._bookmarksDirty()) {
+        await this._saveBookmarksToServer(this._loadLibrary(BOOKMARKS_STORAGE_KEY));
+      }
+      const result = await this._hass.callWS({ type: "advanced_history/bookmarks/get" });
+      if (result?.initialized && Array.isArray(result.bookmarks)) {
+        this._saveLocalLibrary(
+          BOOKMARKS_STORAGE_KEY,
+          result.bookmarks.slice(0, BOOKMARKS_LIMIT)
+        );
+      }
+    } catch (error) {
+      console.warn("Advanced History: unable to refresh bookmarks", error);
+      this._notice = this._customLocalize("bookmark_sync_error");
     }
   }
 
@@ -251,6 +360,20 @@ export class StorageMethods {
     }
     this._activeSnapshot = this._clone(snapshot.chart);
     this._pendingPeriodRestore = this._clone(snapshot.period);
+    if (this._pendingPeriodRestore?.start) {
+      this._beginPeriodRestore(this._pendingPeriodRestore);
+    } else {
+      this._finishPeriodRestore();
+    }
+    this._energyUnsubscribe?.();
+    this._energyUnsubscribe = null;
+    if (this._energyCollection && this._pendingPeriodRestore?.start) {
+      this._applyStoredPeriod(
+        this._energyCollection,
+        this._pendingPeriodRestore,
+        false
+      );
+    }
     this._targets = this._normalizeTargets(snapshot.targets);
     this._saveTargets();
     this._notice = "";
@@ -314,21 +437,76 @@ export class StorageMethods {
     return this.config.compare;
   }
 
-  _restorePendingPeriod(collection) {
-    const pendingPeriod = this._pendingPeriodRestore;
-    if (!pendingPeriod?.start || !collection) return false;
-    const start = new Date(pendingPeriod.start);
-    const end = pendingPeriod.end ? new Date(pendingPeriod.end) : undefined;
+  _applyStoredPeriod(collection, period, clearPending = true) {
+    if (!period?.start || !collection) return false;
+    const start = new Date(period.start);
+    const end = period.end ? new Date(period.end) : undefined;
     if (Number.isNaN(start.getTime()) || (end && Number.isNaN(end.getTime()))) {
-      this._pendingPeriodRestore = null;
+      if (clearPending) this._pendingPeriodRestore = null;
+      this._finishPeriodRestore();
       return false;
     }
-    collection.setPeriod(start, end);
+    const currentStart = collection.start instanceof Date
+      ? collection.start.getTime()
+      : new Date(collection.start).getTime();
+    const currentEnd = collection.end == null
+      ? undefined
+      : collection.end instanceof Date
+        ? collection.end.getTime()
+        : new Date(collection.end).getTime();
+    const periodChanged = currentStart !== start.getTime()
+      || currentEnd !== end?.getTime();
+    const compare = period.compare || "";
+    const compareChanged = collection.compare !== compare;
+    if (periodChanged) collection.setPeriod(start, end);
     if (typeof collection.setCompare === "function") {
-      collection.setCompare(pendingPeriod.compare || "");
+      if (compareChanged) collection.setCompare(compare);
     }
-    this._pendingPeriodRestore = null;
-    collection.refresh?.();
+    if (clearPending) this._pendingPeriodRestore = null;
+    if (periodChanged || compareChanged) collection.refresh?.();
+    return true;
+  }
+
+  _restorePendingPeriod(collection) {
+    return this._applyStoredPeriod(collection, this._pendingPeriodRestore);
+  }
+
+  _beginPeriodRestore(period) {
+    this._periodRestoreExpected = this._clone(period);
+    this._periodRestoreLoading = true;
+    if (this._periodRestoreTimer) window.clearTimeout(this._periodRestoreTimer);
+    this._periodRestoreTimer = window.setTimeout(
+      () => this._finishPeriodRestore(),
+      300000
+    );
+  }
+
+  _finishPeriodRestore() {
+    this._periodRestoreLoading = false;
+    this._periodRestoreExpected = null;
+    if (this._periodRestoreTimer) window.clearTimeout(this._periodRestoreTimer);
+    this._periodRestoreTimer = null;
+    const banner = this.shadowRoot?.getElementById("period-loading-banner");
+    if (banner) banner.hidden = true;
+  }
+
+  _completePeriodRestoreFromData(data, collection) {
+    const expected = this._periodRestoreExpected;
+    if (!this._periodRestoreLoading || !expected?.start) return false;
+    const actualStart = data?.start || collection?.start;
+    const actualEnd = data?.end ?? collection?.end;
+    const expectedStart = new Date(expected.start).getTime();
+    const expectedEnd = expected.end ? new Date(expected.end).getTime() : undefined;
+    const start = actualStart instanceof Date
+      ? actualStart.getTime()
+      : new Date(actualStart).getTime();
+    const end = actualEnd == null
+      ? undefined
+      : actualEnd instanceof Date
+        ? actualEnd.getTime()
+        : new Date(actualEnd).getTime();
+    if (start !== expectedStart || end !== expectedEnd) return false;
+    this._finishPeriodRestore();
     return true;
   }
 
@@ -369,9 +547,15 @@ export class StorageMethods {
       </div>`).join("");
   }
 
-  _openLibrary(kind = "bookmarks") {
-    if (this.shadowRoot.querySelector(".backdrop")) return;
-    this._renderLibrary(kind);
+  async _openLibrary(kind = "bookmarks") {
+    if (this.shadowRoot.querySelector(".backdrop") || this._libraryOpening) return;
+    this._libraryOpening = true;
+    try {
+      if (kind === "bookmarks") await this._refreshSyncedBookmarks();
+      this._renderLibrary(kind);
+    } finally {
+      this._libraryOpening = false;
+    }
   }
 
   _renderLibrary(kind) {

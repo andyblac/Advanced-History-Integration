@@ -12,14 +12,14 @@
 <p align="center">
   <img alt="Home Assistant custom integration" src="https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-18BCF2?logo=home-assistant&logoColor=white">
   <img alt="HACS custom repository" src="https://img.shields.io/badge/HACS-Custom%20Repository-41BDF5">
-  <img alt="Version 1.9.6" src="https://img.shields.io/badge/version-1.9.6-blue">
+  <img alt="Version 0.5.0" src="https://img.shields.io/badge/version-0.5.0-blue">
   <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-green">
 </p>
 
 Advanced History provides a Home Assistant-style History page with more powerful graphs, native target selection, Energy date navigation, comparisons, bookmarks and a full visual graph editor.
 
 > [!IMPORTANT]
-> [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) is a separate required dependency. Install it through HACS before installing Advanced History.
+> [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) is a separate required dependency. If it is missing, Advanced History provides an **Install using HACS** link and a **Retry** button.
 
 ## Features
 
@@ -28,7 +28,8 @@ Advanced History provides a Home Assistant-style History page with more powerful
 - Numeric history and state-timeline graphs.
 - Floating Energy-style date navigation.
 - Previous-period and previous-year comparison modes.
-- Named bookmarks containing targets, dates and complete chart settings.
+- User-scoped bookmarks containing targets, dates and complete chart settings, synchronized through Home Assistant across devices.
+- Loading feedback while a saved date range is restored and its data is fetched.
 - Undo and redo controls for incremental chart changes.
 - History of the ten most recent charts cleared or replaced by navigation.
 - Separate visual editors for current-chart settings and Card Defaults.
@@ -37,6 +38,7 @@ Advanced History provides a Home Assistant-style History page with more powerful
 - Administrator-only mode.
 - Native Home Assistant translations wherever matching strings are available.
 - Additional translations for Advanced History-specific wording.
+- Missing graph-card detection with guided HACS installation and in-page retry.
 
 ## Contents
 
@@ -198,7 +200,7 @@ Each snapshot stores:
 - per-entity styling;
 - graph height and default hours.
 
-Restoring a bookmark or History entry changes the current view without overwriting the integration-wide defaults. Bookmarks and chart history are stored in the current browser's local storage, so they are not automatically shared between browsers or devices.
+Restoring a bookmark or History entry changes the current view without overwriting the integration-wide defaults. Bookmarks are stored by Home Assistant user and synchronized whenever the bookmark library is opened, making them available to the same account on other devices. Chart history and Undo/Redo remain in the current browser because they describe that device's editing session.
 
 ## Languages
 
@@ -232,15 +234,19 @@ Remove the old `panel_custom` YAML entry to avoid duplicate sidebar routes. Exis
 
 ### Statistics Graph Chart Card could not be loaded
 
-Confirm the card is installed and registered under **Settings → Dashboards → Resources**. Copy its exact resource URL into **Graph card module URL** in the Advanced History configuration.
+Use **Install using HACS** on the Advanced History error screen, install the card, return to Advanced History and select **Retry**. Advanced History checks registered dashboard resources as well as the standard HACS locations.
+
+If the card is already installed, confirm it is registered under **Settings → Dashboards → Resources**. If its URL is unusual, copy the exact resource URL into **Graph card module URL** in the Advanced History configuration.
 
 ### The panel still shows an older version
 
 Reload the integration, then hard-refresh the browser or clear the Home Assistant frontend cache. The loaded panel version is also written to the browser console.
 
-### Targets or bookmarks differ on another device
+### Bookmarks do not appear on another device
 
-Targets, bookmarks and chart history are stored in browser local storage. Each browser profile maintains its own copy.
+Confirm both devices are signed in with the same Home Assistant user, then reopen **Bookmarks** to refresh the server copy. If synchronization is temporarily unavailable, changes remain cached on the current device and are retried later.
+
+Targets, chart history and Undo/Redo intentionally remain specific to each browser profile.
 
 ### The native target picker does not load
 
@@ -258,7 +264,7 @@ custom_components/advanced_history/
 ├── config_flow.py              # Setup and reconfigure forms
 ├── const.py                    # Constants and visible defaults
 ├── panel.py                    # Frontend/sidebar registration
-├── websocket.py                # Legacy graph-options command module (not registered)
+├── websocket.py                # User-scoped bookmark storage commands
 ├── manifest.json
 ├── brand/
 ├── translations/               # Config-flow translations
