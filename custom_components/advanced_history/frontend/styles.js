@@ -104,6 +104,7 @@ export const panelStyles = `
   .library-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
   .library-summary { display:block; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--secondary-text-color); font-size:12px; }
   .library-row .delete { width:40px; padding:8px; color:var(--secondary-text-color); }
+  .library-row .update { width:40px; padding:8px; color:var(--primary-color); }
   .library-empty { padding:40px 20px; color:var(--secondary-text-color); text-align:center; }
   .dialog-title { min-height:64px; padding:0 24px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--divider-color); }
   .dialog-title h2 { margin:0; font-size:20px; font-weight:500; }

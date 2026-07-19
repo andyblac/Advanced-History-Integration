@@ -18,6 +18,7 @@ export class StorageMethods {
     const previous = this._loadCurrentSnapshot();
     const hasUrlTargets = Object.values(fromUrl).some((items) => items.length);
     if (hasUrlTargets) {
+      this._loadedBookmarkId = null;
       if (
         previous?.targets &&
         this._targetCount(this._normalizeTargets(previous.targets)) &&
@@ -46,6 +47,7 @@ export class StorageMethods {
       JSON.stringify(this._normalizeTargets(previous.targets)) === JSON.stringify(this._targets)
     ) {
       this._currentSnapshot = this._clone(previous);
+      this._loadedBookmarkId = previous.source_bookmark_id || null;
       this._activeSnapshot = this._clone(previous.chart);
       this._pendingPeriodRestore = this._clone(previous.period);
       this._hiddenTargets = this._normalizeTargets(previous.hidden_targets || {});
@@ -232,6 +234,7 @@ export class StorageMethods {
         compare: this._clone(this._snapshotCompareSetting()),
       },
       period,
+      source_bookmark_id: this._loadedBookmarkId || null,
     };
   }
 
@@ -274,6 +277,10 @@ export class StorageMethods {
 
   _recordChange(snapshot = null) {
     const source = snapshot ? this._clone(snapshot) : this._captureSnapshot();
+    if (!this._targetCount(this._normalizeTargets(source.targets || {}))) {
+      this._loadedBookmarkId = null;
+    }
+    source.source_bookmark_id = this._loadedBookmarkId || null;
     source.id = this._newSnapshotId();
     source.name = this._snapshotLabel(source);
     source.saved_at = new Date().toISOString();
@@ -333,6 +340,7 @@ export class StorageMethods {
     this._saveLibrary(sourceKey, source.slice(1));
     this._saveLibrary(destinationKey, [this._clone(current), ...destination].slice(0, UNDO_LIMIT));
     this._currentSnapshot = this._clone(restored);
+    this._loadedBookmarkId = restored.source_bookmark_id || null;
     this._saveCurrentSnapshot(restored);
     this._applySnapshot(restored, false);
   }
@@ -347,11 +355,43 @@ export class StorageMethods {
 
   _saveCurrentBookmark(name) {
     const snapshot = this._captureSnapshot(name.trim() || this._snapshotLabel());
+    delete snapshot.source_bookmark_id;
     const items = this._loadLibrary(BOOKMARKS_STORAGE_KEY);
     if (this._saveLibrary(BOOKMARKS_STORAGE_KEY, [snapshot, ...items])) {
+      this._loadedBookmarkId = snapshot.id;
+      this._recordChange();
       return true;
     }
     return false;
+  }
+
+  _bookmarkHasChanges(bookmark) {
+    if (!bookmark || bookmark.id !== this._loadedBookmarkId) return false;
+    const current = this._currentSnapshot || this._captureSnapshot();
+    if (!this._targetCount(this._normalizeTargets(current.targets || {}))) return false;
+    return this._snapshotFingerprint(bookmark) !== this._snapshotFingerprint(current);
+  }
+
+  _updateBookmark(id) {
+    const items = this._loadLibrary(BOOKMARKS_STORAGE_KEY);
+    const index = items.findIndex((item) => item.id === id);
+    if (index === -1) return false;
+    const current = this._captureSnapshot(items[index].name || this._snapshotLabel(items[index]));
+    current.id = items[index].id;
+    delete current.source_bookmark_id;
+    items[index] = current;
+    if (!this._saveLibrary(BOOKMARKS_STORAGE_KEY, items)) return false;
+    this._loadedBookmarkId = current.id;
+    this._recordChange();
+    return true;
+  }
+
+  _clearLoadedBookmark(id = null) {
+    if (id && this._loadedBookmarkId !== id) return;
+    this._loadedBookmarkId = null;
+    if (!this._currentSnapshot) return;
+    this._currentSnapshot.source_bookmark_id = null;
+    this._saveCurrentSnapshot(this._currentSnapshot);
   }
 
   _applySnapshot(snapshot, recordChange = true) {
@@ -542,15 +582,17 @@ export class StorageMethods {
     return `${targetCount} · ${period} · ${height}px · ${this._formatSnapshotTime(snapshot.saved_at)}`;
   }
 
-  _libraryRows(items) {
+  _libraryRows(items, isBookmarks = false) {
     if (!items.length) return `<div class="library-empty">${this._escape(this._customLocalize("nothing_saved"))}</div>`;
     const deleteLabel = this._localize("ui.common.delete", "Delete");
+    const updateLabel = this._customLocalize("update_bookmark");
     return items.map((item) => `
       <div class="library-row">
         <button class="library-main" data-open-snapshot="${this._escape(item.id)}">
           <span class="library-name">${this._escape(item.name || this._snapshotLabel(item))}</span>
           <span class="library-summary">${this._escape(this._snapshotSummary(item))}</span>
         </button>
+        ${isBookmarks && this._bookmarkHasChanges(item) ? `<button class="update" data-update-snapshot="${this._escape(item.id)}" title="${this._escape(updateLabel)}"><ha-icon icon="mdi:update"></ha-icon></button>` : ""}
         <button class="delete" data-delete-snapshot="${this._escape(item.id)}" title="${this._escape(deleteLabel)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>
       </div>`).join("");
   }
@@ -579,7 +621,7 @@ export class StorageMethods {
     backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${title}">
       <header class="dialog-title"><h2>${title}</h2><span class="count">${items.length}${isBookmarks ? "" : ` / ${HISTORY_LIMIT}`}</span></header>
       ${isBookmarks ? `<div class="library-save"><input id="bookmark-name" maxlength="80" placeholder="${this._escape(this._customLocalize("bookmark_name"))}" value="${this._escape(this._snapshotLabel())}"><button data-action="save-current">${this._escape(this._customLocalize("save_current"))}</button></div>` : ""}
-      <div class="library-list">${this._libraryRows(items)}</div>
+      <div class="library-list">${this._libraryRows(items, isBookmarks)}</div>
       <footer class="dialog-actions"><button data-action="clear" style="margin-right:auto" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</button><button data-action="close">${this._escape(close)}</button></footer>
     </section>`;
     backdrop.addEventListener("click", (event) => { if (event.target === backdrop) backdrop.remove(); });
@@ -591,14 +633,21 @@ export class StorageMethods {
     backdrop.querySelector('[data-action="clear"]').addEventListener("click", () => {
       const message = this._customLocalize(isBookmarks ? "confirm_clear_bookmarks" : "confirm_clear_history");
       if (!items.length || !window.confirm(message)) return;
+      if (isBookmarks) this._clearLoadedBookmark();
       this._saveLibrary(key, []);
       this._renderLibrary(kind);
     });
     backdrop.querySelectorAll("[data-open-snapshot]").forEach((button) => button.addEventListener("click", () => {
       const snapshot = items.find((item) => item.id === button.dataset.openSnapshot);
-      if (snapshot) this._applySnapshot(snapshot);
+      if (!snapshot) return;
+      this._loadedBookmarkId = isBookmarks ? snapshot.id : null;
+      this._applySnapshot(snapshot);
+    }));
+    backdrop.querySelectorAll("[data-update-snapshot]").forEach((button) => button.addEventListener("click", () => {
+      if (this._updateBookmark(button.dataset.updateSnapshot)) this._renderLibrary(kind);
     }));
     backdrop.querySelectorAll("[data-delete-snapshot]").forEach((button) => button.addEventListener("click", () => {
+      if (isBookmarks) this._clearLoadedBookmark(button.dataset.deleteSnapshot);
       this._saveLibrary(key, items.filter((item) => item.id !== button.dataset.deleteSnapshot));
       this._renderLibrary(kind);
     }));

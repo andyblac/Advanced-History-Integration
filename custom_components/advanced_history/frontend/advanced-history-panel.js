@@ -42,6 +42,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._incomingTargetOverride = false;
     this._bookmarkSyncReady = false;
     this._bookmarkSaveQueue = Promise.resolve();
+    this._loadedBookmarkId = null;
     this._periodRestoreLoading = false;
     this._periodRestoreExpected = null;
     this._periodRestoreTimer = null;
