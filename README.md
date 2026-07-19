@@ -89,7 +89,7 @@ Full setup, usage, configuration, and troubleshooting documentation is available
 
 Special thanks to [cataseven](https://github.com/cataseven) for creating [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card), and for allowing and supporting its use in this project.
 
-Graph rendering and the visual graph editor are provided at runtime by Statistics Graph Chart Card. It is not bundled with Advanced History and remains licensed under the [Apache License 2.0](https://github.com/cataseven/Statistics-Graph-Chart-Card/blob/main/LICENSE).
+Graph rendering and the visual graph editor are provided at runtime by Statistics Graph Chart Card. It is not bundled with Advanced History and remains licensed under the [GNU General Public License v3.0](https://github.com/cataseven/Statistics-Graph-Chart-Card/blob/main/LICENSE).
 
 Native controls and localization are supplied by the [Home Assistant frontend](https://github.com/home-assistant/frontend). [HACS](https://www.hacs.xyz/) provides the optional community installation and update channel.
 
