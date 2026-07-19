@@ -10,7 +10,7 @@ import { panelStyles as css } from "./styles.js";
 import { TargetPickerMethods } from "./target-picker.js";
 import { customLocalize } from "./translations.js";
 
-const PANEL_VERSION = "0.5.0";
+const PANEL_VERSION = "0.5.1";
 
 class AdvancedHistoryPanel extends HTMLElement {
   constructor() {

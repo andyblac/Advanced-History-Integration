@@ -128,7 +128,9 @@ export const panelStyles = `
   @media (max-width:600px) {
     .content { padding:0 12px 96px; }
     .energy-nav-floating { left:8px; right:8px; bottom:max(8px,env(safe-area-inset-bottom)); width:calc(100vw - 16px); }
-    .appbar { padding:0 12px; }
+    .appbar { padding:0 4px; gap:0; }
+    .appbar h1 { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:16px; }
+    .appbar .icon-button { flex:0 0 40px; }
     .dialog { height:100%; border-radius:0; }
     .backdrop { padding:0; }
     .tab { flex:1; padding:0 4px; }
