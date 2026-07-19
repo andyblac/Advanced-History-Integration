@@ -10,8 +10,6 @@ import { panelStyles as css } from "./styles.js";
 import { TargetPickerMethods } from "./target-picker.js";
 import { customLocalize } from "./translations.js";
 
-const PANEL_VERSION = "0.5.5";
-
 class AdvancedHistoryPanel extends HTMLElement {
   constructor() {
     super();
@@ -48,6 +46,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._periodRestoreExpected = null;
     this._periodRestoreTimer = null;
     this._energyResetPending = false;
+    this._versionLogged = false;
   }
 
   set hass(value) {
@@ -60,7 +59,14 @@ class AdvancedHistoryPanel extends HTMLElement {
     if (!this._loaded && value) this._initialize();
   }
   get hass() { return this._hass; }
-  set panel(value) { this._panel = value; if (!this._loaded && this._hass) this._initialize(); }
+  set panel(value) {
+    this._panel = value;
+    if (!this._versionLogged && this.config.integration_version) {
+      console.info(`%c ADVANCED-HISTORY-PANEL %c v${this.config.integration_version} `, "color:white;background:#03a9f4;font-weight:700", "color:#03a9f4;background:white");
+      this._versionLogged = true;
+    }
+    if (!this._loaded && this._hass) this._initialize();
+  }
   get panel() { return this._panel; }
   set narrow(value) { this._narrow = value; }
   get narrow() { return this._narrow; }
@@ -265,4 +271,3 @@ for (const methods of [
 }
 
 if (!customElements.get("advanced-history-panel")) customElements.define("advanced-history-panel", AdvancedHistoryPanel);
-console.info(`%c ADVANCED-HISTORY-PANEL %c v${PANEL_VERSION} `, "color:white;background:#03a9f4;font-weight:700", "color:#03a9f4;background:white");

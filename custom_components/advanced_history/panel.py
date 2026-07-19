@@ -18,6 +18,7 @@ from .const import (
     PANEL_MODULE_URL,
     PANEL_URL_PATH,
     REDIRECT_MODULE_URL,
+    VERSION,
     options_with_defaults,
 )
 
@@ -46,6 +47,7 @@ def _panel_config(entry: ConfigEntry) -> tuple[dict, dict]:
     }
     panel_config["config_entry_id"] = entry.entry_id
     panel_config["settings_path"] = f"/config/integrations/integration/{DOMAIN}"
+    panel_config["integration_version"] = VERSION
 
     compare = options[CONF_COMPARE]
     if compare == "disabled":

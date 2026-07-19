@@ -1,10 +1,15 @@
 """Constants for Advanced History."""
 
+import json
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Mapping
 
 DOMAIN = "advanced_history"
-VERSION = "0.5.5"
+# Keep manifest.json as the single editable source for the integration version.
+VERSION = json.loads(
+    Path(__file__).with_name("manifest.json").read_text(encoding="utf-8")
+)["version"]
 
 PANEL_URL_PATH = "advanced-history"
 PANEL_ELEMENT = "advanced-history-panel"
