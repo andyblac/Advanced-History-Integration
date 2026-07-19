@@ -4,7 +4,7 @@ from copy import deepcopy
 from typing import Any, Mapping
 
 DOMAIN = "advanced_history"
-VERSION = "0.5.1"
+VERSION = "0.5.4"
 
 PANEL_URL_PATH = "advanced-history"
 PANEL_ELEMENT = "advanced-history-panel"

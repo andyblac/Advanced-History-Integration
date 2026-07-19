@@ -67,7 +67,11 @@ export class EnergyMethods {
     }
     this._energyCollection = collection;
 
-    this._restorePendingPeriod(collection);
+    if (this._energyResetPending || !this._targetCount()) {
+      this._resetEnergySelection(collection);
+    } else {
+      this._restorePendingPeriod(collection);
+    }
 
     const applyMode = (mode = collection.compare) => {
       if (this._energyRenderToken !== token) return;
@@ -90,6 +94,32 @@ export class EnergyMethods {
     };
     host.addEventListener("click", syncAfterInteraction);
     compareHost.addEventListener("click", syncAfterInteraction);
+  }
+
+  _resetEnergySelection(collection = this._energyCollection) {
+    this._pendingPeriodRestore = null;
+    this._finishPeriodRestore();
+    this._energyCompare = null;
+    const compareHost = this.shadowRoot?.getElementById("compare-banner");
+    if (compareHost) compareHost.hidden = true;
+
+    if (!collection) {
+      this._energyResetPending = true;
+      return false;
+    }
+
+    this._energyResetPending = false;
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    const periodChanged = collection.start?.getTime?.() !== start.getTime()
+      || collection.end?.getTime?.() !== end.getTime();
+    const compareChanged = Boolean(collection.compare);
+    if (periodChanged) collection.setPeriod(start, end);
+    if (compareChanged) collection.setCompare?.("");
+    if (periodChanged || compareChanged) collection.refresh?.();
+    return periodChanged || compareChanged;
   }
 
 }

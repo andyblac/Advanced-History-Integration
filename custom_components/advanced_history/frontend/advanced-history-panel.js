@@ -10,7 +10,7 @@ import { panelStyles as css } from "./styles.js";
 import { TargetPickerMethods } from "./target-picker.js";
 import { customLocalize } from "./translations.js";
 
-const PANEL_VERSION = "0.5.1";
+const PANEL_VERSION = "0.5.4";
 
 class AdvancedHistoryPanel extends HTMLElement {
   constructor() {
@@ -26,6 +26,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._activeTab = "area_id";
     this._dialogSearch = "";
     this._loaded = false;
+    this._initialized = false;
     this._cards = [];
     this._graphCards = [];
     this._cardLoadError = "";
@@ -45,6 +46,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._periodRestoreLoading = false;
     this._periodRestoreExpected = null;
     this._periodRestoreTimer = null;
+    this._energyResetPending = false;
   }
 
   set hass(value) {
@@ -70,7 +72,15 @@ class AdvancedHistoryPanel extends HTMLElement {
     return customLocalize(language, key, replacements);
   }
 
+  connectedCallback() {
+    if (!this._initialized || !this._hass) return;
+    queueMicrotask(() => {
+      if (this.isConnected && !this._energyUnsubscribe) this._render();
+    });
+  }
+
   disconnectedCallback() {
+    this._energyRenderToken = null;
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;
     this._energyCollection = null;
@@ -100,7 +110,8 @@ class AdvancedHistoryPanel extends HTMLElement {
         console.error("Advanced History: native target picker preload failed", error);
       }),
     ]);
-    this._render();
+    this._initialized = true;
+    if (this.isConnected) this._render();
   }
 
   async _loadEnergyTranslations() {
@@ -206,7 +217,7 @@ class AdvancedHistoryPanel extends HTMLElement {
       ${dependencyMissing ? "" : `<div id="date-controller" class="energy-nav-floating"></div>`}`;
     const menu = this.shadowRoot.getElementById("menu");
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
-    this.shadowRoot.getElementById("remove-all")?.addEventListener("click", () => { this._archiveCurrentChart(); this._activeSnapshot = null; this._targets = { area_id: [], device_id: [], entity_id: [] }; this._saveTargets(); this._recordChange(); this._notice = ""; this._render(); });
+    this.shadowRoot.getElementById("remove-all")?.addEventListener("click", () => { this._archiveCurrentChart(); this._activeSnapshot = null; this._targets = { area_id: [], device_id: [], entity_id: [] }; this._resetEnergySelection(); this._saveTargets(); this._recordChange(); this._notice = ""; this._render(); });
     this.shadowRoot.getElementById("bookmarks")?.addEventListener("click", () => this._openLibrary());
     this.shadowRoot.getElementById("chart-history")?.addEventListener("click", () => this._openLibrary("history"));
     this.shadowRoot.getElementById("undo")?.addEventListener("click", () => this._undo());

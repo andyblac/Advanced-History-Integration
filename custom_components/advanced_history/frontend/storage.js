@@ -375,6 +375,7 @@ export class StorageMethods {
       );
     }
     this._targets = this._normalizeTargets(snapshot.targets);
+    if (!this._targetCount()) this._resetEnergySelection();
     this._saveTargets();
     this._notice = "";
     if (recordChange) this._recordChange(snapshot);

@@ -17,10 +17,13 @@ export const panelStyles = `
   .filters { display:flex; align-items:flex-start; gap:16px; margin-bottom:16px; }
   .energy-nav-floating {
     position:fixed; z-index:20; left:16px; right:16px; bottom:max(12px,env(safe-area-inset-bottom));
-    width:min(720px,calc(100vw - 32px)); margin-inline:auto;
+    width:min(600px,calc(100vw - 32px)); margin-inline:auto;
     filter:drop-shadow(0 3px 8px rgba(0,0,0,.28));
   }
-  .energy-nav-floating > * { width:100%; }
+  .energy-nav-floating > * {
+    display:block; width:100%; height:56px !important; min-height:0; max-height:56px;
+    --ha-card-border-radius:28px;
+  }
   .target-picker {
     flex:1; min-height:56px; padding:7px 10px; border:1px solid var(--divider-color); border-radius:4px;
     background:var(--card-background-color); display:flex; align-items:center; flex-wrap:wrap; gap:7px; cursor:text;
