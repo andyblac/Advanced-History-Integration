@@ -11,7 +11,7 @@
 <p align="center">
   <img alt="Home Assistant custom integration" src="https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-18BCF2?logo=home-assistant&logoColor=white">
   <img alt="HACS custom repository" src="https://img.shields.io/badge/HACS-Custom%20Repository-41BDF5">
-  <img alt="Latest version" src="https://img.shields.io/github/v/tag/andyblac/Advanced-History-Integration?include_prereleases&sort=semver&label=version">
+  <img alt="Version" src="https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fraw.githubusercontent.com%2Fandyblac%2FAdvanced-History-Integration%2Fmaster%2Fcustom_components%2Fadvanced_history%2Fmanifest.json&amp;query=%24.version&amp;label=version&amp;color=blue">
   <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-green">
 </p>
 
