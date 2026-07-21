@@ -125,6 +125,9 @@ export const panelStyles = `
   .dialog-actions { min-height:64px; padding:10px 18px; display:flex; align-items:center; justify-content:flex-end; gap:8px; border-top:1px solid var(--divider-color); }
   .dialog-actions button { min-width:84px; height:40px; padding:0 14px; border:0; border-radius:8px; cursor:pointer; color:var(--primary-color); background:transparent; font-weight:500; }
   .dialog-actions button.primary { color:var(--text-primary-color,white); background:var(--primary-color); }
+  .diagnostics-dialog { max-width:900px; }
+  .diagnostics-note { padding:14px 24px; color:var(--secondary-text-color); border-bottom:1px solid var(--divider-color); }
+  .diagnostics-preview { flex:1; min-height:0; margin:0; padding:18px 24px; overflow:auto; color:var(--primary-text-color); background:var(--primary-background-color); font:13px/1.5 var(--code-font-family,monospace); white-space:pre; tab-size:2; }
   @media (max-width:900px) {
     .filters { flex-direction:column; gap:8px; }
     .target-picker { width:100%; min-width:0; }

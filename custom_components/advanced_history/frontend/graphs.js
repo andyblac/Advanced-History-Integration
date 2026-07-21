@@ -268,16 +268,18 @@ export class GraphMethods {
     const loading = this._localize("ui.common.loading", "Loading");
     const graphSettings = this._customLocalize("graph_settings");
     const editorNote = this._customLocalize("graph_editor_note");
+    const diagnostics = this._customLocalize("diagnostics");
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop";
     backdrop.innerHTML = `<section class="dialog editor-dialog" role="dialog" aria-modal="true" aria-label="${this._escape(graphSettings)}">
       <header class="dialog-title"><h2>${this._escape(graphSettings)}</h2></header>
       <div class="editor-note">${this._escape(editorNote)}</div>
       <div class="editor-host"><div class="start"><p>${this._escape(loading)}…</p></div></div>
-      <footer class="dialog-actions"><span class="editor-status"></span><button data-action="cancel">${this._escape(cancel)}</button><button class="primary" data-action="save">${this._escape(saveLabel)}</button></footer>
+      <footer class="dialog-actions"><button class="dialog-leading-action" data-action="diagnostics">${this._escape(diagnostics)}</button><span class="editor-status"></span><button data-action="cancel">${this._escape(cancel)}</button><button class="primary" data-action="save">${this._escape(saveLabel)}</button></footer>
     </section>`;
     backdrop.addEventListener("click", (event) => { if (event.target === backdrop) backdrop.remove(); });
     backdrop.querySelector('[data-action="cancel"]').addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector('[data-action="diagnostics"]').addEventListener("click", () => this._openDiagnostics());
     this.shadowRoot.append(backdrop);
 
     const host = backdrop.querySelector(".editor-host");

@@ -34,7 +34,12 @@ const TRANSLATIONS = {
     "copy_share_link": "Copy share link",
     "share_link_copied": "Share link copied",
     "share_link_error": "Share link could not be copied",
-    "shared_link_invalid": "This shared chart link is invalid or is not supported by this browser."
+    "shared_link_invalid": "This shared chart link is invalid or is not supported by this browser.",
+    "diagnostics": "Diagnostics",
+    "diagnostics_note": "Review this privacy-safe report before copying it. It excludes history values, names, registry IDs, bookmarks and Home Assistant URLs.",
+    "copy_diagnostics": "Copy diagnostics",
+    "diagnostics_copied": "Diagnostics copied",
+    "diagnostics_copy_error": "Diagnostics could not be copied"
   },
   "en-GB": {
     "bookmarks": "Bookmarks",
@@ -71,7 +76,12 @@ const TRANSLATIONS = {
     "copy_share_link": "Copy share link",
     "share_link_copied": "Share link copied",
     "share_link_error": "Share link could not be copied",
-    "shared_link_invalid": "This shared chart link is invalid or is not supported by this browser."
+    "shared_link_invalid": "This shared chart link is invalid or is not supported by this browser.",
+    "diagnostics": "Diagnostics",
+    "diagnostics_note": "Review this privacy-safe report before copying it. It excludes history values, names, registry IDs, bookmarks and Home Assistant URLs.",
+    "copy_diagnostics": "Copy diagnostics",
+    "diagnostics_copied": "Diagnostics copied",
+    "diagnostics_copy_error": "Diagnostics could not be copied"
   },
   "de": {
     "bookmarks": "Lesezeichen",
@@ -108,7 +118,12 @@ const TRANSLATIONS = {
     "copy_share_link": "Freigabelink kopieren",
     "share_link_copied": "Freigabelink kopiert",
     "share_link_error": "Freigabelink konnte nicht kopiert werden",
-    "shared_link_invalid": "Dieser freigegebene Diagrammlink ist ungültig oder wird von diesem Browser nicht unterstützt."
+    "shared_link_invalid": "Dieser freigegebene Diagrammlink ist ungültig oder wird von diesem Browser nicht unterstützt.",
+    "diagnostics": "Diagnose",
+    "diagnostics_note": "Prüfe diesen datenschutzfreundlichen Bericht vor dem Kopieren. Verlaufswerte, Namen, Registry-IDs, Lesezeichen und Home-Assistant-URLs sind ausgeschlossen.",
+    "copy_diagnostics": "Diagnose kopieren",
+    "diagnostics_copied": "Diagnose kopiert",
+    "diagnostics_copy_error": "Diagnose konnte nicht kopiert werden"
   },
   "es": {
     "bookmarks": "Marcadores",
@@ -145,7 +160,12 @@ const TRANSLATIONS = {
     "copy_share_link": "Copiar enlace para compartir",
     "share_link_copied": "Enlace copiado",
     "share_link_error": "No se pudo copiar el enlace",
-    "shared_link_invalid": "Este enlace de gráfico compartido no es válido o no es compatible con este navegador."
+    "shared_link_invalid": "Este enlace de gráfico compartido no es válido o no es compatible con este navegador.",
+    "diagnostics": "Diagnóstico",
+    "diagnostics_note": "Revisa este informe seguro para la privacidad antes de copiarlo. Excluye valores del historial, nombres, IDs del registro, marcadores y URLs de Home Assistant.",
+    "copy_diagnostics": "Copiar diagnóstico",
+    "diagnostics_copied": "Diagnóstico copiado",
+    "diagnostics_copy_error": "No se pudo copiar el diagnóstico"
   },
   "fr": {
     "bookmarks": "Favoris",
@@ -182,7 +202,12 @@ const TRANSLATIONS = {
     "copy_share_link": "Copier le lien de partage",
     "share_link_copied": "Lien de partage copié",
     "share_link_error": "Impossible de copier le lien de partage",
-    "shared_link_invalid": "Ce lien de graphique partagé est invalide ou n’est pas pris en charge par ce navigateur."
+    "shared_link_invalid": "Ce lien de graphique partagé est invalide ou n’est pas pris en charge par ce navigateur.",
+    "diagnostics": "Diagnostic",
+    "diagnostics_note": "Vérifiez ce rapport respectueux de la vie privée avant de le copier. Il exclut les valeurs d’historique, les noms, les identifiants de registre, les favoris et les URL Home Assistant.",
+    "copy_diagnostics": "Copier le diagnostic",
+    "diagnostics_copied": "Diagnostic copié",
+    "diagnostics_copy_error": "Le diagnostic n’a pas pu être copié"
   },
   "it": {
     "bookmarks": "Segnalibri",
@@ -219,7 +244,12 @@ const TRANSLATIONS = {
     "copy_share_link": "Copia link di condivisione",
     "share_link_copied": "Link di condivisione copiato",
     "share_link_error": "Impossibile copiare il link di condivisione",
-    "shared_link_invalid": "Questo link al grafico condiviso non è valido o non è supportato da questo browser."
+    "shared_link_invalid": "Questo link al grafico condiviso non è valido o non è supportato da questo browser.",
+    "diagnostics": "Diagnostica",
+    "diagnostics_note": "Controlla questo rapporto rispettoso della privacy prima di copiarlo. Esclude valori della cronologia, nomi, ID del registro, segnalibri e URL di Home Assistant.",
+    "copy_diagnostics": "Copia diagnostica",
+    "diagnostics_copied": "Diagnostica copiata",
+    "diagnostics_copy_error": "Impossibile copiare la diagnostica"
   },
   "nl": {
     "bookmarks": "Bladwijzers",
@@ -256,7 +286,12 @@ const TRANSLATIONS = {
     "copy_share_link": "Deellink kopiëren",
     "share_link_copied": "Deellink gekopieerd",
     "share_link_error": "Deellink kon niet worden gekopieerd",
-    "shared_link_invalid": "Deze gedeelde grafiekkoppeling is ongeldig of wordt niet door deze browser ondersteund."
+    "shared_link_invalid": "Deze gedeelde grafiekkoppeling is ongeldig of wordt niet door deze browser ondersteund.",
+    "diagnostics": "Diagnostiek",
+    "diagnostics_note": "Controleer dit privacyveilige rapport voordat je het kopieert. Geschiedeniswaarden, namen, register-ID’s, bladwijzers en Home Assistant-URL’s zijn uitgesloten.",
+    "copy_diagnostics": "Diagnostiek kopiëren",
+    "diagnostics_copied": "Diagnostiek gekopieerd",
+    "diagnostics_copy_error": "Diagnostiek kon niet worden gekopieerd"
   },
   "pt-BR": {
     "bookmarks": "Favoritos",
@@ -293,7 +328,12 @@ const TRANSLATIONS = {
     "copy_share_link": "Copiar link de compartilhamento",
     "share_link_copied": "Link de compartilhamento copiado",
     "share_link_error": "Não foi possível copiar o link de compartilhamento",
-    "shared_link_invalid": "Este link de gráfico compartilhado é inválido ou não é compatível com este navegador."
+    "shared_link_invalid": "Este link de gráfico compartilhado é inválido ou não é compatível com este navegador.",
+    "diagnostics": "Diagnóstico",
+    "diagnostics_note": "Revise este relatório seguro para privacidade antes de copiá-lo. Ele exclui valores de histórico, nomes, IDs de registro, favoritos e URLs do Home Assistant.",
+    "copy_diagnostics": "Copiar diagnóstico",
+    "diagnostics_copied": "Diagnóstico copiado",
+    "diagnostics_copy_error": "Não foi possível copiar o diagnóstico"
   }
 };
 

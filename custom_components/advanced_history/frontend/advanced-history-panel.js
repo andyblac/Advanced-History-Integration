@@ -4,6 +4,7 @@ import {
   CARD_TAG,
 } from "./constants.js";
 import { EnergyMethods } from "./energy.js";
+import { DiagnosticsMethods } from "./diagnostics.js";
 import { GraphMethods } from "./graphs.js";
 import { ShareMethods } from "./share.js";
 import { StorageMethods } from "./storage.js";
@@ -262,6 +263,7 @@ for (const methods of [
   TargetPickerMethods,
   GraphMethods,
   EnergyMethods,
+  DiagnosticsMethods,
 ]) {
   for (const name of Object.getOwnPropertyNames(methods.prototype)) {
     if (name === "constructor") continue;
