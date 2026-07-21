@@ -1,7 +1,9 @@
 import { ensureCardLoaded, installConfigFlowDefaultsEditor } from "./config-flow-defaults.js";
 import { CARD_TAG } from "./constants.js";
 
-const INSTALL_KEY = "__advancedHistoryShowMoreRedirectInstalled";
+// Keep the legacy global value so an update cannot install duplicate listeners
+// in a browser session that still has the previous module loaded.
+const SHOW_MORE_REDIRECT_INSTALL_KEY = "__advancedHistoryShowMoreRedirectInstalled";
 const PANEL_PATH = "/advanced-history";
 const PANEL_KEY = "advanced-history";
 const MORE_INFO_PATCH_KEY = "__advancedHistoryMoreInfoPatched";
@@ -315,8 +317,8 @@ function rewriteShowMoreLink(event) {
   link.href = `${target.pathname}${target.search}`;
 }
 
-if (!window[INSTALL_KEY]) {
-  window[INSTALL_KEY] = true;
+if (!window[SHOW_MORE_REDIRECT_INSTALL_KEY]) {
+  window[SHOW_MORE_REDIRECT_INSTALL_KEY] = true;
   // Rewriting the real anchor preserves Home Assistant's normal navigation,
   // including dialog closure, modifier keys, new tabs, and browser history.
   document.addEventListener("click", rewriteShowMoreLink, true);

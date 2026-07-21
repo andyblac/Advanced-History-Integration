@@ -14,7 +14,7 @@ VERSION = json.loads(
 PANEL_URL_PATH = "advanced-history"
 PANEL_ELEMENT = "advanced-history-panel"
 PANEL_MODULE_URL = f"/advanced_history/advanced-history-panel.js?v={VERSION}"
-REDIRECT_MODULE_URL = f"/advanced_history/advanced-history-redirect.js?v={VERSION}"
+MORE_INFO_MODULE_URL = f"/advanced_history/advanced-history-more-info.js?v={VERSION}"
 
 CONF_TITLE = "title"
 CONF_ENTRY_TYPE = "entry_type"

@@ -15,10 +15,10 @@ from .const import (
     CONF_SIDEBAR_ICON,
     CONF_TITLE,
     DOMAIN,
+    MORE_INFO_MODULE_URL,
     PANEL_ELEMENT,
     PANEL_MODULE_URL,
     PANEL_URL_PATH,
-    REDIRECT_MODULE_URL,
     VERSION,
     options_with_defaults,
 )
@@ -48,7 +48,7 @@ async def async_register_frontend(hass: HomeAssistant, entry_id: str) -> None:
     await _async_register_static_files(hass)
     entries = hass.data.setdefault(_FRONTEND_ENTRIES, set())
     if not entries:
-        frontend.add_extra_js_url(hass, REDIRECT_MODULE_URL)
+        frontend.add_extra_js_url(hass, MORE_INFO_MODULE_URL)
     entries.add(entry_id)
 
 
@@ -57,7 +57,7 @@ def async_unregister_frontend(hass: HomeAssistant, entry_id: str) -> None:
     entries = hass.data.setdefault(_FRONTEND_ENTRIES, set())
     entries.discard(entry_id)
     if not entries:
-        frontend.remove_extra_js_url(hass, REDIRECT_MODULE_URL)
+        frontend.remove_extra_js_url(hass, MORE_INFO_MODULE_URL)
 
 
 def _panel_config(entry: ConfigEntry) -> tuple[dict, dict]:
