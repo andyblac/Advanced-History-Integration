@@ -79,8 +79,6 @@ New installations create both services automatically. The More Info graph replac
 3. Restart Home Assistant.
 4. Add **Advanced History** from **Settings → Devices & services**.
 
-No `panel_custom` entry is required in `configuration.yaml`.
-
 ### Existing installations from before 0.6.0
 
 After updating, open **Settings → Devices & services → Advanced History**, select **Add service**, and complete **Set up More-Info**. This creates the optional More Info graph replacement without changing the sidebar panel configuration.
