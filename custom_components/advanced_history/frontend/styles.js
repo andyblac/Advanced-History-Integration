@@ -53,6 +53,17 @@ export const panelStyles = `
   .add-target:hover { background:var(--secondary-background-color); }
   .add-target ha-icon { width:19px; height:19px; }
   .charts { display:grid; gap:16px; }
+  .graph-shell { position:relative; min-width:0; }
+  .graph-shell > statistics-graph-chart-card { display:block; }
+  .data-source-indicator {
+    position:absolute; z-index:2; top:12px; right:46px; min-height:24px; padding:0 9px; display:inline-flex; align-items:center;
+    border:1px solid var(--divider-color); border-radius:12px; color:var(--secondary-text-color);
+    max-width:calc(100% - 150px); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+    background:var(--card-background-color); box-shadow:0 1px 2px rgba(0,0,0,.16); font-size:11px; line-height:1; cursor:help;
+  }
+  .data-source-indicator.history { color:var(--primary-color); border-color:var(--primary-color); }
+  .data-source-indicator.statistics { color:var(--success-color,#43a047); border-color:var(--success-color,#43a047); }
+  .data-source-indicator.mixed { color:var(--warning-color,#ffa600); border-color:var(--warning-color,#ffa600); }
   .compare-banner { margin:-4px 0 16px; }
   .compare-banner[hidden] { display:none; }
   .loading-banner {

@@ -58,7 +58,7 @@ class AdvancedHistoryPanel extends HTMLElement {
       this._nativeTargetPicker.hass = this._targetPickerHass();
       this._syncNativeTargetVisibility();
     }
-    for (const card of this._cards) card.hass = value;
+    for (const card of this._cards) this._setGraphCardHass(card, value);
     if (!this._loaded && value) this._initialize();
   }
   get hass() { return this._hass; }

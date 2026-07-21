@@ -39,7 +39,12 @@ const TRANSLATIONS = {
     "diagnostics_note": "Review this privacy-safe report before copying it. It excludes history values, names, registry IDs, bookmarks and Home Assistant URLs.",
     "copy_diagnostics": "Copy diagnostics",
     "diagnostics_copied": "Diagnostics copied",
-    "diagnostics_copy_error": "Diagnostics could not be copied"
+    "diagnostics_copy_error": "Diagnostics could not be copied",
+    "data_source_pending": "Determining source…",
+    "data_source_history": "Recorder history",
+    "data_source_statistics": "Long-term statistics",
+    "data_source_mixed": "Mixed sources",
+    "data_source_help": "The data source actually requested by Statistics Graph Chart Card."
   },
   "en-GB": {
     "bookmarks": "Bookmarks",
@@ -81,7 +86,12 @@ const TRANSLATIONS = {
     "diagnostics_note": "Review this privacy-safe report before copying it. It excludes history values, names, registry IDs, bookmarks and Home Assistant URLs.",
     "copy_diagnostics": "Copy diagnostics",
     "diagnostics_copied": "Diagnostics copied",
-    "diagnostics_copy_error": "Diagnostics could not be copied"
+    "diagnostics_copy_error": "Diagnostics could not be copied",
+    "data_source_pending": "Determining source…",
+    "data_source_history": "Recorder history",
+    "data_source_statistics": "Long-term statistics",
+    "data_source_mixed": "Mixed sources",
+    "data_source_help": "The data source actually requested by Statistics Graph Chart Card."
   },
   "de": {
     "bookmarks": "Lesezeichen",
@@ -123,7 +133,12 @@ const TRANSLATIONS = {
     "diagnostics_note": "Prüfe diesen datenschutzfreundlichen Bericht vor dem Kopieren. Verlaufswerte, Namen, Registry-IDs, Lesezeichen und Home-Assistant-URLs sind ausgeschlossen.",
     "copy_diagnostics": "Diagnose kopieren",
     "diagnostics_copied": "Diagnose kopiert",
-    "diagnostics_copy_error": "Diagnose konnte nicht kopiert werden"
+    "diagnostics_copy_error": "Diagnose konnte nicht kopiert werden",
+    "data_source_pending": "Datenquelle wird ermittelt…",
+    "data_source_history": "Recorder-Verlauf",
+    "data_source_statistics": "Langzeitstatistiken",
+    "data_source_mixed": "Gemischte Quellen",
+    "data_source_help": "Die von Statistics Graph Chart Card tatsächlich angeforderte Datenquelle."
   },
   "es": {
     "bookmarks": "Marcadores",
@@ -165,7 +180,12 @@ const TRANSLATIONS = {
     "diagnostics_note": "Revisa este informe seguro para la privacidad antes de copiarlo. Excluye valores del historial, nombres, IDs del registro, marcadores y URLs de Home Assistant.",
     "copy_diagnostics": "Copiar diagnóstico",
     "diagnostics_copied": "Diagnóstico copiado",
-    "diagnostics_copy_error": "No se pudo copiar el diagnóstico"
+    "diagnostics_copy_error": "No se pudo copiar el diagnóstico",
+    "data_source_pending": "Determinando origen…",
+    "data_source_history": "Historial del Recorder",
+    "data_source_statistics": "Estadísticas a largo plazo",
+    "data_source_mixed": "Orígenes combinados",
+    "data_source_help": "El origen de datos solicitado realmente por Statistics Graph Chart Card."
   },
   "fr": {
     "bookmarks": "Favoris",
@@ -207,7 +227,12 @@ const TRANSLATIONS = {
     "diagnostics_note": "Vérifiez ce rapport respectueux de la vie privée avant de le copier. Il exclut les valeurs d’historique, les noms, les identifiants de registre, les favoris et les URL Home Assistant.",
     "copy_diagnostics": "Copier le diagnostic",
     "diagnostics_copied": "Diagnostic copié",
-    "diagnostics_copy_error": "Le diagnostic n’a pas pu être copié"
+    "diagnostics_copy_error": "Le diagnostic n’a pas pu être copié",
+    "data_source_pending": "Détermination de la source…",
+    "data_source_history": "Historique Recorder",
+    "data_source_statistics": "Statistiques à long terme",
+    "data_source_mixed": "Sources mixtes",
+    "data_source_help": "La source de données réellement demandée par Statistics Graph Chart Card."
   },
   "it": {
     "bookmarks": "Segnalibri",
@@ -249,7 +274,12 @@ const TRANSLATIONS = {
     "diagnostics_note": "Controlla questo rapporto rispettoso della privacy prima di copiarlo. Esclude valori della cronologia, nomi, ID del registro, segnalibri e URL di Home Assistant.",
     "copy_diagnostics": "Copia diagnostica",
     "diagnostics_copied": "Diagnostica copiata",
-    "diagnostics_copy_error": "Impossibile copiare la diagnostica"
+    "diagnostics_copy_error": "Impossibile copiare la diagnostica",
+    "data_source_pending": "Determinazione origine…",
+    "data_source_history": "Cronologia Recorder",
+    "data_source_statistics": "Statistiche a lungo termine",
+    "data_source_mixed": "Origini miste",
+    "data_source_help": "L’origine dati effettivamente richiesta da Statistics Graph Chart Card."
   },
   "nl": {
     "bookmarks": "Bladwijzers",
@@ -291,7 +321,12 @@ const TRANSLATIONS = {
     "diagnostics_note": "Controleer dit privacyveilige rapport voordat je het kopieert. Geschiedeniswaarden, namen, register-ID’s, bladwijzers en Home Assistant-URL’s zijn uitgesloten.",
     "copy_diagnostics": "Diagnostiek kopiëren",
     "diagnostics_copied": "Diagnostiek gekopieerd",
-    "diagnostics_copy_error": "Diagnostiek kon niet worden gekopieerd"
+    "diagnostics_copy_error": "Diagnostiek kon niet worden gekopieerd",
+    "data_source_pending": "Bron bepalen…",
+    "data_source_history": "Recorder-geschiedenis",
+    "data_source_statistics": "Langetermijnstatistieken",
+    "data_source_mixed": "Gemengde bronnen",
+    "data_source_help": "De gegevensbron die Statistics Graph Chart Card daadwerkelijk heeft aangevraagd."
   },
   "pt-BR": {
     "bookmarks": "Favoritos",
@@ -333,7 +368,12 @@ const TRANSLATIONS = {
     "diagnostics_note": "Revise este relatório seguro para privacidade antes de copiá-lo. Ele exclui valores de histórico, nomes, IDs de registro, favoritos e URLs do Home Assistant.",
     "copy_diagnostics": "Copiar diagnóstico",
     "diagnostics_copied": "Diagnóstico copiado",
-    "diagnostics_copy_error": "Não foi possível copiar o diagnóstico"
+    "diagnostics_copy_error": "Não foi possível copiar o diagnóstico",
+    "data_source_pending": "Determinando fonte…",
+    "data_source_history": "Histórico do Recorder",
+    "data_source_statistics": "Estatísticas de longo prazo",
+    "data_source_mixed": "Fontes combinadas",
+    "data_source_help": "A fonte de dados realmente solicitada pelo Statistics Graph Chart Card."
   }
 };
 

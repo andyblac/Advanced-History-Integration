@@ -139,6 +139,10 @@ export class DiagnosticsMethods {
         default_hours: snapshot.chart?.default_hours ?? this._effectiveDefaultHours(),
         graph_height: snapshot.chart?.graph_height ?? this._effectiveGraphHeight(),
         compare: this._sanitizeDiagnosticValue(snapshot.chart?.compare ?? this._effectiveCompare(), aliases),
+        data_sources: (this._graphCards || []).map((card) => ({
+          chart_mode: card.__advancedHistoryChartMode || null,
+          source: card.__advancedHistorySourceTracker?.source || "pending",
+        })),
         card_options: cardOptions,
         entity_options: entityOptions,
       },

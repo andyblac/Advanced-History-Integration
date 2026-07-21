@@ -38,7 +38,18 @@ export class GraphMethods {
   }
 
   _createGraph(host, entityIds, title, mode) {
+    const shell = document.createElement("div");
+    shell.className = "graph-shell";
+    const sourceIndicator = document.createElement("span");
+    sourceIndicator.className = "data-source-indicator pending";
+    sourceIndicator.textContent = this._customLocalize("data_source_pending");
+    sourceIndicator.title = this._customLocalize("data_source_help");
     const card = document.createElement(CARD_TAG);
+    card.__advancedHistorySourceTracker = this._createDataSourceTracker(
+      sourceIndicator,
+      Boolean(this._energyCollection)
+    );
+    card.__advancedHistoryChartMode = mode;
     const cardOptions = this._cardOptions();
     const config = {
       type: `custom:${CARD_TAG}`, card_header: title, chart_mode: mode,
@@ -50,8 +61,138 @@ export class GraphMethods {
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
       energy_date_sync: true,
     };
-    try { card.setConfig(config); card.hass = this._hass; host.append(card); this._cards.push(card); this._graphCards.push(card); }
+    try {
+      card.setConfig(config);
+      this._setGraphCardHass(card, this._hass);
+      shell.append(card, sourceIndicator);
+      host.append(shell);
+      this._cards.push(card);
+      this._graphCards.push(card);
+    }
     catch (error) { host.insertAdjacentHTML("beforeend", `<div class="error">${this._escape(error.message || error)}</div>`); }
+  }
+
+  _createDataSourceTracker(indicator, active = true) {
+    const sources = new Set();
+    let enabled = active;
+    let cyclePending = false;
+    const render = () => {
+      const source = !sources.size ? "pending" : sources.size > 1 ? "mixed" : [...sources][0];
+      indicator.className = `data-source-indicator ${source}`;
+      indicator.textContent = this._customLocalize(
+        source === "pending"
+          ? "data_source_pending"
+          : source === "mixed"
+            ? "data_source_mixed"
+            : source === "statistics"
+              ? "data_source_statistics"
+              : "data_source_history"
+      );
+    };
+    return {
+      get source() {
+        if (!sources.size) return "pending";
+        return sources.size > 1 ? "mixed" : [...sources][0];
+      },
+      reset: () => {
+        sources.clear();
+        cyclePending = false;
+        render();
+      },
+      beginCycle: () => {
+        cyclePending = true;
+      },
+      activate: () => {
+        enabled = true;
+        sources.clear();
+        cyclePending = false;
+        render();
+      },
+      record: (source) => {
+        if (!enabled || !source) return;
+        if (cyclePending) {
+          sources.clear();
+          cyclePending = false;
+        }
+        if (sources.has(source)) return;
+        sources.add(source);
+        render();
+      },
+    };
+  }
+
+  _beginGraphDataSourceCycle() {
+    for (const card of this._graphCards || []) {
+      card.__advancedHistorySourceTracker?.beginCycle?.();
+    }
+  }
+
+  _activateGraphDataSourceTracking() {
+    for (const card of this._graphCards || []) {
+      card.__advancedHistorySourceTracker?.activate?.();
+      if (card.__advancedHistoryInstrumentedHass) {
+        card.hass = card.__advancedHistoryInstrumentedHass;
+        card.requestUpdate?.("hass");
+      }
+    }
+  }
+
+  _requestDataSource(message) {
+    const type = typeof message === "string" ? message : message?.type;
+    if (typeof type !== "string") return null;
+    if (type.includes("statistics_during_period")) return "statistics";
+    if (type.includes("history/period") || type.includes("history_during_period")) return "history";
+    return null;
+  }
+
+  _setGraphCardHass(card, hass) {
+    const tracker = card?.__advancedHistorySourceTracker;
+    if (!card || !tracker || !hass) {
+      if (card) card.hass = hass;
+      return;
+    }
+    if (card.__advancedHistoryHassSource === hass && card.__advancedHistoryInstrumentedHass) {
+      card.hass = card.__advancedHistoryInstrumentedHass;
+      return;
+    }
+
+    const record = (message) => tracker.record(this._requestDataSource(message));
+    const connection = hass.connection ? new Proxy(hass.connection, {
+      get: (target, property) => {
+        const value = Reflect.get(target, property, target);
+        if (typeof value !== "function") return value;
+        if (!["subscribeMessage", "sendMessage", "sendMessagePromise"].includes(property)) {
+          return value.bind(target);
+        }
+        return (...args) => {
+          record(args.find((argument) => argument?.type));
+          return value.apply(target, args);
+        };
+      },
+    }) : null;
+    const instrumented = new Proxy(hass, {
+      get: (target, property) => {
+        if (property === "connection" && connection) return connection;
+        const value = Reflect.get(target, property, target);
+        if (typeof value !== "function") return value;
+        if (property === "callWS") {
+          return (message) => {
+            record(message);
+            return value.call(target, message);
+          };
+        }
+        if (property === "callApi") {
+          return (...args) => {
+            record(args.find((argument) => typeof argument === "string" && argument.includes("history/period")));
+            return value.apply(target, args);
+          };
+        }
+        return value.bind(target);
+      },
+    });
+    card.__advancedHistoryHassSource = hass;
+    card.__advancedHistoryInstrumentedHass = instrumented;
+    card.hass = instrumented;
   }
 
   _resolvedTimeZone() {

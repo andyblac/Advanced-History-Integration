@@ -119,6 +119,7 @@ export class EnergyMethods {
       return;
     }
     this._energyCollection = collection;
+    this._activateGraphDataSourceTracking();
 
     if (this._energyResetPending || !this._targetCount()) {
       this._resetEnergySelection(collection);
@@ -145,6 +146,9 @@ export class EnergyMethods {
       queueMicrotask(() => applyMode(collection.compare));
       setTimeout(() => applyMode(collection.compare), 150);
     };
+    const beginDataSourceCycle = () => this._beginGraphDataSourceCycle();
+    host.addEventListener("click", beginDataSourceCycle, true);
+    compareHost.addEventListener("click", beginDataSourceCycle, true);
     host.addEventListener("click", syncAfterInteraction);
     compareHost.addEventListener("click", syncAfterInteraction);
   }
