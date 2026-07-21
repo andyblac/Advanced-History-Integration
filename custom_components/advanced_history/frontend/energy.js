@@ -20,6 +20,7 @@ export class EnergyMethods {
       controller.hass = this._hass;
       host.replaceChildren(controller);
       this._cards.push(controller);
+      this._replaceEnergyDownloadAction(controller);
       this._makeEnergySelectorFixed(controller, token);
 
       const compareCard = helpers.createCardElement({ type: "energy-compare" });
@@ -50,6 +51,58 @@ export class EnergyMethods {
       }
       await new Promise((resolve) => requestAnimationFrame(resolve));
     }
+  }
+
+  _replaceEnergyDownloadAction(controller) {
+    const downloadLabel = this._localize(
+      "ui.panel.lovelace.components.energy_period_selector.download_data",
+      "Download data"
+    );
+    const normalizedLabel = downloadLabel.trim().replace(/\s+/g, " ");
+    controller.addEventListener("click", (event) => {
+      const item = event.composedPath().find((node) => node?.localName === "ha-dropdown-item");
+      const itemLabel = item?.textContent?.trim().replace(/\s+/g, " ");
+      if (itemLabel !== normalizedLabel) return;
+      event.preventDefault();
+      event.stopPropagation();
+      event.stopImmediatePropagation();
+      const dropdown = item.closest?.("ha-dropdown");
+      if (dropdown) dropdown.open = false;
+      this._downloadChartData();
+    }, true);
+  }
+
+  _downloadChartData() {
+    const downloads = this._graphCards.flatMap((card, index) => {
+      const csv = typeof card._buildCsvText === "function" ? card._buildCsvText() : null;
+      if (!csv) return [];
+      const title = card._config?.card_header || (index ? `chart-${index + 1}` : "chart");
+      return [{ csv, title }];
+    });
+    if (!downloads.length) {
+      this.dispatchEvent(new CustomEvent("hass-notification", {
+        detail: { message: this._localize("ui.common.no_data", "No data") },
+        bubbles: true,
+        composed: true,
+      }));
+      return;
+    }
+
+    const now = new Date();
+    const part = (value) => String(value).padStart(2, "0");
+    const timestamp = `${now.getFullYear()}${part(now.getMonth() + 1)}${part(now.getDate())}-${part(now.getHours())}${part(now.getMinutes())}`;
+    downloads.forEach(({ csv, title }, index) => {
+      const safeTitle = String(title).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `chart-${index + 1}`;
+      const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `advanced-history-${safeTitle}-${timestamp}.csv`;
+      document.body.append(anchor);
+      anchor.click();
+      anchor.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    });
   }
 
   async _bindEnergyCollection(token, host, compareHost, compareCard) {

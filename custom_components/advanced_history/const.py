@@ -35,8 +35,9 @@ DEFAULT_ENTITY_OPTIONS = {
 
 DEFAULT_CARD_OPTIONS = {
     "auto_scale_points": True,
+    "include_area_on_duplicate_names": True,
+    "show_full_period": True,
     "show_tooltip": True,
-    "show_export": True,
     "zoom_sync": True,
     "zoom_sync_group": "advanced-history-panel",
     "tooltip_sync": True,

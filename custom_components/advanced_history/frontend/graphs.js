@@ -39,17 +39,34 @@ export class GraphMethods {
 
   _createGraph(host, entityIds, title, mode) {
     const card = document.createElement(CARD_TAG);
+    const cardOptions = this._cardOptions();
     const config = {
       type: `custom:${CARD_TAG}`, card_header: title, chart_mode: mode,
       entities: entityIds.map((id) => this._entityCardConfig(id, mode)),
       hours_to_show: this._effectiveDefaultHours(),
       height: this._effectiveGraphHeight(),
       ...(mode === "state_timeline" ? { group_by: "raw" } : {}),
-      ...this._cardOptions(),
+      ...cardOptions,
+      time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
       energy_date_sync: true,
     };
     try { card.setConfig(config); card.hass = this._hass; host.append(card); this._cards.push(card); this._graphCards.push(card); }
     catch (error) { host.insertAdjacentHTML("beforeend", `<div class="error">${this._escape(error.message || error)}</div>`); }
+  }
+
+  _resolvedTimeZone() {
+    const preference = this._hass?.locale?.time_zone;
+    const serverTimeZone = this._hass?.config?.time_zone;
+    const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    if (preference === "server" || preference === "home") {
+      return serverTimeZone || browserTimeZone || "UTC";
+    }
+    if (preference === "local" || preference === "auto") {
+      return browserTimeZone || serverTimeZone || "UTC";
+    }
+    if (typeof preference === "string" && preference) return preference;
+    return serverTimeZone || browserTimeZone || "UTC";
   }
 
   _isNumeric(id) {
