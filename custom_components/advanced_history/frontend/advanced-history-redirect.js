@@ -8,6 +8,7 @@ const MORE_INFO_PATCH_KEY = "__advancedHistoryMoreInfoPatched";
 const MORE_INFO_HOST_CLASS = "advanced-history-more-info-chart";
 const MORE_INFO_HOST_BOTTOM_OFFSET =
   "margin-block-end:calc(var(--ha-space-6, 24px) * -1);";
+const MORE_INFO_STATE_TIMELINE_HEIGHT = 90;
 const MORE_INFO_REPLACING_ATTRIBUTE = "advanced-history-replacing-chart";
 const MORE_INFO_STYLE_CLASS = "advanced-history-more-info-style";
 const MORE_INFO_CONFIG_TYPE = "advanced_history/more_info/config";
@@ -55,10 +56,60 @@ function nativeGraphColor(historyView) {
     || style.getPropertyValue("--color-1").trim();
 }
 
-function moreInfoCardConfig(historyView, options) {
+function cssVariableChain(properties) {
+  return properties.reduceRight(
+    (fallback, property) => `var(${property}${fallback ? `, ${fallback}` : ""})`,
+    "",
+  );
+}
+
+function nativeStateColor(domain, deviceClass, state, active) {
+  if (state === "unavailable") {
+    return "var(--history-unavailable-color, var(--state-unavailable-color))";
+  }
+  if (state === "unknown") {
+    return "var(--history-unknown-color, var(--state-inactive-color))";
+  }
+  const stateKey = state.replace(/[^a-z0-9_]+/gi, "_").toLowerCase();
+  const properties = [];
+  if (deviceClass) {
+    properties.push(`--state-${domain}-${deviceClass}-${stateKey}-color`);
+  }
+  properties.push(
+    `--state-${domain}-${stateKey}-color`,
+    `--state-${domain}-${active ? "active" : "inactive"}-color`,
+    `--state-${active ? "active" : "inactive"}-color`,
+  );
+  return cssVariableChain(properties);
+}
+
+function nativeBinaryStateMap(historyView) {
   const entityId = historyView.entityId;
-  const state = historyView.hass?.states?.[entityId];
-  const numeric = state?.state !== "" && Number.isFinite(Number(state?.state));
+  const domain = entityId?.split(".", 1)[0];
+  if (!new Set(["binary_sensor", "input_boolean"]).has(domain)) return undefined;
+  const stateObj = historyView.hass?.states?.[entityId];
+  if (!stateObj) return undefined;
+  const deviceClass = stateObj.attributes?.device_class;
+  return ["off", "on", "unknown", "unavailable"].map((state) => ({
+    value: state,
+    label: historyView.hass?.formatEntityState?.(stateObj, state) || state,
+    color: nativeStateColor(domain, deviceClass, state, state === "on"),
+  }));
+}
+
+function isNumericMoreInfoHistory(historyView, nativeChart) {
+  if (nativeChart?.localName === "statistics-chart") return true;
+
+  const state = historyView.hass?.states?.[historyView.entityId];
+  const attributes = state?.attributes || {};
+  return attributes.state_class != null
+    || attributes.unit_of_measurement != null
+    || (state?.state !== "" && Number.isFinite(Number(state?.state)));
+}
+
+function moreInfoCardConfig(historyView, nativeChart, options) {
+  const entityId = historyView.entityId;
+  const numeric = isNumericMoreInfoHistory(historyView, nativeChart);
   const cardOptions = options && typeof options === "object" && !Array.isArray(options)
     ? structuredClone(options)
     : {};
@@ -67,10 +118,25 @@ function moreInfoCardConfig(historyView, options) {
   delete template.entity;
   delete template.statistic_id;
   delete template.compare;
-  if (!Object.prototype.hasOwnProperty.call(template, "color")) {
+  if (numeric && !Object.prototype.hasOwnProperty.call(template, "color")) {
     const color = nativeGraphColor(historyView);
     if (color) template.color = color;
   }
+  if (!numeric && !Object.prototype.hasOwnProperty.call(template, "name")) {
+    // Home Assistant omits the entity name beside a single More Info state
+    // timeline. A truthy whitespace value also prevents the card from falling
+    // back to its generated friendly name while leaving no visible label.
+    template.name = " ";
+  }
+  if (
+    !numeric
+    && !Object.prototype.hasOwnProperty.call(template, "state_map")
+    && !Object.prototype.hasOwnProperty.call(template, "color")
+  ) {
+    const stateMap = nativeBinaryStateMap(historyView);
+    if (stateMap) template.state_map = stateMap;
+  }
+  const configuredHeight = Number(cardOptions.height) || 240;
   return {
     ...cardOptions,
     type: `custom:${CARD_TAG}`,
@@ -78,7 +144,9 @@ function moreInfoCardConfig(historyView, options) {
     card_padding: cardOptions.card_padding ?? 0,
     chart_mode: numeric ? "timeline" : "state_timeline",
     hours_to_show: Number(cardOptions.hours_to_show) || 24,
-    height: Number(cardOptions.height) || 240,
+    height: numeric
+      ? configuredHeight
+      : Math.min(configuredHeight, MORE_INFO_STATE_TIMELINE_HEIGHT),
     time_zone: cardOptions.time_zone ?? resolvedTimeZone(historyView.hass),
     ...(numeric ? {} : { group_by: "raw" }),
     entities: [{ ...template, entity: entityId }],
@@ -152,7 +220,7 @@ async function replaceMoreInfoChart(historyView) {
     nativeChart = root.querySelector("statistics-chart, state-history-charts");
     if (!nativeChart) return;
     const options = serviceConfig.card_options || {};
-    const config = moreInfoCardConfig(historyView, options);
+    const config = moreInfoCardConfig(historyView, nativeChart, options);
     const configKey = JSON.stringify({ entityId: historyView.entityId, config });
     let host = root.querySelector(`.${MORE_INFO_HOST_CLASS}`);
     let card = host?.querySelector(CARD_TAG);
@@ -177,6 +245,19 @@ async function replaceMoreInfoChart(historyView) {
 }
 
 function scheduleMoreInfoReplacement(historyView) {
+  if (moreInfoConfigCache?.enabled === false) {
+    restoreNativeChart(historyView);
+    if (Date.now() >= moreInfoConfigExpires && !moreInfoConfigRequest) {
+      getMoreInfoConfig(historyView.hass)
+        .then((config) => {
+          if (config?.enabled && historyView.isConnected) {
+            scheduleMoreInfoReplacement(historyView);
+          }
+        })
+        .catch(() => undefined);
+    }
+    return;
+  }
   claimMoreInfoChart(historyView);
   Promise.resolve(historyView.updateComplete)
     .then(() => replaceMoreInfoChart(historyView))
