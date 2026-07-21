@@ -30,7 +30,11 @@ const TRANSLATIONS = {
     "more_info_card_defaults": "More Info Card Defaults",
     "more_info_card_defaults_config_flow_note": "These settings only affect the Statistics Graph shown in entity dialogs. Saving updates the More Info Card Defaults YAML field; submit the config flow to apply it.",
     "hide_target": "Hide {target} from the chart",
-    "show_target": "Show {target} on the chart"
+    "show_target": "Show {target} on the chart",
+    "copy_share_link": "Copy share link",
+    "share_link_copied": "Share link copied",
+    "share_link_error": "Share link could not be copied",
+    "shared_link_invalid": "This shared chart link is invalid or is not supported by this browser."
   },
   "en-GB": {
     "bookmarks": "Bookmarks",
@@ -63,7 +67,11 @@ const TRANSLATIONS = {
     "more_info_card_defaults": "More Info Card Defaults",
     "more_info_card_defaults_config_flow_note": "These settings only affect the Statistics Graph shown in entity dialogs. Saving updates the More Info Card Defaults YAML field; submit the config flow to apply it.",
     "hide_target": "Hide {target} from the chart",
-    "show_target": "Show {target} on the chart"
+    "show_target": "Show {target} on the chart",
+    "copy_share_link": "Copy share link",
+    "share_link_copied": "Share link copied",
+    "share_link_error": "Share link could not be copied",
+    "shared_link_invalid": "This shared chart link is invalid or is not supported by this browser."
   },
   "de": {
     "bookmarks": "Lesezeichen",
@@ -96,7 +104,11 @@ const TRANSLATIONS = {
     "more_info_card_defaults": "Standards für Entitätsdetails",
     "more_info_card_defaults_config_flow_note": "Diese Einstellungen gelten nur für Statistics Graph in Entitätsdialogen. Beim Speichern wird das YAML-Feld Standards für Entitätsdetails aktualisiert; sende den Konfigurationsablauf ab, um es anzuwenden.",
     "hide_target": "{target} im Diagramm ausblenden",
-    "show_target": "{target} im Diagramm anzeigen"
+    "show_target": "{target} im Diagramm anzeigen",
+    "copy_share_link": "Freigabelink kopieren",
+    "share_link_copied": "Freigabelink kopiert",
+    "share_link_error": "Freigabelink konnte nicht kopiert werden",
+    "shared_link_invalid": "Dieser freigegebene Diagrammlink ist ungültig oder wird von diesem Browser nicht unterstützt."
   },
   "es": {
     "bookmarks": "Marcadores",
@@ -129,7 +141,11 @@ const TRANSLATIONS = {
     "more_info_card_defaults": "Valores predeterminados de Más información",
     "more_info_card_defaults_config_flow_note": "Estos ajustes solo afectan a Statistics Graph en los diálogos de entidad. Al guardar se actualiza el campo YAML de Más información; envía el flujo de configuración para aplicarlo.",
     "hide_target": "Ocultar {target} del gráfico",
-    "show_target": "Mostrar {target} en el gráfico"
+    "show_target": "Mostrar {target} en el gráfico",
+    "copy_share_link": "Copiar enlace para compartir",
+    "share_link_copied": "Enlace copiado",
+    "share_link_error": "No se pudo copiar el enlace",
+    "shared_link_invalid": "Este enlace de gráfico compartido no es válido o no es compatible con este navegador."
   },
   "fr": {
     "bookmarks": "Favoris",
@@ -162,7 +178,11 @@ const TRANSLATIONS = {
     "more_info_card_defaults": "Valeurs par défaut de Plus d’informations",
     "more_info_card_defaults_config_flow_note": "Ces paramètres concernent uniquement Statistics Graph dans les boîtes de dialogue d’entité. L’enregistrement met à jour le champ YAML de Plus d’informations ; validez le flux de configuration pour l’appliquer.",
     "hide_target": "Masquer {target} du graphique",
-    "show_target": "Afficher {target} sur le graphique"
+    "show_target": "Afficher {target} sur le graphique",
+    "copy_share_link": "Copier le lien de partage",
+    "share_link_copied": "Lien de partage copié",
+    "share_link_error": "Impossible de copier le lien de partage",
+    "shared_link_invalid": "Ce lien de graphique partagé est invalide ou n’est pas pris en charge par ce navigateur."
   },
   "it": {
     "bookmarks": "Segnalibri",
@@ -195,7 +215,11 @@ const TRANSLATIONS = {
     "more_info_card_defaults": "Impostazioni predefinite di Ulteriori informazioni",
     "more_info_card_defaults_config_flow_note": "Queste impostazioni interessano solo Statistics Graph nelle finestre delle entità. Il salvataggio aggiorna il campo YAML di Ulteriori informazioni; invia il flusso di configurazione per applicarlo.",
     "hide_target": "Nascondi {target} dal grafico",
-    "show_target": "Mostra {target} nel grafico"
+    "show_target": "Mostra {target} nel grafico",
+    "copy_share_link": "Copia link di condivisione",
+    "share_link_copied": "Link di condivisione copiato",
+    "share_link_error": "Impossibile copiare il link di condivisione",
+    "shared_link_invalid": "Questo link al grafico condiviso non è valido o non è supportato da questo browser."
   },
   "nl": {
     "bookmarks": "Bladwijzers",
@@ -228,7 +252,11 @@ const TRANSLATIONS = {
     "more_info_card_defaults": "Standaardwaarden voor Meer informatie",
     "more_info_card_defaults_config_flow_note": "Deze instellingen gelden alleen voor Statistics Graph in entiteitsvensters. Opslaan werkt het YAML-veld voor Meer informatie bij; dien de configuratiestroom in om dit toe te passen.",
     "hide_target": "{target} in de grafiek verbergen",
-    "show_target": "{target} in de grafiek tonen"
+    "show_target": "{target} in de grafiek tonen",
+    "copy_share_link": "Deellink kopiëren",
+    "share_link_copied": "Deellink gekopieerd",
+    "share_link_error": "Deellink kon niet worden gekopieerd",
+    "shared_link_invalid": "Deze gedeelde grafiekkoppeling is ongeldig of wordt niet door deze browser ondersteund."
   },
   "pt-BR": {
     "bookmarks": "Favoritos",
@@ -261,7 +289,11 @@ const TRANSLATIONS = {
     "more_info_card_defaults": "Padrões de Mais informações",
     "more_info_card_defaults_config_flow_note": "Estas configurações afetam apenas o Statistics Graph nos diálogos de entidade. Salvar atualiza o campo YAML de Mais informações; envie o fluxo de configuração para aplicá-lo.",
     "hide_target": "Ocultar {target} do gráfico",
-    "show_target": "Mostrar {target} no gráfico"
+    "show_target": "Mostrar {target} no gráfico",
+    "copy_share_link": "Copiar link de compartilhamento",
+    "share_link_copied": "Link de compartilhamento copiado",
+    "share_link_error": "Não foi possível copiar o link de compartilhamento",
+    "shared_link_invalid": "Este link de gráfico compartilhado é inválido ou não é compatível com este navegador."
   }
 };
 

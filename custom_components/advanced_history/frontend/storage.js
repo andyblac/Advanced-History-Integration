@@ -6,16 +6,46 @@ import {
   HISTORY_LIMIT,
   HISTORY_STORAGE_KEY,
   REDO_STORAGE_KEY,
+  SHARE_QUERY_PARAM,
   STORAGE_KEY,
   UNDO_LIMIT,
   UNDO_STORAGE_KEY,
 } from "./constants.js";
 
 export class StorageMethods {
-  _loadTargets() {
+  async _loadTargets() {
     const params = new URLSearchParams(location.search);
+    const sharedSnapshot = await this._sharedSnapshotFromUrl(params);
+    if (params.has(SHARE_QUERY_PARAM) && !sharedSnapshot) {
+      const url = new URL(location.href);
+      url.searchParams.delete(SHARE_QUERY_PARAM);
+      history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+      this._notice = this._customLocalize("shared_link_invalid");
+    }
     const fromUrl = { area_id: params.getAll("area_id"), device_id: params.getAll("device_id"), entity_id: params.getAll("entity_id") };
     const previous = this._loadCurrentSnapshot();
+    if (sharedSnapshot) {
+      this._loadedBookmarkId = null;
+      if (
+        previous?.targets &&
+        this._targetCount(this._normalizeTargets(previous.targets)) &&
+        this._snapshotFingerprint(previous) !== this._snapshotFingerprint(sharedSnapshot)
+      ) {
+        this._archiveSnapshot(previous);
+        this._pushUndoSnapshot(previous);
+        this._saveLibrary(REDO_STORAGE_KEY, []);
+      }
+      this._targets = this._normalizeTargets(sharedSnapshot.targets);
+      this._hiddenTargets = this._normalizeTargets(sharedSnapshot.hidden_targets || {});
+      this._activeSnapshot = this._clone(sharedSnapshot.chart);
+      this._pendingPeriodRestore = this._clone(sharedSnapshot.period);
+      this._currentSnapshot = this._clone(sharedSnapshot);
+      this._incomingTargetOverride = true;
+      this._pruneHiddenTargets();
+      this._saveCurrentSnapshot(sharedSnapshot);
+      this._replaceSharedUrlWithTargets();
+      return;
+    }
     const hasUrlTargets = Object.values(fromUrl).some((items) => items.length);
     if (hasUrlTargets) {
       this._loadedBookmarkId = null;
@@ -67,6 +97,7 @@ export class StorageMethods {
   _saveTargets() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(this._targets));
     const url = new URL(location.href);
+    url.searchParams.delete(SHARE_QUERY_PARAM);
     ["area_id", "device_id", "entity_id"].forEach((key) => {
       url.searchParams.delete(key);
       this._targets[key].forEach((value) => url.searchParams.append(key, value));
@@ -623,6 +654,7 @@ export class StorageMethods {
     const items = this._loadLibrary(key);
     const title = this._customLocalize(isBookmarks ? "bookmarks" : "chart_history");
     const clearLabel = this._customLocalize(isBookmarks ? "clear_bookmarks" : "clear_history");
+    const copyShareLink = this._customLocalize("copy_share_link");
     const close = this._localize("ui.common.close", "Close");
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop";
@@ -630,7 +662,7 @@ export class StorageMethods {
       <header class="dialog-title"><h2>${title}</h2><span class="count">${items.length}${isBookmarks ? "" : ` / ${HISTORY_LIMIT}`}</span></header>
       ${isBookmarks ? `<div class="library-save"><input id="bookmark-name" maxlength="80" placeholder="${this._escape(this._customLocalize("bookmark_name"))}" value="${this._escape(this._snapshotLabel())}"><button data-action="save-current">${this._escape(this._customLocalize("save_current"))}</button></div>` : ""}
       <div class="library-list">${this._libraryRows(items, isBookmarks)}</div>
-      <footer class="dialog-actions"><button data-action="clear" style="margin-right:auto" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</button><button data-action="close">${this._escape(close)}</button></footer>
+      <footer class="dialog-actions"><button data-action="clear" style="margin-right:auto" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</button>${isBookmarks ? `<button data-action="share" ${this._targetCount() ? "" : "disabled"}>${this._escape(copyShareLink)}</button>` : ""}<button data-action="close">${this._escape(close)}</button></footer>
     </section>`;
     backdrop.addEventListener("click", (event) => { if (event.target === backdrop) backdrop.remove(); });
     backdrop.querySelector('[data-action="close"]').addEventListener("click", () => backdrop.remove());
@@ -638,6 +670,7 @@ export class StorageMethods {
       const input = backdrop.querySelector("#bookmark-name");
       if (this._saveCurrentBookmark(input.value)) this._renderLibrary(kind);
     });
+    backdrop.querySelector('[data-action="share"]')?.addEventListener("click", (event) => this._copyShareLink(event.currentTarget));
     backdrop.querySelector('[data-action="clear"]').addEventListener("click", () => {
       const message = this._customLocalize(isBookmarks ? "confirm_clear_bookmarks" : "confirm_clear_history");
       if (!items.length || !window.confirm(message)) return;

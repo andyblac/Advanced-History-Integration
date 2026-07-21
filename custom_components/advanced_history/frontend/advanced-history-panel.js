@@ -5,6 +5,7 @@ import {
 } from "./constants.js";
 import { EnergyMethods } from "./energy.js";
 import { GraphMethods } from "./graphs.js";
+import { ShareMethods } from "./share.js";
 import { StorageMethods } from "./storage.js";
 import { panelStyles as css } from "./styles.js";
 import { TargetPickerMethods } from "./target-picker.js";
@@ -101,7 +102,7 @@ class AdvancedHistoryPanel extends HTMLElement {
 
   async _initialize() {
     this._loaded = true;
-    this._loadTargets();
+    await this._loadTargets();
     this._loadingView();
     try {
       [this._areas, this._devices, this._entities] = await Promise.all([
@@ -257,6 +258,7 @@ class AdvancedHistoryPanel extends HTMLElement {
 
 for (const methods of [
   StorageMethods,
+  ShareMethods,
   TargetPickerMethods,
   GraphMethods,
   EnergyMethods,

@@ -15,3 +15,4 @@ export const CURRENT_SNAPSHOT_STORAGE_KEY = "advanced-history-panel.current-snap
 export const UNDO_STORAGE_KEY = "advanced-history-panel.undo.v1";
 export const REDO_STORAGE_KEY = "advanced-history-panel.redo.v1";
 export const UNDO_LIMIT = 50;
+export const SHARE_QUERY_PARAM = "chart";
