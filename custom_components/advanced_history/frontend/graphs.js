@@ -430,13 +430,14 @@ export class GraphMethods {
     const { cardOptions, entityOptions } = this._splitGraphEditorConfig(config);
     const defaultHours = Number(config?.hours_to_show) || this._effectiveDefaultHours();
     const graphHeight = Number(config?.height) || this._effectiveGraphHeight();
+    const compare = this._snapshotCompareSetting();
     this._activeSnapshot = {
       card_options: cardOptions,
       entity_options: entityOptions,
       default_hours: defaultHours,
       graph_height: graphHeight,
-      compare: this._clone(this._snapshotCompareSetting()),
     };
+    if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
     this._recordChange();
     return { cardOptions, entityOptions, defaultHours, graphHeight };
   }

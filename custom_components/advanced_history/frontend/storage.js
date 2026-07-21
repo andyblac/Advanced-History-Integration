@@ -250,6 +250,14 @@ export class StorageMethods {
       end: collection.end?.toISOString?.() || null,
       compare: collection.compare ?? "",
     } : this._clone(this._pendingPeriodRestore);
+    const compare = this._snapshotCompareSetting();
+    const chart = {
+      card_options: this._clone(this._effectiveCardOptionsConfig()),
+      entity_options: this._clone(this._effectiveEntityOptionsConfig()),
+      default_hours: this._effectiveDefaultHours(),
+      graph_height: this._effectiveGraphHeight(),
+    };
+    if (compare !== undefined) chart.compare = this._clone(compare);
     return {
       schema: 1,
       id: this._newSnapshotId(),
@@ -257,13 +265,7 @@ export class StorageMethods {
       saved_at: new Date().toISOString(),
       targets: this._clone(this._targets),
       hidden_targets: this._clone(this._hiddenTargets),
-      chart: {
-        card_options: this._clone(this._effectiveCardOptionsConfig()),
-        entity_options: this._clone(this._effectiveEntityOptionsConfig()),
-        default_hours: this._effectiveDefaultHours(),
-        graph_height: this._effectiveGraphHeight(),
-        compare: this._clone(this._snapshotCompareSetting()),
-      },
+      chart,
       period,
       source_bookmark_id: this._loadedBookmarkId || null,
     };
@@ -435,6 +437,7 @@ export class StorageMethods {
       this._archiveCurrentChart();
     }
     this._activeSnapshot = this._clone(snapshot.chart);
+    if (this._activeSnapshot?.compare === undefined) delete this._activeSnapshot.compare;
     this._pendingPeriodRestore = this._clone(snapshot.period);
     if (this._pendingPeriodRestore?.start) {
       this._beginPeriodRestore(this._pendingPeriodRestore);
@@ -503,14 +506,14 @@ export class StorageMethods {
   }
 
   _effectiveCompare() {
-    if (this._activeSnapshot && Object.prototype.hasOwnProperty.call(this._activeSnapshot, "compare")) {
+    if (this._activeSnapshot?.compare !== undefined) {
       return this._activeSnapshot.compare;
     }
     return this.config.compare !== undefined ? this.config.compare : this._energyCompare;
   }
 
   _snapshotCompareSetting() {
-    if (this._activeSnapshot && Object.prototype.hasOwnProperty.call(this._activeSnapshot, "compare")) {
+    if (this._activeSnapshot?.compare !== undefined) {
       return this._activeSnapshot.compare;
     }
     return this.config.compare;
