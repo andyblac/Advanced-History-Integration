@@ -1,4 +1,5 @@
 import { CARD_TAG } from "./constants.js";
+import { automaticEntityOptions } from "./entity-defaults.js";
 
 const REDACTED_OPTION_KEYS = /^(?:annotations|state_map)$|(?:^|_)(?:area|device|user|entry)_id$|(?:friendly_)?name$|(?:card_)?header$|title$|label$|text$|url$/i;
 
@@ -90,6 +91,10 @@ export class DiagnosticsMethods {
         device_class: attributes.device_class || null,
         state_class: attributes.state_class || null,
         unit_of_measurement: attributes.unit_of_measurement || null,
+        automatic_options: automaticEntityOptions(
+          state,
+          this._isNumeric(entityId) ? "timeline" : "state_timeline"
+        ),
       };
     });
     const viewport = window.visualViewport;

@@ -1,4 +1,5 @@
 import { CARD_HACS_INSTALL_URL, CARD_TAG } from "./constants.js";
+import { CARD_DEFAULT_AGGREGATE, automaticEntityOptions } from "./entity-defaults.js";
 
 export class GraphMethods {
   _renderGraphs() {
@@ -225,6 +226,7 @@ export class GraphMethods {
   ) {
     const savedOptions = entityOptionsConfig?.[entity];
     const entityOptions = {
+      ...automaticEntityOptions(this._hass.states[entity], mode),
       ...this._defaultEntityOptions(cardOptionsConfig),
       ...(savedOptions && typeof savedOptions === "object" ? savedOptions : {}),
     };
@@ -347,6 +349,20 @@ export class GraphMethods {
       delete options.entity;
       delete options.statistic_id;
       delete options.compare;
+      const integrationBase = {
+        ...automaticEntityOptions(this._hass.states[entity], "timeline"),
+        ...this._defaultEntityOptions(this.config.card_options),
+        ...(integrationEntityDefaults?.[entity] || {}),
+      };
+      if (
+        !Object.prototype.hasOwnProperty.call(options, "aggregate_func")
+        && (integrationBase.aggregate_func ?? CARD_DEFAULT_AGGREGATE) !== CARD_DEFAULT_AGGREGATE
+      ) {
+        // The card removes values equal to its own default from editor output.
+        // Preserve that as an explicit override when our automatic/configured
+        // fallback would otherwise select a different aggregation.
+        options.aggregate_func = CARD_DEFAULT_AGGREGATE;
+      }
       const automaticColor = this._editorAutoColors.get(entity);
       if (
         automaticColor &&
@@ -361,12 +377,8 @@ export class GraphMethods {
         if (value === true && !(key in options)) options[key] = false;
       }
       if (!editDefaults) {
-        const entityBase = {
-          ...this._defaultEntityOptions(this.config.card_options),
-          ...(integrationEntityDefaults?.[entity] || {}),
-        };
         for (const [key, value] of Object.entries(options)) {
-          if (this._sameGraphOption(value, entityBase[key])) delete options[key];
+          if (this._sameGraphOption(value, integrationBase[key])) delete options[key];
         }
       }
       if (Object.keys(options).length) entityOptions[entity] = options;
@@ -409,11 +421,20 @@ export class GraphMethods {
     const loading = this._localize("ui.common.loading", "Loading");
     const graphSettings = this._customLocalize("graph_settings");
     const editorNote = this._customLocalize("graph_editor_note");
+    const mappingError = this._customLocalize("graph_code_editor_mapping_error");
     const diagnostics = this._customLocalize("diagnostics");
+    const showCodeEditor = this._localize(
+      "ui.panel.lovelace.editor.edit_card.show_code_editor",
+      "Show code editor"
+    );
+    const showVisualEditor = this._localize(
+      "ui.panel.lovelace.editor.edit_card.show_visual_editor",
+      "Show visual editor"
+    );
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop";
     backdrop.innerHTML = `<section class="dialog editor-dialog" role="dialog" aria-modal="true" aria-label="${this._escape(graphSettings)}">
-      <header class="dialog-title"><h2>${this._escape(graphSettings)}</h2></header>
+      <header class="dialog-title"><h2>${this._escape(graphSettings)}</h2><button type="button" class="editor-mode-toggle" data-action="toggle-editor" aria-label="${this._escape(showCodeEditor)}" title="${this._escape(showCodeEditor)}"><ha-icon icon="mdi:code-tags"></ha-icon><span>${this._escape(showCodeEditor)}</span></button></header>
       <div class="editor-note">${this._escape(editorNote)}</div>
       <div class="editor-host"><div class="start"><p>${this._escape(loading)}…</p></div></div>
       <footer class="dialog-actions"><button class="dialog-leading-action" data-action="diagnostics">${this._escape(diagnostics)}</button><span class="editor-status"></span><button data-action="cancel">${this._escape(cancel)}</button><button class="primary" data-action="save">${this._escape(saveLabel)}</button></footer>
@@ -426,24 +447,95 @@ export class GraphMethods {
     const host = backdrop.querySelector(".editor-host");
     const status = backdrop.querySelector(".editor-status");
     const save = backdrop.querySelector('[data-action="save"]');
+    const toggle = backdrop.querySelector('[data-action="toggle-editor"]');
     let draft = this._graphEditorConfig();
-    try {
-      const cardClass = customElements.get(CARD_TAG);
-      let editor = typeof cardClass?.getConfigElement === "function" ? await cardClass.getConfigElement() : null;
-      if (!editor) {
-        await customElements.whenDefined("statistics-graph-chart-card-editor");
-        editor = document.createElement("statistics-graph-chart-card-editor");
-      }
-      if (!backdrop.isConnected) return;
-      editor.hass = this._hass;
-      editor.setConfig(draft);
-      editor.addEventListener("config-changed", (event) => { if (event.detail?.config) draft = event.detail.config; });
-      host.replaceChildren(editor);
-    } catch (error) {
+    let mode = "visual";
+    let renderToken = 0;
+
+    const updateToggle = () => {
+      const code = mode === "code";
+      const label = code ? showVisualEditor : showCodeEditor;
+      toggle.querySelector("ha-icon").icon = code ? "mdi:tune" : "mdi:code-tags";
+      toggle.querySelector("span").textContent = label;
+      toggle.setAttribute("aria-label", label);
+      toggle.title = label;
+    };
+
+    const showEditorError = (error) => {
       console.error("Advanced History: graph editor failed to load", error);
       host.innerHTML = `<div class="error">${this._escape(error.message || this._customLocalize("graph_editor_load_error"))}</div>`;
       save.disabled = true;
-    }
+    };
+
+    const renderVisualEditor = async () => {
+      const token = ++renderToken;
+      mode = "visual";
+      status.textContent = "";
+      save.disabled = false;
+      toggle.disabled = false;
+      updateToggle();
+      host.innerHTML = `<div class="start"><p>${this._escape(loading)}…</p></div>`;
+      try {
+        const cardClass = customElements.get(CARD_TAG);
+        let editor = typeof cardClass?.getConfigElement === "function" ? await cardClass.getConfigElement() : null;
+        if (!editor) {
+          await customElements.whenDefined("statistics-graph-chart-card-editor");
+          editor = document.createElement("statistics-graph-chart-card-editor");
+        }
+        if (token !== renderToken || !backdrop.isConnected) return;
+        editor.hass = this._hass;
+        editor.setConfig(draft);
+        editor.addEventListener("config-changed", (event) => {
+          if (event.detail?.config) draft = event.detail.config;
+        });
+        host.replaceChildren(editor);
+      } catch (error) {
+        if (token === renderToken) showEditorError(error);
+      }
+    };
+
+    const renderCodeEditor = async () => {
+      ++renderToken;
+      mode = "code";
+      status.textContent = "";
+      save.disabled = false;
+      toggle.disabled = false;
+      updateToggle();
+      try {
+        if (!customElements.get("ha-yaml-editor")) {
+          await Promise.race([
+            customElements.whenDefined("ha-yaml-editor"),
+            new Promise((_, reject) => window.setTimeout(() => reject(new Error(this._customLocalize("graph_editor_load_error"))), 3000)),
+          ]);
+        }
+        if (!backdrop.isConnected || mode !== "code") return;
+        const editor = document.createElement("ha-yaml-editor");
+        editor.hass = this._hass;
+        editor.inDialog = true;
+        editor.setValue(draft);
+        editor.addEventListener("value-changed", (event) => {
+          const value = event.detail?.value;
+          const isMapping = Boolean(value) && typeof value === "object" && !Array.isArray(value);
+          const valid = event.detail?.isValid !== false && isMapping;
+          status.textContent = valid
+            ? ""
+            : event.detail?.errorMsg || mappingError;
+          save.disabled = !valid;
+          toggle.disabled = !valid;
+          if (valid) draft = value;
+        });
+        editor.addEventListener("editor-save", () => { if (!save.disabled) save.click(); });
+        host.replaceChildren(editor);
+      } catch (error) {
+        showEditorError(error);
+      }
+    };
+
+    toggle.addEventListener("click", () => {
+      if (mode === "visual") renderCodeEditor();
+      else renderVisualEditor();
+    });
+    renderVisualEditor();
 
     save.addEventListener("click", () => {
       this._applyGraphEditorConfig(draft);

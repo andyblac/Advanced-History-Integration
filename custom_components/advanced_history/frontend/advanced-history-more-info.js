@@ -1,5 +1,6 @@
 import { ensureCardLoaded, installConfigFlowDefaultsEditor } from "./config-flow-defaults.js";
 import { CARD_TAG } from "./constants.js";
+import { automaticEntityOptions } from "./entity-defaults.js";
 
 // Keep the legacy global value so an update cannot install duplicate listeners
 // in a browser session that still has the previous module loaded.
@@ -115,7 +116,10 @@ function moreInfoCardConfig(historyView, nativeChart, options) {
   const cardOptions = options && typeof options === "object" && !Array.isArray(options)
     ? structuredClone(options)
     : {};
-  const template = structuredClone(entityTemplate(cardOptions));
+  const template = {
+    ...automaticEntityOptions(historyView.hass?.states?.[entityId], numeric ? "timeline" : "state_timeline"),
+    ...structuredClone(entityTemplate(cardOptions)),
+  };
   delete cardOptions.entities;
   delete template.entity;
   delete template.statistic_id;

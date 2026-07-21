@@ -100,9 +100,14 @@ export const panelStyles = `
     color:var(--primary-text-color); background:var(--card-background-color); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.35);
   }
   .editor-dialog { width:min(1040px,100%); }
+  .editor-mode-toggle { margin-left:auto; min-height:40px; padding:0 14px; display:flex; align-items:center; gap:8px; border:0; border-radius:20px; cursor:pointer; color:var(--primary-color); background:transparent; font:inherit; font-weight:500; }
+  .editor-mode-toggle:hover { background:var(--secondary-background-color); }
+  .editor-mode-toggle:disabled { opacity:.5; cursor:default; }
+  .editor-mode-toggle ha-icon { width:20px; height:20px; }
   .editor-note { margin:14px 18px 8px; padding:10px 12px; color:var(--secondary-text-color); background:var(--secondary-background-color); border-radius:8px; line-height:1.4; }
   .editor-host { flex:1; min-height:0; overflow:auto; padding:8px 18px 18px; }
   .editor-host > * { display:block; width:100%; }
+  .editor-host ha-yaml-editor { min-height:480px; }
   .editor-status { margin-right:auto; color:var(--error-color); font-size:13px; }
   .library-save { padding:14px 18px; display:flex; gap:10px; border-bottom:1px solid var(--divider-color); }
   .library-save input { flex:1; min-width:0; height:42px; padding:0 12px; color:var(--primary-text-color); background:var(--secondary-background-color); border:1px solid var(--divider-color); border-radius:8px; }
@@ -151,6 +156,9 @@ export const panelStyles = `
     .appbar .icon-button { flex:0 0 40px; }
     .dialog { height:100%; border-radius:0; }
     .backdrop { padding:0; }
+    .dialog-title { padding:0 14px; }
+    .editor-mode-toggle { min-width:40px; padding:0 10px; }
+    .editor-mode-toggle span { display:none; }
     .tab { flex:1; padding:0 4px; }
     .chip { max-width:230px; }
   }
