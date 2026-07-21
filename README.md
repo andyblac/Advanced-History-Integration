@@ -20,9 +20,9 @@
 
 ## What is Advanced History?
 
-Advanced History provides a dedicated Home Assistant sidebar panel that keeps the familiar History-page workflow while using [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) for graph rendering.
+Advanced History provides a dedicated Home Assistant sidebar panel that keeps the familiar History-page workflow while using [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) for graph rendering. It can also optionally replace the native History graph inside entity More Info dialogs.
 
-It includes native target selection, Energy-style date navigation and comparisons, visual graph editing, reusable bookmarks, chart history, and Undo/Redo.
+It includes native target selection, Energy-style date navigation and comparisons, visual graph editing, reusable bookmarks, chart history, Undo/Redo, and independent defaults for the sidebar and More Info graphs.
 
 ## Why was it created?
 
@@ -40,6 +40,8 @@ Advanced History brings those two ideas together: select targets as you would in
 - Save complete charts as user-scoped bookmarks synchronized across devices.
 - Restore recently cleared charts and use Undo/Redo for incremental changes.
 - Optionally open entity-dialog **Show more** links in Advanced History.
+- Optionally replace native entity More Info History graphs with independently configured Statistics Graph Chart Card graphs.
+- Match Home Assistant's numeric, state, axis, grid, theme, and timezone behavior in More Info dialogs.
 
 ## Requirements
 
@@ -65,7 +67,10 @@ If the graph card is missing, Advanced History displays an **Install using HACS*
 5. Search for **Advanced History** and install it.
 6. Restart Home Assistant.
 7. Open **Settings → Devices & services → Add integration**.
-8. Search for **Advanced History**, complete setup, then open it from the sidebar.
+8. Search for **Advanced History** and complete setup.
+9. Confirm the integration contains separate **Advanced History** and **More-Info** services, then open Advanced History from the sidebar.
+
+New installations create both services automatically. The More Info graph replacement has its own enable switch, optional calendar, YAML defaults, and visual editor.
 
 ### Manual
 
@@ -76,6 +81,10 @@ If the graph card is missing, Advanced History displays an **Install using HACS*
 
 No `panel_custom` entry is required in `configuration.yaml`.
 
+### Existing installations from before 0.6.0
+
+After updating, open **Settings → Devices & services → Advanced History**, select **Add service**, and complete **Set up More-Info**. This creates the optional More Info graph replacement without changing the sidebar panel configuration.
+
 ## Documentation
 
 Full setup, usage, configuration, and troubleshooting documentation is available in the [Advanced History Wiki](https://github.com/andyblac/Advanced-History-Integration/wiki).
@@ -83,6 +92,7 @@ Full setup, usage, configuration, and troubleshooting documentation is available
 - [Installation](https://github.com/andyblac/Advanced-History-Integration/wiki/Installation)
 - [Getting started](https://github.com/andyblac/Advanced-History-Integration/wiki/Getting-Started)
 - [Configuration reference](https://github.com/andyblac/Advanced-History-Integration/wiki/Configuration-Reference)
+- [More Info graphs](https://github.com/andyblac/Advanced-History-Integration/wiki/More-Info-Graphs)
 - [Troubleshooting](https://github.com/andyblac/Advanced-History-Integration/wiki/Troubleshooting)
 
 ## Special thanks
