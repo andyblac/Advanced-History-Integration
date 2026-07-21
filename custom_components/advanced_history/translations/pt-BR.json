@@ -13,15 +13,15 @@
           "graph_height": "Altura do gráfico",
           "include_hidden": "Incluir entidades ocultas",
           "redirect_show_more": "Abrir Mostrar mais no Advanced History",
-          "card_module_url": "URL do módulo do cartão de gráfico",
           "card_options": "Padrões do cartão",
           "compare": "Comparação padrão",
-          "require_admin": "Somente administradores"
+          "require_admin": "Somente administradores",
+          "card_module_url": "URL do módulo do cartão de gráfico"
         },
         "data_description": {
           "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
-          "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
-          "card_options": "Configurações padrão do Statistics Graph Chart Card para novos gráficos. Edite o YAML diretamente ou use o botão Abrir editor visual abaixo."
+          "card_options": "Configurações padrão do Statistics Graph Chart Card para novos gráficos. Edite o YAML diretamente ou use o botão Abrir editor visual abaixo.",
+          "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card."
         }
       },
       "reconfigure": {
@@ -45,6 +45,38 @@
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
           "card_options": "Configurações padrão do Statistics Graph Chart Card para novos gráficos. Edite o YAML diretamente ou use o botão Abrir editor visual abaixo."
         }
+      },
+      "more_info": {
+        "title": "Configurar More-Info",
+        "description": "Cria um serviço separado que pode substituir o gráfico de histórico nativo nas caixas de diálogo das entidades.",
+        "data": {
+          "replace_more_info_history": "Usar Statistics Graph em Mais informações",
+          "more_info_show_date_picker": "Mostrar calendário do gráfico",
+          "card_module_url": "URL do módulo do cartão de gráfico",
+          "more_info_card_options": "Padrões de Mais informações"
+        },
+        "data_description": {
+          "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",
+          "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
+          "more_info_card_options": "Configurações separadas do Statistics Graph Chart Card para o gráfico nos diálogos de entidade. Edite o YAML diretamente ou use o botão do editor visual correspondente."
+        }
+      },
+      "reconfigure_more_info": {
+        "title": "Reconfigurar More-Info",
+        "description": "Atualiza o gráfico More-Info e seus padrões de cartão independentes.",
+        "data": {
+          "replace_more_info_history": "Usar Statistics Graph em Mais informações",
+          "more_info_show_date_picker": "Mostrar calendário do gráfico",
+          "card_module_url": "URL do módulo do cartão de gráfico",
+          "more_info_card_options": "Padrões de Mais informações"
+        },
+        "data_description": {
+          "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",
+          "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
+          "more_info_card_options": "Configurações separadas do Statistics Graph Chart Card para o gráfico nos diálogos de entidade. Edite o YAML diretamente ou use o botão do editor visual correspondente."
+        }
       }
     },
     "abort": {
@@ -65,15 +97,21 @@
           "graph_height": "Altura do gráfico",
           "include_hidden": "Incluir entidades ocultas",
           "redirect_show_more": "Abrir Mostrar mais no Advanced History",
+          "replace_more_info_history": "Usar Statistics Graph em Mais informações",
+          "more_info_show_date_picker": "Mostrar calendário do gráfico",
           "card_module_url": "URL do módulo do cartão de gráfico",
           "card_options": "Padrões do cartão",
+          "more_info_card_options": "Padrões de Mais informações",
           "compare": "Comparação padrão",
           "require_admin": "Somente administradores"
         },
         "data_description": {
           "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
+          "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
-          "card_options": "Configurações padrão do Statistics Graph Chart Card para novos gráficos. Edite o YAML diretamente ou use o botão Abrir editor visual abaixo."
+          "card_options": "Configurações padrão do Statistics Graph Chart Card para novos gráficos. Edite o YAML diretamente ou use o botão Abrir editor visual abaixo.",
+          "more_info_card_options": "Configurações separadas do Statistics Graph Chart Card para o gráfico nos diálogos de entidade. Edite o YAML diretamente ou use o botão do editor visual correspondente."
         }
       }
     }

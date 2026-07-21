@@ -13,15 +13,15 @@
           "graph_height": "Grafiekhoogte",
           "include_hidden": "Verborgen entiteiten opnemen",
           "redirect_show_more": "Meer weergeven openen in Advanced History",
-          "card_module_url": "Module-URL van grafiekkaart",
           "card_options": "Standaardwaarden van de kaart",
           "compare": "Standaardvergelijking",
-          "require_admin": "Alleen beheerders"
+          "require_admin": "Alleen beheerders",
+          "card_module_url": "Module-URL van grafiekkaart"
         },
         "data_description": {
           "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
-          "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
-          "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder."
+          "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder.",
+          "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren."
         }
       },
       "reconfigure": {
@@ -45,6 +45,38 @@
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
           "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder."
         }
+      },
+      "more_info": {
+        "title": "More-Info instellen",
+        "description": "Maak een aparte service die de standaardgeschiedenisgrafiek in entiteitsdialogen kan vervangen.",
+        "data": {
+          "replace_more_info_history": "Statistics Graph gebruiken in Meer informatie",
+          "more_info_show_date_picker": "Grafiekkalender tonen",
+          "card_module_url": "Module-URL van grafiekkaart",
+          "more_info_card_options": "Standaardwaarden voor Meer informatie"
+        },
+        "data_description": {
+          "replace_more_info_history": "Vervang de ingebouwde geschiedenisgrafiek in entiteitsvensters door Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Toon de ingebouwde datumkiezer van Statistics Graph Chart Card in entiteitsvensters.",
+          "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
+          "more_info_card_options": "Afzonderlijke Statistics Graph Chart Card-instellingen voor de grafiek in entiteitsvensters. Bewerk de YAML rechtstreeks of gebruik de bijbehorende visuele editor."
+        }
+      },
+      "reconfigure_more_info": {
+        "title": "More-Info opnieuw configureren",
+        "description": "Werk de More-Info-grafiek en de onafhankelijke kaartstandaarden bij.",
+        "data": {
+          "replace_more_info_history": "Statistics Graph gebruiken in Meer informatie",
+          "more_info_show_date_picker": "Grafiekkalender tonen",
+          "card_module_url": "Module-URL van grafiekkaart",
+          "more_info_card_options": "Standaardwaarden voor Meer informatie"
+        },
+        "data_description": {
+          "replace_more_info_history": "Vervang de ingebouwde geschiedenisgrafiek in entiteitsvensters door Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Toon de ingebouwde datumkiezer van Statistics Graph Chart Card in entiteitsvensters.",
+          "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
+          "more_info_card_options": "Afzonderlijke Statistics Graph Chart Card-instellingen voor de grafiek in entiteitsvensters. Bewerk de YAML rechtstreeks of gebruik de bijbehorende visuele editor."
+        }
       }
     },
     "abort": {
@@ -65,15 +97,21 @@
           "graph_height": "Grafiekhoogte",
           "include_hidden": "Verborgen entiteiten opnemen",
           "redirect_show_more": "Meer weergeven openen in Advanced History",
+          "replace_more_info_history": "Statistics Graph gebruiken in Meer informatie",
+          "more_info_show_date_picker": "Grafiekkalender tonen",
           "card_module_url": "Module-URL van grafiekkaart",
           "card_options": "Standaardwaarden van de kaart",
+          "more_info_card_options": "Standaardwaarden voor Meer informatie",
           "compare": "Standaardvergelijking",
           "require_admin": "Alleen beheerders"
         },
         "data_description": {
           "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
+          "replace_more_info_history": "Vervang de ingebouwde geschiedenisgrafiek in entiteitsvensters door Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Toon de ingebouwde datumkiezer van Statistics Graph Chart Card in entiteitsvensters.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
-          "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder."
+          "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder.",
+          "more_info_card_options": "Afzonderlijke Statistics Graph Chart Card-instellingen voor de grafiek in entiteitsvensters. Bewerk de YAML rechtstreeks of gebruik de bijbehorende visuele editor."
         }
       }
     }

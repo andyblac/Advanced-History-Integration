@@ -10,7 +10,7 @@ export class GraphMethods {
     if (this._cardLoadError) {
       const title = this._customLocalize("card_missing_title");
       const install = this._customLocalize("install_with_hacs");
-      const retry = this._localize("ui.common.retry", "Retry");
+      const retry = this._localize("ui.panel.app.retry", "Retry");
       host.innerHTML = `<div class="error dependency-error">
         <ha-icon icon="mdi:puzzle-outline"></ha-icon>
         <h2>${this._escape(title)}</h2>

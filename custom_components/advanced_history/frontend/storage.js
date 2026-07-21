@@ -577,13 +577,21 @@ export class StorageMethods {
     const dateFormatter = new Intl.DateTimeFormat(this._hass.locale?.language, { dateStyle: "medium" });
     const period = periodStart && !Number.isNaN(periodStart.getTime())
       ? `${dateFormatter.format(periodStart)}${periodEnd && !Number.isNaN(periodEnd.getTime()) ? ` – ${dateFormatter.format(periodEnd)}` : ""}`
-      : this._customLocalize(hours === 1 ? "hour_one" : "hour_many", { count: hours });
-    const targetCount = this._customLocalize(count === 1 ? "target_one" : "target_many", { count });
+      : new Intl.NumberFormat(this._hass.locale?.language, {
+        style: "unit",
+        unit: "hour",
+        unitDisplay: "long",
+      }).format(hours);
+    const targetCount = this._localize(
+      "ui.panel.config.automation.editor.target_summary.targets",
+      `${count} ${count === 1 ? "target" : "targets"}`,
+      { count }
+    );
     return `${targetCount} · ${period} · ${height}px · ${this._formatSnapshotTime(snapshot.saved_at)}`;
   }
 
   _libraryRows(items, isBookmarks = false) {
-    if (!items.length) return `<div class="library-empty">${this._escape(this._customLocalize("nothing_saved"))}</div>`;
+    if (!items.length) return `<div class="library-empty">${this._escape(this._localize("ui.components.media-browser.no_items", "No items"))}</div>`;
     const deleteLabel = this._localize("ui.common.delete", "Delete");
     const updateLabel = this._customLocalize("update_bookmark");
     return items.map((item) => `

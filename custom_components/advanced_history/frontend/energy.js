@@ -81,7 +81,7 @@ export class EnergyMethods {
     });
     if (!downloads.length) {
       this.dispatchEvent(new CustomEvent("hass-notification", {
-        detail: { message: this._localize("ui.common.no_data", "No data") },
+        detail: { message: this._localize("ui.components.data-table.no-data", "No data") },
         bubbles: true,
         composed: true,
       }));

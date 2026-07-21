@@ -13,15 +13,15 @@
           "graph_height": "Hauteur du graphique",
           "include_hidden": "Inclure les entités masquées",
           "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
-          "card_module_url": "URL du module de la carte graphique",
           "card_options": "Valeurs par défaut de la carte",
           "compare": "Comparaison par défaut",
-          "require_admin": "Administrateurs uniquement"
+          "require_admin": "Administrateurs uniquement",
+          "card_module_url": "URL du module de la carte graphique"
         },
         "data_description": {
           "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
-          "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
-          "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous."
+          "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous.",
+          "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card."
         }
       },
       "reconfigure": {
@@ -45,6 +45,38 @@
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
           "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous."
         }
+      },
+      "more_info": {
+        "title": "Configurer More-Info",
+        "description": "Crée un service distinct qui peut remplacer le graphique d’historique natif dans les boîtes de dialogue des entités.",
+        "data": {
+          "replace_more_info_history": "Utiliser Statistics Graph dans Plus d’informations",
+          "more_info_show_date_picker": "Afficher le calendrier du graphique",
+          "card_module_url": "URL du module de la carte graphique",
+          "more_info_card_options": "Valeurs par défaut de Plus d’informations"
+        },
+        "data_description": {
+          "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
+          "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
+          "more_info_card_options": "Paramètres Statistics Graph Chart Card distincts pour le graphique des boîtes de dialogue d’entité. Modifiez le YAML directement ou utilisez son bouton d’éditeur visuel."
+        }
+      },
+      "reconfigure_more_info": {
+        "title": "Reconfigurer More-Info",
+        "description": "Met à jour le graphique More-Info et ses réglages de carte indépendants.",
+        "data": {
+          "replace_more_info_history": "Utiliser Statistics Graph dans Plus d’informations",
+          "more_info_show_date_picker": "Afficher le calendrier du graphique",
+          "card_module_url": "URL du module de la carte graphique",
+          "more_info_card_options": "Valeurs par défaut de Plus d’informations"
+        },
+        "data_description": {
+          "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
+          "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
+          "more_info_card_options": "Paramètres Statistics Graph Chart Card distincts pour le graphique des boîtes de dialogue d’entité. Modifiez le YAML directement ou utilisez son bouton d’éditeur visuel."
+        }
       }
     },
     "abort": {
@@ -65,15 +97,21 @@
           "graph_height": "Hauteur du graphique",
           "include_hidden": "Inclure les entités masquées",
           "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
+          "replace_more_info_history": "Utiliser Statistics Graph dans Plus d’informations",
+          "more_info_show_date_picker": "Afficher le calendrier du graphique",
           "card_module_url": "URL du module de la carte graphique",
           "card_options": "Valeurs par défaut de la carte",
+          "more_info_card_options": "Valeurs par défaut de Plus d’informations",
           "compare": "Comparaison par défaut",
           "require_admin": "Administrateurs uniquement"
         },
         "data_description": {
           "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
+          "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
-          "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous."
+          "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous.",
+          "more_info_card_options": "Paramètres Statistics Graph Chart Card distincts pour le graphique des boîtes de dialogue d’entité. Modifiez le YAML directement ou utilisez son bouton d’éditeur visuel."
         }
       }
     }

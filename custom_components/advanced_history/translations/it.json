@@ -13,15 +13,15 @@
           "graph_height": "Altezza del grafico",
           "include_hidden": "Includi entità nascoste",
           "redirect_show_more": "Apri Mostra altro in Advanced History",
-          "card_module_url": "URL del modulo della scheda grafico",
           "card_options": "Impostazioni predefinite della scheda",
           "compare": "Confronto predefinito",
-          "require_admin": "Solo amministratori"
+          "require_admin": "Solo amministratori",
+          "card_module_url": "URL del modulo della scheda grafico"
         },
         "data_description": {
           "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
-          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
-          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante."
+          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante.",
+          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card."
         }
       },
       "reconfigure": {
@@ -45,6 +45,38 @@
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
           "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante."
         }
+      },
+      "more_info": {
+        "title": "Configura More-Info",
+        "description": "Crea un servizio separato che può sostituire il grafico cronologico nativo nelle finestre delle entità.",
+        "data": {
+          "replace_more_info_history": "Usa Statistics Graph in Ulteriori informazioni",
+          "more_info_show_date_picker": "Mostra calendario del grafico",
+          "card_module_url": "URL del modulo della scheda grafico",
+          "more_info_card_options": "Impostazioni predefinite di Ulteriori informazioni"
+        },
+        "data_description": {
+          "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Mostra il selettore di date integrato di Statistics Graph Chart Card nelle finestre delle entità.",
+          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
+          "more_info_card_options": "Impostazioni separate di Statistics Graph Chart Card per il grafico nelle finestre delle entità. Modifica il YAML direttamente oppure usa il relativo editor visuale."
+        }
+      },
+      "reconfigure_more_info": {
+        "title": "Riconfigura More-Info",
+        "description": "Aggiorna il grafico More-Info e le relative impostazioni predefinite indipendenti.",
+        "data": {
+          "replace_more_info_history": "Usa Statistics Graph in Ulteriori informazioni",
+          "more_info_show_date_picker": "Mostra calendario del grafico",
+          "card_module_url": "URL del modulo della scheda grafico",
+          "more_info_card_options": "Impostazioni predefinite di Ulteriori informazioni"
+        },
+        "data_description": {
+          "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Mostra il selettore di date integrato di Statistics Graph Chart Card nelle finestre delle entità.",
+          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
+          "more_info_card_options": "Impostazioni separate di Statistics Graph Chart Card per il grafico nelle finestre delle entità. Modifica il YAML direttamente oppure usa il relativo editor visuale."
+        }
       }
     },
     "abort": {
@@ -65,15 +97,21 @@
           "graph_height": "Altezza del grafico",
           "include_hidden": "Includi entità nascoste",
           "redirect_show_more": "Apri Mostra altro in Advanced History",
+          "replace_more_info_history": "Usa Statistics Graph in Ulteriori informazioni",
+          "more_info_show_date_picker": "Mostra calendario del grafico",
           "card_module_url": "URL del modulo della scheda grafico",
           "card_options": "Impostazioni predefinite della scheda",
+          "more_info_card_options": "Impostazioni predefinite di Ulteriori informazioni",
           "compare": "Confronto predefinito",
           "require_admin": "Solo amministratori"
         },
         "data_description": {
           "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
+          "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Mostra il selettore di date integrato di Statistics Graph Chart Card nelle finestre delle entità.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
-          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante."
+          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante.",
+          "more_info_card_options": "Impostazioni separate di Statistics Graph Chart Card per il grafico nelle finestre delle entità. Modifica il YAML direttamente oppure usa il relativo editor visuale."
         }
       }
     }

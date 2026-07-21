@@ -16,7 +16,7 @@ function custom(hass, key) {
   return customLocalize(language(hass), key);
 }
 
-function findCardDefaultsSelector(root = document) {
+function findObjectSelector(name, root = document) {
   const queue = [root];
   const visited = new Set();
   while (queue.length) {
@@ -29,7 +29,7 @@ function findCardDefaultsSelector(root = document) {
     for (const child of children || []) {
       if (
         child.localName === "ha-selector" &&
-        (child.schema?.name === "card_options" || child.name === "card_options")
+        (child.schema?.name === name || child.name === name)
       ) {
         const objectSelector = child.shadowRoot?.querySelector("ha-selector-object");
         if (objectSelector) return objectSelector;
@@ -41,9 +41,10 @@ function findCardDefaultsSelector(root = document) {
   return null;
 }
 
-async function ensureCardLoaded(hass) {
+export async function ensureCardLoaded(hass, configuredModuleUrl = "") {
   if (customElements.get(CARD_TAG)) return;
-  const configured = hass?.panels?.["advanced-history"]?.config?.card_module_url;
+  const configured = configuredModuleUrl
+    || hass?.panels?.["advanced-history"]?.config?.card_module_url;
   const candidates = configured ? [configured] : CARD_DEFAULT_MODULE_URLS;
   for (const url of candidates) {
     try {
@@ -69,29 +70,34 @@ function sampleEntities(hass, count) {
   return numeric.slice(0, Math.max(1, count));
 }
 
-export function editorConfig(hass, defaults) {
+export function editorConfig(hass, defaults, profile = "panel") {
   const templates = entityTemplates(defaults);
   const samples = sampleEntities(hass, templates.length || 1);
   const entities = samples.map((entity, index) => ({
     ...(templates[index] || templates[0] || {}),
     entity,
   }));
-  return {
+  const config = {
     ...(defaults && typeof defaults === "object" && !Array.isArray(defaults) ? defaults : {}),
     type: `custom:${CARD_TAG}`,
     card_header: custom(hass, "numeric_history"),
     chart_mode: "timeline",
-    hours_to_show: 24,
-    height: 500,
+    hours_to_show: profile === "more-info" ? Number(defaults?.hours_to_show) || 24 : 24,
+    height: profile === "more-info" ? Number(defaults?.height) || 300 : 500,
     entities,
-    energy_date_sync: true,
   };
+  if (profile === "panel") config.energy_date_sync = true;
+  return config;
 }
 
-export function defaultsFromEditor(config) {
+export function defaultsFromEditor(config, profile = "panel") {
   const protectedKeys = new Set([
-    "type", "card_header", "chart_mode", "hours_to_show", "height", "energy_date_sync", "entities",
+    "type", "card_header", "chart_mode", "energy_date_sync", "entities",
   ]);
+  if (profile === "panel") {
+    protectedKeys.add("hours_to_show");
+    protectedKeys.add("height");
+  }
   const defaults = {};
   for (const [key, value] of Object.entries(config || {})) {
     if (!protectedKeys.has(key) && value !== undefined) defaults[key] = structuredClone(value);
@@ -133,13 +139,14 @@ export function updateObjectSelector(selector, value) {
   requestAnimationFrame(() => requestAnimationFrame(refreshYaml));
 }
 
-async function openDefaultsEditor(selector) {
+async function openDefaultsEditor(selector, profile) {
   if (document.querySelector("advanced-history-defaults-dialog")) return;
   const hass = selector.hass;
   const dialog = document.createElement("advanced-history-defaults-dialog");
   document.body.append(dialog);
   const root = dialog.attachShadow({ mode: "open" });
-  const title = custom(hass, "card_defaults");
+  const isMoreInfo = profile === "more-info";
+  const title = custom(hass, isMoreInfo ? "more_info_card_defaults" : "card_defaults");
   root.innerHTML = `
     <style>
       :host { display:contents; color:var(--primary-text-color); }
@@ -162,7 +169,7 @@ async function openDefaultsEditor(selector) {
     <dialog aria-label="${title}">
       <section>
         <header><h2>${title}</h2></header>
-        <div class="note">${custom(hass, "card_defaults_config_flow_note")}</div>
+        <div class="note">${custom(hass, isMoreInfo ? "more_info_card_defaults_config_flow_note" : "card_defaults_config_flow_note")}</div>
         <div class="host">${localize(hass, "ui.common.loading", "Loading")}…</div>
         <footer><span class="status"></span><button data-action="cancel">${localize(hass, "ui.common.cancel", "Cancel")}</button><button class="primary" data-action="save">${localize(hass, "ui.common.save", "Save")}</button></footer>
       </section>
@@ -177,7 +184,7 @@ async function openDefaultsEditor(selector) {
   root.querySelector('[data-action="cancel"]').addEventListener("click", close);
   const save = root.querySelector('[data-action="save"]');
   const status = root.querySelector(".status");
-  let draft = editorConfig(hass, selector.value || {});
+  let draft = editorConfig(hass, selector.value || {}, profile);
   modal.showModal();
   try {
     await ensureCardLoaded(hass);
@@ -199,29 +206,40 @@ async function openDefaultsEditor(selector) {
     save.disabled = true;
   }
   save.addEventListener("click", () => {
-    updateObjectSelector(selector, defaultsFromEditor(draft));
+    updateObjectSelector(selector, defaultsFromEditor(draft, profile));
     close();
   });
 }
 
-function injectButton() {
-  if (!location.pathname.startsWith("/config/integrations")) return false;
-  const selector = findCardDefaultsSelector();
+function injectButton(selector, profile) {
   if (!selector?.shadowRoot) return false;
-  if (selector.shadowRoot.querySelector(".advanced-history-defaults-button")) return true;
+  const className = profile === "more-info"
+    ? "advanced-history-more-info-defaults-button"
+    : "advanced-history-defaults-button";
+  if (selector.shadowRoot.querySelector(`.${className}`)) return true;
+  const isMoreInfo = profile === "more-info";
   const button = document.createElement("button");
   button.type = "button";
   button.dataset[INJECTED_KEY] = "true";
-  button.className = "advanced-history-defaults-button";
+  button.className = className;
   button.innerHTML = `<ha-icon icon="mdi:tune-variant"></ha-icon><span>${custom(selector.hass, "open_card_defaults_editor")}</span>`;
   button.style.cssText = "margin:12px 0 0;padding:0 16px;height:40px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--primary-color);border-radius:20px;color:var(--primary-color);background:transparent;cursor:pointer;font:inherit;font-weight:500";
   button.addEventListener("click", (event) => {
     event.preventDefault();
     event.stopPropagation();
-    openDefaultsEditor(selector);
+    openDefaultsEditor(selector, profile);
   });
   selector.shadowRoot.append(button);
   return true;
+}
+
+function injectButtons() {
+  if (!location.pathname.startsWith("/config/integrations")) return false;
+  const panelSelector = findObjectSelector("card_options");
+  const moreInfoSelector = findObjectSelector("more_info_card_options");
+  if (panelSelector) injectButton(panelSelector, "panel");
+  if (moreInfoSelector) injectButton(moreInfoSelector, "more-info");
+  return Boolean(panelSelector || moreInfoSelector);
 }
 
 function scanForConfigFlow() {
@@ -229,7 +247,7 @@ function scanForConfigFlow() {
   let attempts = 0;
   scanForConfigFlow.timer = window.setInterval(() => {
     attempts += 1;
-    if (injectButton() || attempts >= 30) {
+    if (injectButtons() || attempts >= 30) {
       window.clearInterval(scanForConfigFlow.timer);
       scanForConfigFlow.timer = null;
     }

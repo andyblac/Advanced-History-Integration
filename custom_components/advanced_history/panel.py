@@ -1,5 +1,6 @@
 """Frontend and sidebar panel registration for Advanced History."""
 
+import asyncio
 from pathlib import Path
 
 from homeassistant.components import frontend, panel_custom
@@ -23,18 +24,40 @@ from .const import (
 )
 
 _STATIC_REGISTERED = f"{DOMAIN}_static_registered"
+_STATIC_REGISTER_LOCK = f"{DOMAIN}_static_register_lock"
+_FRONTEND_ENTRIES = f"{DOMAIN}_frontend_entries"
 
 
 async def _async_register_static_files(hass: HomeAssistant) -> None:
     """Expose the integration frontend directory once per HA process."""
     if hass.data.get(_STATIC_REGISTERED):
         return
+    lock = hass.data.setdefault(_STATIC_REGISTER_LOCK, asyncio.Lock())
+    async with lock:
+        if hass.data.get(_STATIC_REGISTERED):
+            return
+        frontend_dir = Path(__file__).parent / "frontend"
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig("/advanced_history", str(frontend_dir), False)]
+        )
+        hass.data[_STATIC_REGISTERED] = True
 
-    frontend_dir = Path(__file__).parent / "frontend"
-    await hass.http.async_register_static_paths(
-        [StaticPathConfig("/advanced_history", str(frontend_dir), False)]
-    )
-    hass.data[_STATIC_REGISTERED] = True
+
+async def async_register_frontend(hass: HomeAssistant, entry_id: str) -> None:
+    """Register shared frontend resources for one integration entry."""
+    await _async_register_static_files(hass)
+    entries = hass.data.setdefault(_FRONTEND_ENTRIES, set())
+    if not entries:
+        frontend.add_extra_js_url(hass, REDIRECT_MODULE_URL)
+    entries.add(entry_id)
+
+
+def async_unregister_frontend(hass: HomeAssistant, entry_id: str) -> None:
+    """Release shared frontend resources when an entry unloads."""
+    entries = hass.data.setdefault(_FRONTEND_ENTRIES, set())
+    entries.discard(entry_id)
+    if not entries:
+        frontend.remove_extra_js_url(hass, REDIRECT_MODULE_URL)
 
 
 def _panel_config(entry: ConfigEntry) -> tuple[dict, dict]:
@@ -62,12 +85,7 @@ def _panel_config(entry: ConfigEntry) -> tuple[dict, dict]:
 
 
 async def async_register_panel(hass: HomeAssistant, entry: ConfigEntry) -> None:
-    """Register frontend resources and the Advanced History sidebar panel."""
-    await _async_register_static_files(hass)
-
-    # This lightweight hook is inert unless redirect_show_more is enabled.
-    frontend.add_extra_js_url(hass, REDIRECT_MODULE_URL)
-
+    """Register the Advanced History sidebar panel."""
     options, panel_config = _panel_config(entry)
 
     # Replace an older panel_custom YAML registration using the same route.
@@ -87,6 +105,5 @@ async def async_register_panel(hass: HomeAssistant, entry: ConfigEntry) -> None:
 
 
 def async_unregister_panel(hass: HomeAssistant) -> None:
-    """Remove the sidebar panel and global redirect hook."""
+    """Remove the sidebar panel."""
     frontend.async_remove_panel(hass, PANEL_URL_PATH, warn_if_unknown=False)
-    frontend.remove_extra_js_url(hass, REDIRECT_MODULE_URL)

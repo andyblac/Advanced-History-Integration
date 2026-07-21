@@ -13,15 +13,15 @@
           "graph_height": "Diagrammhöhe",
           "include_hidden": "Ausgeblendete Entitäten einbeziehen",
           "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
-          "card_module_url": "Modul-URL der Diagrammkarte",
           "card_options": "Kartenstandards",
           "compare": "Standardvergleich",
-          "require_admin": "Nur Administratoren"
+          "require_admin": "Nur Administratoren",
+          "card_module_url": "Modul-URL der Diagrammkarte"
         },
         "data_description": {
           "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
-          "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen."
+          "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen.",
+          "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen."
         }
       },
       "reconfigure": {
@@ -45,6 +45,38 @@
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
           "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen."
         }
+      },
+      "more_info": {
+        "title": "More-Info einrichten",
+        "description": "Erstellt einen separaten Dienst, der das native Verlaufsdiagramm in den Entitätsdetails ersetzen kann.",
+        "data": {
+          "replace_more_info_history": "Statistics Graph in Entitätsdetails verwenden",
+          "more_info_show_date_picker": "Diagrammkalender anzeigen",
+          "card_module_url": "Modul-URL der Diagrammkarte",
+          "more_info_card_options": "Standards für Entitätsdetails"
+        },
+        "data_description": {
+          "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
+          "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
+          "more_info_card_options": "Separate Einstellungen der Statistics Graph Chart Card für das Diagramm in Entitätsdialogen. Bearbeite das YAML direkt oder verwende den zugehörigen visuellen Editor."
+        }
+      },
+      "reconfigure_more_info": {
+        "title": "More-Info neu konfigurieren",
+        "description": "Aktualisiere den More-Info-Diagrammersatz und seine unabhängigen Kartenvorgaben.",
+        "data": {
+          "replace_more_info_history": "Statistics Graph in Entitätsdetails verwenden",
+          "more_info_show_date_picker": "Diagrammkalender anzeigen",
+          "card_module_url": "Modul-URL der Diagrammkarte",
+          "more_info_card_options": "Standards für Entitätsdetails"
+        },
+        "data_description": {
+          "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
+          "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
+          "more_info_card_options": "Separate Einstellungen der Statistics Graph Chart Card für das Diagramm in Entitätsdialogen. Bearbeite das YAML direkt oder verwende den zugehörigen visuellen Editor."
+        }
       }
     },
     "abort": {
@@ -65,15 +97,21 @@
           "graph_height": "Diagrammhöhe",
           "include_hidden": "Ausgeblendete Entitäten einbeziehen",
           "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
+          "replace_more_info_history": "Statistics Graph in Entitätsdetails verwenden",
+          "more_info_show_date_picker": "Diagrammkalender anzeigen",
           "card_module_url": "Modul-URL der Diagrammkarte",
           "card_options": "Kartenstandards",
+          "more_info_card_options": "Standards für Entitätsdetails",
           "compare": "Standardvergleich",
           "require_admin": "Nur Administratoren"
         },
         "data_description": {
           "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
+          "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen."
+          "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen.",
+          "more_info_card_options": "Separate Einstellungen der Statistics Graph Chart Card für das Diagramm in Entitätsdialogen. Bearbeite das YAML direkt oder verwende den zugehörigen visuellen Editor."
         }
       }
     }

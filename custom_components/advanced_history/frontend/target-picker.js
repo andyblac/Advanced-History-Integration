@@ -271,7 +271,7 @@ export class TargetPickerMethods {
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop";
     backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${this._escape(addTarget)}">
-      <header class="dialog-title"><h2>${this._escape(addTarget)}</h2><span class="count">${this._escape(this._customLocalize("selected_count", { count: this._targetCount(this._draftTargets) }))}</span></header>
+      <header class="dialog-title"><h2>${this._escape(addTarget)}</h2><span class="count">${this._escape(this._localize("ui.panel.config.entities.picker.selected", `${this._targetCount(this._draftTargets)} selected`, { number: this._targetCount(this._draftTargets) }))}</span></header>
       <nav class="tabs">${Object.entries(targetTypes).map(([key,label]) => `<button class="tab ${key === this._activeTab ? "active" : ""}" data-tab="${key}">${this._escape(label)}</button>`).join("")}</nav>
       <div class="search-wrap"><input class="search" type="search" placeholder="${this._escape(this._localize("ui.common.search", "Search"))}" value="${this._escape(this._dialogSearch)}"></div>
       <div class="target-list">${this._dialogRows()}</div>
@@ -307,7 +307,12 @@ export class TargetPickerMethods {
       const list = this._draftTargets[this._activeTab];
       if (checkbox.checked && !list.includes(checkbox.dataset.targetId)) list.push(checkbox.dataset.targetId);
       if (!checkbox.checked) this._draftTargets[this._activeTab] = list.filter((id) => id !== checkbox.dataset.targetId);
-      backdrop.querySelector(".dialog-title .count").textContent = this._customLocalize("selected_count", { count: this._targetCount(this._draftTargets) });
+      const selected = this._targetCount(this._draftTargets);
+      backdrop.querySelector(".dialog-title .count").textContent = this._localize(
+        "ui.panel.config.entities.picker.selected",
+        `${selected} selected`,
+        { number: selected }
+      );
     }));
   }
 

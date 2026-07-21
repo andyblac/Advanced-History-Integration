@@ -45,6 +45,38 @@
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
           "card_options": "Default Statistics Graph Chart Card settings for new charts. Edit the YAML directly or use the Open visual editor button below it."
         }
+      },
+      "more_info": {
+        "title": "Set up More-Info",
+        "description": "Create a separate service that can replace the native History graph in entity More Info dialogs.",
+        "data": {
+          "replace_more_info_history": "Use Statistics Graph in More Info",
+          "more_info_show_date_picker": "Show chart calendar",
+          "card_module_url": "Graph card module URL",
+          "more_info_card_options": "More Info Card Defaults"
+        },
+        "data_description": {
+          "replace_more_info_history": "Replace the native History graph in entity dialogs with Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Show the Statistics Graph Chart Card's built-in date picker in entity dialogs.",
+          "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
+          "more_info_card_options": "Statistics Graph Chart Card settings used only in entity dialogs. Edit the YAML directly or use the visual editor button."
+        }
+      },
+      "reconfigure_more_info": {
+        "title": "Reconfigure More-Info",
+        "description": "Update the More-Info graph replacement and its independent card defaults.",
+        "data": {
+          "replace_more_info_history": "Use Statistics Graph in More Info",
+          "more_info_show_date_picker": "Show chart calendar",
+          "card_module_url": "Graph card module URL",
+          "more_info_card_options": "More Info Card Defaults"
+        },
+        "data_description": {
+          "replace_more_info_history": "Replace the native History graph in entity dialogs with Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Show the Statistics Graph Chart Card's built-in date picker in entity dialogs.",
+          "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
+          "more_info_card_options": "Statistics Graph Chart Card settings used only in entity dialogs. Edit the YAML directly or use the visual editor button."
+        }
       }
     },
     "abort": {
@@ -65,15 +97,21 @@
           "graph_height": "Graph height",
           "include_hidden": "Include hidden entities",
           "redirect_show_more": "Open Show more in Advanced History",
+          "replace_more_info_history": "Use Statistics Graph in More Info",
+          "more_info_show_date_picker": "Show chart calendar",
           "card_module_url": "Graph card module URL",
           "card_options": "Card Defaults",
+          "more_info_card_options": "More Info Card Defaults",
           "compare": "Default comparison",
           "require_admin": "Administrators only"
         },
         "data_description": {
           "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
+          "replace_more_info_history": "Replace the native History graph in entity dialogs with Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Show the Statistics Graph Chart Card's built-in date picker in entity dialogs.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
-          "card_options": "Default Statistics Graph Chart Card settings for new charts. Edit the YAML directly or use the Open visual editor button below it."
+          "card_options": "Default Statistics Graph Chart Card settings for new charts. Edit the YAML directly or use the Open visual editor button below it.",
+          "more_info_card_options": "Separate Statistics Graph Chart Card settings for the graph shown in entity dialogs. Edit the YAML directly or use its visual editor button."
         }
       }
     }

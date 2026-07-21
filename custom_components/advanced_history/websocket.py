@@ -11,10 +11,20 @@ import voluptuous as vol
 
 from homeassistant.components import websocket_api
 from homeassistant.components.websocket_api import ActiveConnection
+from homeassistant.config_entries import ConfigEntryState
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.storage import Store
 
-from .const import DOMAIN
+from .const import (
+    CONF_CARD_MODULE_URL,
+    CONF_MORE_INFO_CARD_OPTIONS,
+    CONF_MORE_INFO_SHOW_DATE_PICKER,
+    CONF_REPLACE_MORE_INFO_HISTORY,
+    DOMAIN,
+    ENTRY_TYPE_MORE_INFO,
+    config_entry_type,
+    more_info_options_with_defaults,
+)
 
 _WEBSOCKET_REGISTERED = f"{DOMAIN}_websocket_registered"
 _BOOKMARK_STORE_DATA = f"{DOMAIN}_bookmark_store"
@@ -105,6 +115,42 @@ async def websocket_save_bookmarks(
     connection.send_result(msg["id"])
 
 
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/more_info/config"}
+)
+@websocket_api.async_response
+async def websocket_get_more_info_config(
+    hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Return the independently configured More-Info graph settings."""
+    entry = next(
+        (
+            candidate
+            for candidate in hass.config_entries.async_entries(DOMAIN)
+            if config_entry_type(candidate) == ENTRY_TYPE_MORE_INFO
+            and candidate.state is ConfigEntryState.LOADED
+        ),
+        None,
+    )
+    if entry is None:
+        connection.send_result(msg["id"], {"enabled": False})
+        return
+
+    options = more_info_options_with_defaults(entry.options)
+    card_options = deepcopy(options[CONF_MORE_INFO_CARD_OPTIONS])
+    card_options["show_date_picker"] = bool(
+        options[CONF_MORE_INFO_SHOW_DATE_PICKER]
+    )
+    connection.send_result(
+        msg["id"],
+        {
+            "enabled": bool(options[CONF_REPLACE_MORE_INFO_HISTORY]),
+            "card_module_url": options[CONF_CARD_MODULE_URL],
+            "card_options": card_options,
+        },
+    )
+
+
 def async_register_websocket_commands(hass: HomeAssistant) -> None:
     """Register integration WebSocket commands once per Home Assistant process."""
     if hass.data.get(_WEBSOCKET_REGISTERED):
@@ -112,4 +158,5 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
 
     websocket_api.async_register_command(hass, websocket_get_bookmarks)
     websocket_api.async_register_command(hass, websocket_save_bookmarks)
+    websocket_api.async_register_command(hass, websocket_get_more_info_config)
     hass.data[_WEBSOCKET_REGISTERED] = True
