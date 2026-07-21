@@ -1,6 +1,8 @@
 import { CARD_HACS_INSTALL_URL, CARD_TAG } from "./constants.js";
 import { CARD_DEFAULT_AGGREGATE, automaticEntityOptions } from "./entity-defaults.js";
 
+const DATA_SOURCE_CACHE = new Map();
+
 export class GraphMethods {
   _renderGraphs() {
     const host = this.shadowRoot.getElementById("charts");
@@ -46,11 +48,14 @@ export class GraphMethods {
     sourceIndicator.textContent = this._customLocalize("data_source_pending");
     sourceIndicator.title = this._customLocalize("data_source_help");
     const card = document.createElement(CARD_TAG);
+    const sourceKey = `${mode}:${entityIds.join("\u001f")}`;
     card.__advancedHistorySourceTracker = this._createDataSourceTracker(
       sourceIndicator,
-      Boolean(this._energyCollection)
+      Boolean(this._energyCollection),
+      sourceKey
     );
     card.__advancedHistoryChartMode = mode;
+    card.__advancedHistorySourceKey = sourceKey;
     const cardOptions = this._cardOptions();
     const config = {
       type: `custom:${CARD_TAG}`, card_header: title, chart_mode: mode,
@@ -73,12 +78,27 @@ export class GraphMethods {
     catch (error) { host.insertAdjacentHTML("beforeend", `<div class="error">${this._escape(error.message || error)}</div>`); }
   }
 
-  _createDataSourceTracker(indicator, active = true) {
+  _createDataSourceTracker(indicator, active = true, sourceKey = null) {
     const sources = new Set();
+    const sourceCache = this._graphDataSources || DATA_SOURCE_CACHE;
+    const cachedSource = sourceKey ? sourceCache.get(sourceKey) : null;
+    if (cachedSource === "mixed") {
+      sources.add("history");
+      sources.add("statistics");
+    } else if (cachedSource === "history" || cachedSource === "statistics") {
+      sources.add(cachedSource);
+    }
     let enabled = active;
     let cyclePending = false;
     const render = () => {
       const source = !sources.size ? "pending" : sources.size > 1 ? "mixed" : [...sources][0];
+      if (sourceKey && source !== "pending") {
+        sourceCache.delete(sourceKey);
+        sourceCache.set(sourceKey, source);
+        while (sourceCache.size > 20) {
+          sourceCache.delete(sourceCache.keys().next().value);
+        }
+      }
       indicator.className = `data-source-indicator ${source}`;
       indicator.textContent = this._customLocalize(
         source === "pending"
@@ -90,7 +110,7 @@ export class GraphMethods {
               : "data_source_history"
       );
     };
-    return {
+    const tracker = {
       get source() {
         if (!sources.size) return "pending";
         return sources.size > 1 ? "mixed" : [...sources][0];
@@ -98,6 +118,7 @@ export class GraphMethods {
       reset: () => {
         sources.clear();
         cyclePending = false;
+        if (sourceKey) sourceCache.delete(sourceKey);
         render();
       },
       beginCycle: () => {
@@ -105,8 +126,7 @@ export class GraphMethods {
       },
       activate: () => {
         enabled = true;
-        sources.clear();
-        cyclePending = false;
+        cyclePending = Boolean(sources.size);
         render();
       },
       record: (source) => {
@@ -120,6 +140,8 @@ export class GraphMethods {
         render();
       },
     };
+    render();
+    return tracker;
   }
 
   _beginGraphDataSourceCycle() {
@@ -131,8 +153,13 @@ export class GraphMethods {
   _activateGraphDataSourceTracking() {
     for (const card of this._graphCards || []) {
       card.__advancedHistorySourceTracker?.activate?.();
-      if (card.__advancedHistoryInstrumentedHass) {
-        card.hass = card.__advancedHistoryInstrumentedHass;
+      if (this._hass) {
+        // Recreate the instrumented wrapper so reconnecting a cached panel
+        // gives the card a genuinely new hass value. This makes the card
+        // request its data again after tracking has been activated.
+        card.__advancedHistoryHassSource = null;
+        card.__advancedHistoryInstrumentedHass = null;
+        this._setGraphCardHass(card, this._hass);
         card.requestUpdate?.("hass");
       }
     }
