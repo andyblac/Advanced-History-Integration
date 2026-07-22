@@ -559,7 +559,7 @@ export class GraphMethods {
       graph_height: graphHeight,
     };
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
-    this._recordChange();
+    this._recordChange(null, true);
     return { cardOptions, entityOptions, defaultHours, graphHeight };
   }
 

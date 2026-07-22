@@ -80,6 +80,16 @@ export class StorageMethods {
     ) {
       this._currentSnapshot = this._clone(previous);
       this._loadedBookmarkId = previous.source_bookmark_id || null;
+      const loadedBookmark = this._loadedBookmarkId
+        ? this._loadLibrary(BOOKMARKS_STORAGE_KEY).find((item) => item.id === this._loadedBookmarkId)
+        : null;
+      this._loadedBookmarkBaselineFingerprint = loadedBookmark
+        ? this._snapshotFingerprint(loadedBookmark)
+        : null;
+      this._loadedBookmarkDirty = Boolean(
+        loadedBookmark &&
+        this._snapshotFingerprint(previous) !== this._loadedBookmarkBaselineFingerprint
+      );
       this._activeSnapshot = this._clone(previous.chart);
       this._pendingPeriodRestore = this._clone(previous.period);
       if (this._pendingPeriodRestore?.start) {
@@ -313,7 +323,7 @@ export class StorageMethods {
     return names.length > 3 ? `${names.slice(0, 3).join(", ")} +${names.length - 3}` : names.join(", ");
   }
 
-  _recordChange(snapshot = null) {
+  _recordChange(snapshot = null, bookmarkEdit = false) {
     const source = snapshot ? this._clone(snapshot) : this._captureSnapshot();
     if (!this._targetCount(this._normalizeTargets(source.targets || {}))) {
       this._loadedBookmarkId = null;
@@ -341,6 +351,14 @@ export class StorageMethods {
     this._saveCurrentSnapshot(source);
     if (freshSessionFingerprint && !this._periodRestoreLoading) {
       this._freshSnapshotSessionFingerprint = null;
+    }
+    if (this._loadedBookmarkId && bookmarkEdit && !restoringFreshSession) {
+      this._loadedBookmarkDirty = Boolean(
+        this._loadedBookmarkBaselineFingerprint &&
+        sourceFingerprint !== this._loadedBookmarkBaselineFingerprint
+      );
+    } else if (!this._loadedBookmarkId) {
+      this._loadedBookmarkDirty = false;
     }
     this._updateUndoRedoButtons();
   }
@@ -376,6 +394,12 @@ export class StorageMethods {
     this._updateUndoRedoButtons();
   }
 
+  _clearChartSessionHistory() {
+    this._freshSnapshotSessionFingerprint = null;
+    this._clearLoadedBookmark();
+    this._clearUndoRedoHistory();
+  }
+
   _updateUndoRedoButtons() {
     const undo = this.shadowRoot?.getElementById("undo");
     const redo = this.shadowRoot?.getElementById("redo");
@@ -394,6 +418,16 @@ export class StorageMethods {
     this._saveLibrary(destinationKey, [this._clone(current), ...destination].slice(0, UNDO_LIMIT));
     this._currentSnapshot = this._clone(restored);
     this._loadedBookmarkId = restored.source_bookmark_id || null;
+    const loadedBookmark = this._loadedBookmarkId
+      ? this._loadLibrary(BOOKMARKS_STORAGE_KEY).find((item) => item.id === this._loadedBookmarkId)
+      : null;
+    this._loadedBookmarkBaselineFingerprint = loadedBookmark
+      ? this._snapshotFingerprint(loadedBookmark)
+      : null;
+    this._loadedBookmarkDirty = Boolean(
+      loadedBookmark &&
+      this._snapshotFingerprint(restored) !== this._loadedBookmarkBaselineFingerprint
+    );
     this._saveCurrentSnapshot(restored);
     this._applySnapshot(restored, false);
   }
@@ -412,6 +446,8 @@ export class StorageMethods {
     const items = this._loadLibrary(BOOKMARKS_STORAGE_KEY);
     if (this._saveLibrary(BOOKMARKS_STORAGE_KEY, [snapshot, ...items])) {
       this._loadedBookmarkId = snapshot.id;
+      this._loadedBookmarkBaselineFingerprint = this._snapshotFingerprint(snapshot);
+      this._loadedBookmarkDirty = false;
       this._recordChange();
       return true;
     }
@@ -422,7 +458,7 @@ export class StorageMethods {
     if (!bookmark || bookmark.id !== this._loadedBookmarkId) return false;
     const current = this._currentSnapshot || this._captureSnapshot();
     if (!this._targetCount(this._normalizeTargets(current.targets || {}))) return false;
-    return this._snapshotFingerprint(bookmark) !== this._snapshotFingerprint(current);
+    return this._loadedBookmarkDirty;
   }
 
   _updateBookmark(id) {
@@ -435,6 +471,8 @@ export class StorageMethods {
     items[index] = current;
     if (!this._saveLibrary(BOOKMARKS_STORAGE_KEY, items)) return false;
     this._loadedBookmarkId = current.id;
+    this._loadedBookmarkBaselineFingerprint = this._snapshotFingerprint(current);
+    this._loadedBookmarkDirty = false;
     this._recordChange();
     return true;
   }
@@ -442,6 +480,8 @@ export class StorageMethods {
   _clearLoadedBookmark(id = null) {
     if (id && this._loadedBookmarkId !== id) return;
     this._loadedBookmarkId = null;
+    this._loadedBookmarkBaselineFingerprint = null;
+    this._loadedBookmarkDirty = false;
     if (!this._currentSnapshot) return;
     this._currentSnapshot.source_bookmark_id = null;
     this._saveCurrentSnapshot(this._currentSnapshot);
@@ -488,6 +528,8 @@ export class StorageMethods {
     const current = this._clone(snapshot);
     current.source_bookmark_id = this._loadedBookmarkId || null;
     this._freshSnapshotSessionFingerprint = this._snapshotFingerprint(current);
+    this._loadedBookmarkBaselineFingerprint = this._freshSnapshotSessionFingerprint;
+    this._loadedBookmarkDirty = false;
     this._currentSnapshot = this._clone(current);
     this._saveCurrentSnapshot(current);
     this._applySnapshot(current, false);

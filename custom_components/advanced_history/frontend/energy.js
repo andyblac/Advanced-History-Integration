@@ -146,8 +146,14 @@ export class EnergyMethods {
     });
     this._recordChange();
     const syncAfterInteraction = () => {
-      queueMicrotask(() => applyMode(collection.compare));
-      setTimeout(() => applyMode(collection.compare), 150);
+      queueMicrotask(() => {
+        applyMode(collection.compare);
+        this._recordChange(null, true);
+      });
+      setTimeout(() => {
+        applyMode(collection.compare);
+        this._recordChange(null, true);
+      }, 150);
     };
     const beginDataSourceCycle = () => this._beginGraphDataSourceCycle();
     host.addEventListener("click", beginDataSourceCycle, true);
