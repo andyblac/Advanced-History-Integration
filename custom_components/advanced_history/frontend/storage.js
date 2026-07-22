@@ -323,9 +323,15 @@ export class StorageMethods {
     source.name = this._snapshotLabel(source);
     source.saved_at = new Date().toISOString();
     const previous = this._currentSnapshot || this._loadCurrentSnapshot();
-    const changed = previous && this._snapshotFingerprint(previous) !== this._snapshotFingerprint(source);
+    const sourceFingerprint = this._snapshotFingerprint(source);
+    const changed = previous && this._snapshotFingerprint(previous) !== sourceFingerprint;
+    const freshSessionFingerprint = this._freshSnapshotSessionFingerprint;
+    const restoringFreshSession = Boolean(
+      freshSessionFingerprint &&
+      (this._periodRestoreLoading || sourceFingerprint === freshSessionFingerprint)
+    );
 
-    if (changed && !this._incomingTargetOverride) {
+    if (changed && !this._incomingTargetOverride && !restoringFreshSession) {
       this._pushUndoSnapshot(previous);
       this._saveLibrary(REDO_STORAGE_KEY, []);
     }
@@ -333,6 +339,9 @@ export class StorageMethods {
     this._incomingTargetOverride = false;
     this._currentSnapshot = this._clone(source);
     this._saveCurrentSnapshot(source);
+    if (freshSessionFingerprint && !this._periodRestoreLoading) {
+      this._freshSnapshotSessionFingerprint = null;
+    }
     this._updateUndoRedoButtons();
   }
 
@@ -359,6 +368,12 @@ export class StorageMethods {
 
   _archiveCurrentChart() {
     return this._archiveSnapshot(this._captureSnapshot());
+  }
+
+  _clearUndoRedoHistory() {
+    this._saveLibrary(UNDO_STORAGE_KEY, []);
+    this._saveLibrary(REDO_STORAGE_KEY, []);
+    this._updateUndoRedoButtons();
   }
 
   _updateUndoRedoButtons() {
@@ -467,6 +482,16 @@ export class StorageMethods {
     if (recordChange) this._recordChange(snapshot);
     else this._updateUndoRedoButtons();
     this._render();
+  }
+
+  _startFreshSnapshotSession(snapshot) {
+    const current = this._clone(snapshot);
+    current.source_bookmark_id = this._loadedBookmarkId || null;
+    this._freshSnapshotSessionFingerprint = this._snapshotFingerprint(current);
+    this._currentSnapshot = this._clone(current);
+    this._saveCurrentSnapshot(current);
+    this._applySnapshot(current, false);
+    this._clearUndoRedoHistory();
   }
 
   _effectiveCardOptionsConfig() {
@@ -700,7 +725,8 @@ export class StorageMethods {
       const snapshot = items.find((item) => item.id === button.dataset.openSnapshot);
       if (!snapshot) return;
       this._loadedBookmarkId = isBookmarks ? snapshot.id : null;
-      this._applySnapshot(snapshot);
+      if (isBookmarks) this._startFreshSnapshotSession(snapshot);
+      else this._applySnapshot(snapshot);
     }));
     backdrop.querySelectorAll("[data-update-snapshot]").forEach((button) => button.addEventListener("click", () => {
       if (this._updateBookmark(button.dataset.updateSnapshot)) this._renderLibrary(kind);

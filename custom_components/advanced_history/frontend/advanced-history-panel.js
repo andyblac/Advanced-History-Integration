@@ -41,6 +41,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._energyCollection = null;
     this._pendingPeriodRestore = null;
     this._currentSnapshot = null;
+    this._freshSnapshotSessionFingerprint = null;
     this._incomingTargetOverride = false;
     this._bookmarkSyncReady = false;
     this._bookmarkSaveQueue = Promise.resolve();
@@ -233,7 +234,7 @@ class AdvancedHistoryPanel extends HTMLElement {
       ${dependencyMissing ? "" : `<div id="date-controller" class="energy-nav-floating"></div>`}`;
     const menu = this.shadowRoot.getElementById("menu");
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
-    this.shadowRoot.getElementById("remove-all")?.addEventListener("click", () => { this._archiveCurrentChart(); this._activeSnapshot = null; this._targets = { area_id: [], device_id: [], entity_id: [] }; this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] }; this._resetEnergySelection(); this._saveTargets(); this._recordChange(); this._notice = ""; this._render(); });
+    this.shadowRoot.getElementById("remove-all")?.addEventListener("click", () => { this._archiveCurrentChart(); this._activeSnapshot = null; this._targets = { area_id: [], device_id: [], entity_id: [] }; this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] }; this._resetEnergySelection(); this._saveTargets(); this._recordChange(); this._clearUndoRedoHistory(); this._notice = ""; this._render(); });
     this.shadowRoot.getElementById("bookmarks")?.addEventListener("click", () => this._openLibrary());
     this.shadowRoot.getElementById("chart-history")?.addEventListener("click", () => this._openLibrary("history"));
     this.shadowRoot.getElementById("undo")?.addEventListener("click", () => this._undo());
