@@ -67,11 +67,19 @@ export class GraphMethods {
       : detail.automatic
         ? { auto_scale_points: true }
         : { auto_scale_points: false, group_by: detail.groupBy, show_group_by_picker: true };
-    const entities = entityIds.map((id) => {
+    const palette = customElements.get(CARD_TAG)?.PALETTE;
+    const entities = entityIds.map((id, index) => {
       const entity = this._entityCardConfig(id, mode);
-      return detail && mode === "state_timeline"
+      const configured = detail && mode === "state_timeline"
         ? { ...entity, aggregate_func: "last" }
         : entity;
+      // Keep automatically assigned colors stable when entities are toggled.
+      // The card otherwise reindexes its palette after disabled entities are
+      // removed, causing the remaining series to change color.
+      if (configured.color == null && Array.isArray(palette) && palette.length) {
+        configured.color = palette[index % palette.length];
+      }
+      return configured;
     });
     const config = {
       type: `custom:${CARD_TAG}`, card_header: title, chart_mode: mode,
@@ -363,11 +371,14 @@ export class GraphMethods {
       ...this._defaultEntityOptions(cardOptionsConfig),
       ...(savedOptions && typeof savedOptions === "object" ? savedOptions : {}),
     };
+    const enabled = this._enabledResolvedEntityIds?.has(entity) !== false;
     if (mode !== "state_timeline") {
       const { compare: compareDefaults, ...options } = entityOptions;
       const activeCompare = this._effectiveCompare();
       const compare = this._mergeCompareOptions(activeCompare, compareDefaults);
-      return compare == null ? { ...options, entity } : { ...options, entity, compare };
+      return compare == null
+        ? { ...options, entity, enabled }
+        : { ...options, entity, enabled, compare };
     }
     const state = this._hass.states[entity];
     const domain = entity.split(".")[0];
@@ -381,7 +392,7 @@ export class GraphMethods {
     else if (["select","input_select"].includes(domain)) values = state?.attributes?.options || [];
     if (state?.state && !values.includes(state.state)) values.push(state.state);
     const generated = values.length ? { entity, state_map: values.map((value) => ({ value })) } : { entity };
-    return { ...generated, ...entityOptions, entity };
+    return { ...generated, ...entityOptions, entity, enabled };
   }
 
   _mergeCompareOptions(activeCompare, defaults) {
@@ -482,6 +493,10 @@ export class GraphMethods {
       delete options.entity;
       delete options.statistic_id;
       delete options.compare;
+      // Target-chip visibility is stored separately with the chart and is
+      // applied to generated card entities through the card's native enabled
+      // option. Do not turn that transient state into an editor override.
+      delete options.enabled;
       const integrationBase = {
         ...automaticEntityOptions(this._hass.states[entity], "timeline"),
         ...this._defaultEntityOptions(this.config.card_options),

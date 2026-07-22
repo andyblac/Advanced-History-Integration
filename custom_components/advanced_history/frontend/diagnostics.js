@@ -86,7 +86,7 @@ export class DiagnosticsMethods {
         domain: entityId.split(".", 1)[0],
         available: Boolean(state),
         selected_explicitly: explicitEntities.has(entityId),
-        included_in_chart: resolvedEntities.has(entityId),
+        included_in_chart: this._enabledResolvedEntityIds?.has(entityId) !== false,
         numeric: this._isNumeric(entityId),
         device_class: attributes.device_class || null,
         state_class: attributes.state_class || null,

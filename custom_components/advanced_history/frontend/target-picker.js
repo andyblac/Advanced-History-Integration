@@ -232,17 +232,28 @@ export class TargetPickerMethods {
 
   _resolvedEntityIds() {
     const hidden = this._normalizeTargets(this._hiddenTargets || {});
-    const ids = new Set(this._targets.entity_id.filter((id) => !hidden.entity_id.includes(id)));
-    const selectedDevices = new Set(this._targets.device_id.filter((id) => !hidden.device_id.includes(id)));
-    const selectedAreas = new Set(this._targets.area_id.filter((id) => !hidden.area_id.includes(id)));
+    const ids = new Set(this._targets.entity_id);
+    const enabled = new Set(
+      this._targets.entity_id.filter((id) => !hidden.entity_id.includes(id))
+    );
+    const selectedDevices = new Set(this._targets.device_id);
+    const selectedAreas = new Set(this._targets.area_id);
+    const enabledDevices = new Set(
+      this._targets.device_id.filter((id) => !hidden.device_id.includes(id))
+    );
+    const enabledAreas = new Set(
+      this._targets.area_id.filter((id) => !hidden.area_id.includes(id))
+    );
     const deviceById = new Map(this._devices.map((device) => [device.id, device]));
     for (const entity of this._entities) {
       if (entity.disabled_by || (!this.config.include_hidden && entity.hidden_by)) continue;
       const device = entity.device_id ? deviceById.get(entity.device_id) : null;
       const areaId = entity.area_id || device?.area_id;
       if (selectedDevices.has(entity.device_id) || selectedAreas.has(areaId)) ids.add(entity.entity_id);
+      if (enabledDevices.has(entity.device_id) || enabledAreas.has(areaId)) enabled.add(entity.entity_id);
     }
     const available = [...ids].filter((id) => this._hass.states[id]);
+    this._enabledResolvedEntityIds = enabled;
     if (available.length > this.maxEntities) {
       this._notice = this._customLocalize("entity_limit", { count: available.length, max: this.maxEntities });
       return available.slice(0, this.maxEntities);
