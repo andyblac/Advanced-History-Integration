@@ -127,18 +127,21 @@ export class EnergyMethods {
       this._restorePendingPeriod(collection);
     }
 
-    const applyMode = (mode = collection.compare) => {
+    const applyMode = (mode = collection.compare, force = false) => {
       if (this._energyRenderToken !== token) return;
       compareHost.hidden = Boolean(compareCard.hidden);
+      if (this._periodRestoreLoading) return;
       const next = mode === "previous" ? "previous_period" : mode === "yoy" ? "last_year" : null;
-      if (next === this._energyCompare) return;
+      const nextDetailKey = this._largeRangeDetailRenderKey();
+      if (!force && next === this._energyCompare && nextDetailKey === this._largeRangeDetailStateKey) return;
       this._energyCompare = next;
+      this._largeRangeDetailStateKey = nextDetailKey;
       this._renderGraphs();
     };
     applyMode();
     this._energyUnsubscribe = collection.subscribe((data) => {
-      applyMode(data?.compareMode);
-      this._completePeriodRestoreFromData(data, collection);
+      const restored = this._completePeriodRestoreFromData(data, collection);
+      applyMode(data?.compareMode, restored);
       if (data?.start) this._recordChange();
     });
     this._recordChange();
@@ -157,6 +160,8 @@ export class EnergyMethods {
     this._pendingPeriodRestore = null;
     this._finishPeriodRestore();
     this._energyCompare = null;
+    this._largeRangeFineDetail = false;
+    this._largeRangeDetailStateKey = null;
     const compareHost = this.shadowRoot?.getElementById("compare-banner");
     if (compareHost) compareHost.hidden = true;
 

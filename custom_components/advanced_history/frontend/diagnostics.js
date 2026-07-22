@@ -144,6 +144,16 @@ export class DiagnosticsMethods {
         default_hours: snapshot.chart?.default_hours ?? this._effectiveDefaultHours(),
         graph_height: snapshot.chart?.graph_height ?? this._effectiveGraphHeight(),
         compare: this._sanitizeDiagnosticValue(snapshot.chart?.compare ?? this._effectiveCompare(), aliases),
+        large_range_detail: (() => {
+          const profile = this._largeRangeDetailProfile();
+          return {
+            enabled: this.config.large_range_automatic_detail !== false,
+            threshold_days: Math.max(7, Number(this.config.large_range_detail_threshold_days) || 31),
+            mode: !profile ? null : profile.automatic ? "automatic" : "fine",
+            fine_detail: Boolean(profile && !profile.automatic),
+            group_by: profile ? (profile.automatic ? "auto" : profile.groupBy) : null,
+          };
+        })(),
         data_sources: (this._graphCards || []).map((card) => ({
           chart_mode: card.__advancedHistoryChartMode || null,
           source: card.__advancedHistorySourceTracker?.source || "pending",

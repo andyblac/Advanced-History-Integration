@@ -49,6 +49,8 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._periodRestoreExpected = null;
     this._periodRestoreTimer = null;
     this._energyResetPending = false;
+    this._largeRangeFineDetail = false;
+    this._largeRangeDetailStateKey = null;
     this._versionLogged = false;
   }
 
@@ -224,6 +226,7 @@ class AdvancedHistoryPanel extends HTMLElement {
           <ha-circular-progress active size="small"></ha-circular-progress>
           <span>${this._escape(this._customLocalize("loading_saved_range"))}</span>
         </section>
+        <section id="detail-banner" class="detail-banner" hidden></section>
         ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
         <section id="charts" class="charts"></section>
       </main>
@@ -251,7 +254,11 @@ class AdvancedHistoryPanel extends HTMLElement {
       return;
     }
     this._renderEnergyController();
-    this._renderGraphs();
+    // A newly mounted Energy collection first exposes its previous cached
+    // result. Do not create graph cards from that stale range while a saved
+    // period is being restored; the collection subscriber renders them once
+    // Home Assistant confirms the requested period.
+    if (!this._periodRestoreLoading) this._renderGraphs();
   }
 
   _escape(value) { return String(value ?? "").replace(/[&<>'"]/g, (char) => ({ "&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;",'"':"&quot;" })[char]); }

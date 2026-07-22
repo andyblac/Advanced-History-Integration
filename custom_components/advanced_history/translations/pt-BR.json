@@ -9,6 +9,8 @@
           "title": "Título do painel",
           "sidebar_icon": "Ícone da barra lateral",
           "max_entities": "Máximo de entidades",
+          "large_range_automatic_detail": "Detalhe automático para períodos longos",
+          "large_range_detail_threshold_days": "Limite do detalhe automático (dias)",
           "default_hours": "Horas padrão",
           "graph_height": "Altura do gráfico",
           "include_hidden": "Incluir entidades ocultas",
@@ -19,6 +21,8 @@
           "card_module_url": "URL do módulo do cartão de gráfico"
         },
         "data_description": {
+          "large_range_automatic_detail": "Usa agrupamento automático para períodos longos, com a opção de carregar detalhes mais finos no painel Histórico.",
+          "large_range_detail_threshold_days": "Usa o detalhe automático quando o período selecionado tiver pelo menos este número de dias.",
           "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
           "card_options": "Configurações padrão do Statistics Graph Chart Card para novos gráficos. Edite o YAML diretamente ou use o botão Abrir editor visual abaixo.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card."
@@ -31,6 +35,8 @@
           "title": "Título do painel",
           "sidebar_icon": "Ícone da barra lateral",
           "max_entities": "Máximo de entidades",
+          "large_range_automatic_detail": "Detalhe automático para períodos longos",
+          "large_range_detail_threshold_days": "Limite do detalhe automático (dias)",
           "default_hours": "Horas padrão",
           "graph_height": "Altura do gráfico",
           "include_hidden": "Incluir entidades ocultas",
@@ -41,6 +47,8 @@
           "require_admin": "Somente administradores"
         },
         "data_description": {
+          "large_range_automatic_detail": "Usa agrupamento automático para períodos longos, com a opção de carregar detalhes mais finos no painel Histórico.",
+          "large_range_detail_threshold_days": "Usa o detalhe automático quando o período selecionado tiver pelo menos este número de dias.",
           "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
           "card_options": "Configurações padrão do Statistics Graph Chart Card para novos gráficos. Edite o YAML diretamente ou use o botão Abrir editor visual abaixo."
@@ -93,6 +101,8 @@
           "title": "Título do painel",
           "sidebar_icon": "Ícone da barra lateral",
           "max_entities": "Máximo de entidades",
+          "large_range_automatic_detail": "Detalhe automático para períodos longos",
+          "large_range_detail_threshold_days": "Limite do detalhe automático (dias)",
           "default_hours": "Horas padrão",
           "graph_height": "Altura do gráfico",
           "include_hidden": "Incluir entidades ocultas",
@@ -106,6 +116,8 @@
           "require_admin": "Somente administradores"
         },
         "data_description": {
+          "large_range_automatic_detail": "Usa agrupamento automático para períodos longos, com a opção de carregar detalhes mais finos no painel Histórico.",
+          "large_range_detail_threshold_days": "Usa o detalhe automático quando o período selecionado tiver pelo menos este número de dias.",
           "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",

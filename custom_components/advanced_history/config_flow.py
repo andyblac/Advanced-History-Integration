@@ -22,6 +22,8 @@ from .const import (
     CONF_ENTRY_TYPE,
     CONF_GRAPH_HEIGHT,
     CONF_INCLUDE_HIDDEN,
+    CONF_LARGE_RANGE_AUTOMATIC_DETAIL,
+    CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS,
     CONF_MAX_ENTITIES,
     CONF_MORE_INFO_CARD_OPTIONS,
     CONF_MORE_INFO_SHOW_DATE_PICKER,
@@ -54,6 +56,18 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=1, max=200, step=1, mode=selector.NumberSelectorMode.BOX
+                )
+            ),
+            vol.Optional(
+                CONF_LARGE_RANGE_AUTOMATIC_DETAIL,
+                default=values[CONF_LARGE_RANGE_AUTOMATIC_DETAIL],
+            ): selector.BooleanSelector(),
+            vol.Optional(
+                CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS,
+                default=values[CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS],
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=7, max=3650, step=1, mode=selector.NumberSelectorMode.BOX
                 )
             ),
             vol.Optional(

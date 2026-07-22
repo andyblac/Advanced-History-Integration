@@ -39,6 +39,9 @@ export class StorageMethods {
       this._hiddenTargets = this._normalizeTargets(sharedSnapshot.hidden_targets || {});
       this._activeSnapshot = this._clone(sharedSnapshot.chart);
       this._pendingPeriodRestore = this._clone(sharedSnapshot.period);
+      if (this._pendingPeriodRestore?.start) {
+        this._beginPeriodRestore(this._pendingPeriodRestore);
+      }
       this._currentSnapshot = this._clone(sharedSnapshot);
       this._incomingTargetOverride = true;
       this._pruneHiddenTargets();
@@ -72,7 +75,6 @@ export class StorageMethods {
       } catch (_) { /* Ignore corrupt local storage. */ }
     }
     if (
-      !hasUrlTargets &&
       previous?.targets &&
       JSON.stringify(this._normalizeTargets(previous.targets)) === JSON.stringify(this._targets)
     ) {
@@ -80,6 +82,9 @@ export class StorageMethods {
       this._loadedBookmarkId = previous.source_bookmark_id || null;
       this._activeSnapshot = this._clone(previous.chart);
       this._pendingPeriodRestore = this._clone(previous.period);
+      if (this._pendingPeriodRestore?.start) {
+        this._beginPeriodRestore(this._pendingPeriodRestore);
+      }
       this._hiddenTargets = this._normalizeTargets(previous.hidden_targets || {});
       this._pruneHiddenTargets();
     }
@@ -558,7 +563,10 @@ export class StorageMethods {
     this._periodRestoreLoading = true;
     if (this._periodRestoreTimer) window.clearTimeout(this._periodRestoreTimer);
     this._periodRestoreTimer = window.setTimeout(
-      () => this._finishPeriodRestore(),
+      () => {
+        this._finishPeriodRestore();
+        this._renderGraphs();
+      },
       300000
     );
   }
@@ -575,7 +583,11 @@ export class StorageMethods {
   _completePeriodRestoreFromData(data, collection) {
     const expected = this._periodRestoreExpected;
     if (!this._periodRestoreLoading || !expected?.start) return false;
-    const actualStart = data?.start || collection?.start;
+    // setPeriod() updates the collection properties synchronously, while the
+    // native picker updates only from the refreshed EnergyData payload. Use
+    // that payload as the confirmation so stale cached data cannot complete
+    // the restore early.
+    const actualStart = data?.start ?? collection?.start;
     const actualEnd = data?.end ?? collection?.end;
     const expectedStart = new Date(expected.start).getTime();
     const expectedEnd = expected.end ? new Date(expected.end).getTime() : undefined;
@@ -587,7 +599,10 @@ export class StorageMethods {
       : actualEnd instanceof Date
         ? actualEnd.getTime()
         : new Date(actualEnd).getTime();
-    if (start !== expectedStart || end !== expectedEnd) return false;
+    if (start !== expectedStart || end !== expectedEnd) {
+      this._applyStoredPeriod(collection, expected, false);
+      return false;
+    }
     this._finishPeriodRestore();
     return true;
   }

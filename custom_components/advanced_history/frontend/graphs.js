@@ -8,10 +8,12 @@ export class GraphMethods {
   _renderGraphs() {
     const host = this.shadowRoot.getElementById("charts");
     if (!host) return;
+    const detail = this._largeRangeDetailProfile();
     this._cards = this._cards.filter((card) => !this._graphCards.includes(card));
     this._graphCards = [];
     host.replaceChildren();
     if (this._cardLoadError) {
+      this._renderLargeRangeDetailBanner(null);
       const title = this._customLocalize("card_missing_title");
       const install = this._customLocalize("install_with_hacs");
       const retry = this._localize("ui.panel.app.retry", "Retry");
@@ -31,17 +33,19 @@ export class GraphMethods {
     const entityIds = this._resolvedEntityIds();
     if (this._notice && !this.shadowRoot.querySelector(".notice")) host.insertAdjacentHTML("beforebegin", `<div class="notice">${this._escape(this._notice)}</div>`);
     if (!entityIds.length) {
+      this._renderLargeRangeDetailBanner(null);
       const prompt = this._localize("ui.panel.history.start_search", "Select areas, devices, entities or labels above");
       host.innerHTML = `<div class="start"><ha-icon icon="mdi:chart-timeline-variant"></ha-icon><p>${this._escape(prompt)}</p></div>`;
       return;
     }
+    this._renderLargeRangeDetailBanner(detail);
     const numeric = entityIds.filter((id) => this._isNumeric(id));
     const states = entityIds.filter((id) => !this._isNumeric(id));
-    if (numeric.length) this._createGraph(host, numeric, this._customLocalize("numeric_history"), "timeline");
-    if (states.length) this._createGraph(host, states, this._customLocalize("state_history"), "state_timeline");
+    if (numeric.length) this._createGraph(host, numeric, this._customLocalize("numeric_history"), "timeline", detail);
+    if (states.length) this._createGraph(host, states, this._customLocalize("state_history"), "state_timeline", detail);
   }
 
-  _createGraph(host, entityIds, title, mode) {
+  _createGraph(host, entityIds, title, mode, detail = null) {
     const shell = document.createElement("div");
     shell.className = "graph-shell";
     const sourceIndicator = document.createElement("span");
@@ -58,17 +62,42 @@ export class GraphMethods {
     card.__advancedHistoryChartMode = mode;
     card.__advancedHistorySourceKey = sourceKey;
     const cardOptions = this._cardOptions();
+    const detailOptions = !detail
+      ? {}
+      : detail.automatic
+        ? { auto_scale_points: true }
+        : { auto_scale_points: false, group_by: detail.groupBy, show_group_by_picker: true };
+    const entities = entityIds.map((id) => {
+      const entity = this._entityCardConfig(id, mode);
+      return detail && mode === "state_timeline"
+        ? { ...entity, aggregate_func: "last" }
+        : entity;
+    });
     const config = {
       type: `custom:${CARD_TAG}`, card_header: title, chart_mode: mode,
-      entities: entityIds.map((id) => this._entityCardConfig(id, mode)),
+      entities,
       hours_to_show: this._effectiveDefaultHours(),
       height: this._effectiveGraphHeight(),
       ...(mode === "state_timeline" ? { group_by: "raw" } : {}),
       ...cardOptions,
+      ...detailOptions,
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
       energy_date_sync: true,
     };
     try {
+      if (detail?.automatic) {
+        // Statistics Graph Chart Card persists its on-card Group By and PPH
+        // overrides. Apply one picker-free configuration first so the card's
+        // public setConfig path clears those overrides before Auto Scale is
+        // restored. Picker visibility then follows the Card Defaults YAML.
+        card.setConfig({
+          ...config,
+          show_group_by_picker: false,
+          group_by_picker_group: null,
+          show_pph_picker: false,
+          pph_picker_group: null,
+        });
+      }
       card.setConfig(config);
       this._setGraphCardHass(card, this._hass);
       shell.append(card, sourceIndicator);
@@ -77,6 +106,82 @@ export class GraphMethods {
       this._graphCards.push(card);
     }
     catch (error) { host.insertAdjacentHTML("beforeend", `<div class="error">${this._escape(error.message || error)}</div>`); }
+  }
+
+  _largeRangePeriod() {
+    const start = this._energyCollection?.start;
+    const end = this._energyCollection?.end;
+    const startMs = start?.getTime?.();
+    const endMs = end?.getTime?.();
+    if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return null;
+    const hours = (endMs - startMs) / 3_600_000;
+    const compare = this._energyCollection?.compare || "";
+    return {
+      start,
+      end,
+      hours,
+      key: `${start.toISOString()}|${end.toISOString()}|${compare}`,
+    };
+  }
+
+  _largeRangeDetailProfile() {
+    if (this.config.large_range_automatic_detail === false) return null;
+    const period = this._largeRangePeriod();
+    const thresholdDays = Math.max(7, Number(this.config.large_range_detail_threshold_days) || 31);
+    // Calendar periods end one millisecond before midnight and DST can add or
+    // remove an hour. A two-hour tolerance makes a configured 31-day
+    // threshold reliably include a selected calendar month.
+    if (!period || period.hours < thresholdDays * 24 - 2) return null;
+    const groupBy = period.hours > 730 * 24
+      ? "week"
+      : period.hours > 92 * 24
+        ? "date"
+        : "6h";
+    return {
+      ...period,
+      thresholdDays,
+      groupBy,
+      automatic: !this._largeRangeFineDetail,
+    };
+  }
+
+  _largeRangeDetailRenderKey() {
+    const profile = this._largeRangeDetailProfile();
+    if (!profile) return "off";
+    return profile.automatic
+      ? `detail|auto|${profile.key}`
+      : `fine|${profile.groupBy}|${profile.key}`;
+  }
+
+  _renderLargeRangeDetailBanner(profile = this._largeRangeDetailProfile()) {
+    const banner = this.shadowRoot?.getElementById("detail-banner");
+    if (!banner) return;
+    if (!profile) {
+      banner.hidden = true;
+      banner.replaceChildren();
+      return;
+    }
+
+    const resolution = this._customLocalize(
+      `detail_resolution_${profile.automatic ? "auto" : profile.groupBy}`
+    );
+    const text = profile.automatic
+      ? this._customLocalize("automatic_detail_active", { resolution })
+      : this._customLocalize("fine_detail_warning", { resolution });
+    const buttonText = profile.automatic
+      ? this._customLocalize("show_fine_detail")
+      : this._customLocalize("use_automatic_detail");
+    banner.className = `detail-banner${profile.automatic ? "" : " warning"}`;
+    banner.innerHTML = `
+      <ha-icon icon="${profile.automatic ? "mdi:speedometer" : "mdi:alert-outline"}"></ha-icon>
+      <span>${this._escape(text)}</span>
+      <ha-button appearance="plain">${this._escape(buttonText)}</ha-button>`;
+    banner.hidden = false;
+    banner.querySelector("ha-button")?.addEventListener("click", () => {
+      this._largeRangeFineDetail = profile.automatic;
+      this._largeRangeDetailStateKey = this._largeRangeDetailRenderKey();
+      this._renderGraphs();
+    });
   }
 
   _createDataSourceTracker(indicator, active = true, sourceKey = null) {

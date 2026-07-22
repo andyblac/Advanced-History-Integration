@@ -9,6 +9,8 @@
           "title": "Panel title",
           "sidebar_icon": "Sidebar icon",
           "max_entities": "Maximum entities",
+          "large_range_automatic_detail": "Automatic detail for large date ranges",
+          "large_range_detail_threshold_days": "Automatic detail threshold (days)",
           "default_hours": "Default hours",
           "graph_height": "Graph height",
           "include_hidden": "Include hidden entities",
@@ -19,6 +21,8 @@
           "require_admin": "Administrators only"
         },
         "data_description": {
+          "large_range_automatic_detail": "Use automatic grouping for large date ranges, with an option to load finer detail from the History panel.",
+          "large_range_detail_threshold_days": "Use automatic detail when the selected range is at least this many days.",
           "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
           "card_options": "Default Statistics Graph Chart Card settings for new charts. Edit the YAML directly or use the Open visual editor button below it."
@@ -31,6 +35,8 @@
           "title": "Panel title",
           "sidebar_icon": "Sidebar icon",
           "max_entities": "Maximum entities",
+          "large_range_automatic_detail": "Automatic detail for large date ranges",
+          "large_range_detail_threshold_days": "Automatic detail threshold (days)",
           "default_hours": "Default hours",
           "graph_height": "Graph height",
           "include_hidden": "Include hidden entities",
@@ -41,6 +47,8 @@
           "require_admin": "Administrators only"
         },
         "data_description": {
+          "large_range_automatic_detail": "Use automatic grouping for large date ranges, with an option to load finer detail from the History panel.",
+          "large_range_detail_threshold_days": "Use automatic detail when the selected range is at least this many days.",
           "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
           "card_options": "Default Statistics Graph Chart Card settings for new charts. Edit the YAML directly or use the Open visual editor button below it."
@@ -93,6 +101,8 @@
           "title": "Panel title",
           "sidebar_icon": "Sidebar icon",
           "max_entities": "Maximum entities",
+          "large_range_automatic_detail": "Automatic detail for large date ranges",
+          "large_range_detail_threshold_days": "Automatic detail threshold (days)",
           "default_hours": "Default hours",
           "graph_height": "Graph height",
           "include_hidden": "Include hidden entities",
@@ -106,6 +116,8 @@
           "require_admin": "Administrators only"
         },
         "data_description": {
+          "large_range_automatic_detail": "Use automatic grouping for large date ranges, with an option to load finer detail from the History panel.",
+          "large_range_detail_threshold_days": "Use automatic detail when the selected range is at least this many days.",
           "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
           "replace_more_info_history": "Replace the native History graph in entity dialogs with Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Show the Statistics Graph Chart Card's built-in date picker in entity dialogs.",

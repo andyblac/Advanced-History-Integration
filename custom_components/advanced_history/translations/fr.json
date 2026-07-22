@@ -9,6 +9,8 @@
           "title": "Titre du panneau",
           "sidebar_icon": "Icône de la barre latérale",
           "max_entities": "Nombre maximal d’entités",
+          "large_range_automatic_detail": "Détail automatique pour les longues périodes",
+          "large_range_detail_threshold_days": "Seuil du détail automatique (jours)",
           "default_hours": "Nombre d’heures par défaut",
           "graph_height": "Hauteur du graphique",
           "include_hidden": "Inclure les entités masquées",
@@ -19,6 +21,8 @@
           "card_module_url": "URL du module de la carte graphique"
         },
         "data_description": {
+          "large_range_automatic_detail": "Utilise un regroupement automatique pour les longues périodes, avec la possibilité de charger un détail plus fin depuis le panneau Historique.",
+          "large_range_detail_threshold_days": "Utilise le détail automatique lorsque la période sélectionnée couvre au moins ce nombre de jours.",
           "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
           "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card."
@@ -31,6 +35,8 @@
           "title": "Titre du panneau",
           "sidebar_icon": "Icône de la barre latérale",
           "max_entities": "Nombre maximal d’entités",
+          "large_range_automatic_detail": "Détail automatique pour les longues périodes",
+          "large_range_detail_threshold_days": "Seuil du détail automatique (jours)",
           "default_hours": "Nombre d’heures par défaut",
           "graph_height": "Hauteur du graphique",
           "include_hidden": "Inclure les entités masquées",
@@ -41,6 +47,8 @@
           "require_admin": "Administrateurs uniquement"
         },
         "data_description": {
+          "large_range_automatic_detail": "Utilise un regroupement automatique pour les longues périodes, avec la possibilité de charger un détail plus fin depuis le panneau Historique.",
+          "large_range_detail_threshold_days": "Utilise le détail automatique lorsque la période sélectionnée couvre au moins ce nombre de jours.",
           "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
           "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous."
@@ -93,6 +101,8 @@
           "title": "Titre du panneau",
           "sidebar_icon": "Icône de la barre latérale",
           "max_entities": "Nombre maximal d’entités",
+          "large_range_automatic_detail": "Détail automatique pour les longues périodes",
+          "large_range_detail_threshold_days": "Seuil du détail automatique (jours)",
           "default_hours": "Nombre d’heures par défaut",
           "graph_height": "Hauteur du graphique",
           "include_hidden": "Inclure les entités masquées",
@@ -106,6 +116,8 @@
           "require_admin": "Administrateurs uniquement"
         },
         "data_description": {
+          "large_range_automatic_detail": "Utilise un regroupement automatique pour les longues périodes, avec la possibilité de charger un détail plus fin depuis le panneau Historique.",
+          "large_range_detail_threshold_days": "Utilise le détail automatique lorsque la période sélectionnée couvre au moins ce nombre de jours.",
           "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
           "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",

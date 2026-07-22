@@ -9,6 +9,8 @@
           "title": "Paneeltitel",
           "sidebar_icon": "Zijbalkpictogram",
           "max_entities": "Maximum aantal entiteiten",
+          "large_range_automatic_detail": "Automatisch detail voor grote datumbereiken",
+          "large_range_detail_threshold_days": "Drempel automatisch detail (dagen)",
           "default_hours": "Standaard aantal uren",
           "graph_height": "Grafiekhoogte",
           "include_hidden": "Verborgen entiteiten opnemen",
@@ -19,6 +21,8 @@
           "card_module_url": "Module-URL van grafiekkaart"
         },
         "data_description": {
+          "large_range_automatic_detail": "Gebruikt automatische groepering voor grote datumbereiken, met de optie om fijner detail vanuit het Geschiedenispaneel te laden.",
+          "large_range_detail_threshold_days": "Gebruikt automatisch detail wanneer het geselecteerde bereik ten minste dit aantal dagen beslaat.",
           "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
           "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren."
@@ -31,6 +35,8 @@
           "title": "Paneeltitel",
           "sidebar_icon": "Zijbalkpictogram",
           "max_entities": "Maximum aantal entiteiten",
+          "large_range_automatic_detail": "Automatisch detail voor grote datumbereiken",
+          "large_range_detail_threshold_days": "Drempel automatisch detail (dagen)",
           "default_hours": "Standaard aantal uren",
           "graph_height": "Grafiekhoogte",
           "include_hidden": "Verborgen entiteiten opnemen",
@@ -41,6 +47,8 @@
           "require_admin": "Alleen beheerders"
         },
         "data_description": {
+          "large_range_automatic_detail": "Gebruikt automatische groepering voor grote datumbereiken, met de optie om fijner detail vanuit het Geschiedenispaneel te laden.",
+          "large_range_detail_threshold_days": "Gebruikt automatisch detail wanneer het geselecteerde bereik ten minste dit aantal dagen beslaat.",
           "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
           "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder."
@@ -93,6 +101,8 @@
           "title": "Paneeltitel",
           "sidebar_icon": "Zijbalkpictogram",
           "max_entities": "Maximum aantal entiteiten",
+          "large_range_automatic_detail": "Automatisch detail voor grote datumbereiken",
+          "large_range_detail_threshold_days": "Drempel automatisch detail (dagen)",
           "default_hours": "Standaard aantal uren",
           "graph_height": "Grafiekhoogte",
           "include_hidden": "Verborgen entiteiten opnemen",
@@ -106,6 +116,8 @@
           "require_admin": "Alleen beheerders"
         },
         "data_description": {
+          "large_range_automatic_detail": "Gebruikt automatische groepering voor grote datumbereiken, met de optie om fijner detail vanuit het Geschiedenispaneel te laden.",
+          "large_range_detail_threshold_days": "Gebruikt automatisch detail wanneer het geselecteerde bereik ten minste dit aantal dagen beslaat.",
           "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
           "replace_more_info_history": "Vervang de ingebouwde geschiedenisgrafiek in entiteitsvensters door Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Toon de ingebouwde datumkiezer van Statistics Graph Chart Card in entiteitsvensters.",
