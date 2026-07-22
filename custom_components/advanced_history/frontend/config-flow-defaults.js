@@ -83,7 +83,11 @@ export function editorConfig(hass, defaults, profile = "panel") {
     type: `custom:${CARD_TAG}`,
     card_header: custom(hass, "numeric_history"),
     chart_mode: "timeline",
-    hours_to_show: profile === "more-info" ? Number(defaults?.hours_to_show) || 24 : 24,
+    ...(profile === "more-info"
+      ? (defaults?.hours_to_show !== undefined
+        ? { hours_to_show: defaults.hours_to_show }
+        : {})
+      : { hours_to_show: 24 }),
     height: profile === "more-info" ? Number(defaults?.height) || 300 : 500,
     entities,
   };

@@ -23,7 +23,7 @@ from .websocket import async_register_websocket_commands
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate Advanced History config entries."""
-    if entry.version > 4:
+    if entry.version > 5:
         return False
 
     options = deepcopy(dict(entry.options))
@@ -67,7 +67,20 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             card_options.setdefault(key, DEFAULT_MORE_INFO_CARD_OPTIONS[key])
         options[CONF_MORE_INFO_CARD_OPTIONS] = card_options
 
-    hass.config_entries.async_update_entry(entry, options=options, version=4)
+    if entry.version < 5 and config_entry_type(entry) == ENTRY_TYPE_MORE_INFO:
+        configured = options.get(CONF_MORE_INFO_CARD_OPTIONS)
+        card_options = (
+            deepcopy(configured)
+            if isinstance(configured, dict)
+            else deepcopy(DEFAULT_MORE_INFO_CARD_OPTIONS)
+        )
+        if card_options.get("date_picker_default_mode") == "day":
+            card_options["date_picker_default_mode"] = "last_24h"
+        if card_options.get("hours_to_show") == 24:
+            card_options.pop("hours_to_show")
+        options[CONF_MORE_INFO_CARD_OPTIONS] = card_options
+
+    hass.config_entries.async_update_entry(entry, options=options, version=5)
     return True
 
 

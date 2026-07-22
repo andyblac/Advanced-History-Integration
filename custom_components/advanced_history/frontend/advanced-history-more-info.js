@@ -71,6 +71,23 @@ function entityTemplate(options) {
   return rows.find((row) => row && typeof row === "object" && !Array.isArray(row)) || {};
 }
 
+function entityDisplayPrecision(hass, entityId) {
+  const registryEntry = hass?.entities?.[entityId];
+  const attributes = hass?.states?.[entityId]?.attributes || {};
+  const candidates = [
+    registryEntry?.options?.sensor?.display_precision,
+    registryEntry?.display_precision,
+    attributes.suggested_display_precision,
+    attributes.display_precision,
+  ];
+  for (const candidate of candidates) {
+    if (candidate === undefined || candidate === null || candidate === "") continue;
+    const precision = Number(candidate);
+    if (Number.isInteger(precision) && precision >= 0) return precision;
+  }
+  return undefined;
+}
+
 function resolvedTimeZone(hass) {
   const preference = hass?.locale?.time_zone;
   const serverTimeZone = hass?.config?.time_zone;
@@ -179,6 +196,10 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
     const color = nativeGraphColor(historyView);
     if (color) template.color = color;
   }
+  if (numeric && !Object.prototype.hasOwnProperty.call(template, "decimals")) {
+    const decimals = entityDisplayPrecision(historyView.hass, entityId);
+    if (decimals !== undefined) template.decimals = decimals;
+  }
   if (!numeric && !Object.prototype.hasOwnProperty.call(template, "name")) {
     // Home Assistant omits the entity name beside a single More Info state
     // timeline. A truthy whitespace value also prevents the card from falling
@@ -200,7 +221,9 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
     card_header: "",
     card_padding: cardOptions.card_padding ?? 0,
     chart_mode: numeric ? "timeline" : "state_timeline",
-    hours_to_show: Number(cardOptions.hours_to_show) || 24,
+    ...(cardOptions.hours_to_show !== undefined
+      ? { hours_to_show: cardOptions.hours_to_show }
+      : {}),
     height: numeric
       ? configuredHeight
       : Math.min(configuredHeight, MORE_INFO_STATE_TIMELINE_HEIGHT),
