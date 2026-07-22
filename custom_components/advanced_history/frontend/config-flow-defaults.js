@@ -1,4 +1,5 @@
 import { CARD_DEFAULT_MODULE_URLS, CARD_TAG } from "./constants.js";
+import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { customLocalize } from "./translations.js";
 
 const INSTALLED_KEY = "__advancedHistoryConfigFlowDefaultsInstalled";
@@ -140,74 +141,30 @@ export function updateObjectSelector(selector, value) {
 }
 
 async function openDefaultsEditor(selector, profile) {
-  if (document.querySelector("advanced-history-defaults-dialog")) return;
   const hass = selector.hass;
-  const dialog = document.createElement("advanced-history-defaults-dialog");
-  document.body.append(dialog);
-  const root = dialog.attachShadow({ mode: "open" });
   const isMoreInfo = profile === "more-info";
   const title = custom(hass, isMoreInfo ? "more_info_card_defaults" : "card_defaults");
-  root.innerHTML = `
-    <style>
-      :host { display:contents; color:var(--primary-text-color); }
-      * { box-sizing:border-box; }
-      dialog { width:min(1040px,calc(100vw - 40px)); height:min(820px,92vh); max-width:none; max-height:none; margin:auto; padding:0; overflow:hidden; border:0; border-radius:12px; color:var(--primary-text-color); background:var(--card-background-color); box-shadow:0 12px 36px rgba(0,0,0,.4); }
-      dialog::backdrop { background:rgba(0,0,0,.56); }
-      section { width:100%; height:100%; display:flex; flex-direction:column; overflow:hidden; }
-      header { min-height:64px; padding:0 24px; display:flex; align-items:center; border-bottom:1px solid var(--divider-color); }
-      h2 { margin:0; font-size:20px; font-weight:500; }
-      .note { margin:14px 18px 8px; padding:10px 12px; border-radius:8px; color:var(--secondary-text-color); background:var(--secondary-background-color); line-height:1.4; }
-      .host { flex:1; min-height:0; overflow:auto; padding:8px 18px 18px; }
-      .host > * { display:block; width:100%; }
-      footer { min-height:64px; padding:10px 18px; display:flex; align-items:center; justify-content:flex-end; gap:8px; border-top:1px solid var(--divider-color); }
-      .status { margin-right:auto; color:var(--error-color); font-size:13px; }
-      button { min-width:84px; height:40px; padding:0 14px; border:0; border-radius:8px; cursor:pointer; color:var(--primary-color); background:transparent; font:inherit; font-weight:500; }
-      button.primary { color:var(--text-primary-color,white); background:var(--primary-color); }
-      button:disabled { opacity:.5; cursor:default; }
-      @media (max-width:600px) { dialog { width:100vw; height:100vh; border-radius:0; } }
-    </style>
-    <dialog aria-label="${title}">
-      <section>
-        <header><h2>${title}</h2></header>
-        <div class="note">${custom(hass, isMoreInfo ? "more_info_card_defaults_config_flow_note" : "card_defaults_config_flow_note")}</div>
-        <div class="host">${localize(hass, "ui.common.loading", "Loading")}…</div>
-        <footer><span class="status"></span><button data-action="cancel">${localize(hass, "ui.common.cancel", "Cancel")}</button><button class="primary" data-action="save">${localize(hass, "ui.common.save", "Save")}</button></footer>
-      </section>
-    </dialog>`;
-  const modal = root.querySelector("dialog");
-  const close = () => {
-    if (modal.open) modal.close();
-    dialog.remove();
-  };
-  modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
-  modal.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
-  root.querySelector('[data-action="cancel"]').addEventListener("click", close);
-  const save = root.querySelector('[data-action="save"]');
-  const status = root.querySelector(".status");
-  let draft = editorConfig(hass, selector.value || {}, profile);
-  modal.showModal();
-  try {
-    await ensureCardLoaded(hass);
-    const cardClass = customElements.get(CARD_TAG);
-    let editor = typeof cardClass?.getConfigElement === "function" ? await cardClass.getConfigElement() : null;
-    if (!editor) {
-      await customElements.whenDefined("statistics-graph-chart-card-editor");
-      editor = document.createElement("statistics-graph-chart-card-editor");
-    }
-    if (!dialog.isConnected) return;
-    editor.hass = hass;
-    editor.setConfig(draft);
-    editor.addEventListener("config-changed", (event) => {
-      if (event.detail?.config) draft = event.detail.config;
-    });
-    root.querySelector(".host").replaceChildren(editor);
-  } catch (error) {
-    status.textContent = error.message || custom(hass, "graph_editor_load_error");
-    save.disabled = true;
-  }
-  save.addEventListener("click", () => {
-    updateObjectSelector(selector, defaultsFromEditor(draft, profile));
-    close();
+  await openCardEditorDialog({
+    hass,
+    initialConfig: editorConfig(hass, selector.value || {}, profile),
+    title,
+    note: custom(
+      hass,
+      isMoreInfo
+        ? "more_info_card_defaults_config_flow_note"
+        : "card_defaults_config_flow_note",
+    ),
+    labels: {
+      loading: localize(hass, "ui.common.loading", "Loading"),
+      cancel: localize(hass, "ui.common.cancel", "Cancel"),
+      save: localize(hass, "ui.common.save", "Save"),
+      loadError: custom(hass, "graph_editor_load_error"),
+    },
+    allowCode: false,
+    ensureLoaded: () => ensureCardLoaded(hass),
+    onSave: (draft) => {
+      updateObjectSelector(selector, defaultsFromEditor(draft, profile));
+    },
   });
 }
 
