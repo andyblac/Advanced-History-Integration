@@ -1,5 +1,6 @@
 import { ensureCardLoaded, installConfigFlowDefaultsEditor } from "./config-flow-defaults.js";
 import { openCardEditorDialog } from "./card-editor-dialog.js";
+import { installCardHandoffApi } from "./card-handoff.js";
 import { CARD_TAG } from "./constants.js";
 import { automaticEntityOptions } from "./entity-defaults.js";
 import { customLocalize } from "./translations.js";
@@ -632,6 +633,7 @@ if (!window[SHOW_MORE_REDIRECT_INSTALL_KEY]) {
 }
 
 installConfigFlowDefaultsEditor();
+installCardHandoffApi();
 installMoreInfoReplacement().catch((error) => {
   console.warn("Advanced History: unable to install the More Info graph replacement", error);
 });

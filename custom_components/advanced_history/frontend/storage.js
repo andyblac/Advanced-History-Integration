@@ -2,6 +2,7 @@ import {
   BOOKMARKS_DIRTY_STORAGE_KEY,
   BOOKMARKS_LIMIT,
   BOOKMARKS_STORAGE_KEY,
+  CARD_HANDOFF_QUERY_PARAM,
   CURRENT_SNAPSHOT_STORAGE_KEY,
   HISTORY_LIMIT,
   HISTORY_STORAGE_KEY,
@@ -11,11 +12,18 @@ import {
   UNDO_LIMIT,
   UNDO_STORAGE_KEY,
 } from "./constants.js";
+import { consumeCardHandoff } from "./card-handoff.js";
 
 export class StorageMethods {
   async _loadTargets() {
     const params = new URLSearchParams(location.search);
+    const handedOffSnapshot = this._validateSharedSnapshot(consumeCardHandoff(params));
     const sharedSnapshot = await this._sharedSnapshotFromUrl(params);
+    if (params.has(CARD_HANDOFF_QUERY_PARAM) && !handedOffSnapshot) {
+      const url = new URL(location.href);
+      url.searchParams.delete(CARD_HANDOFF_QUERY_PARAM);
+      history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
+    }
     if (params.has(SHARE_QUERY_PARAM) && !sharedSnapshot) {
       const url = new URL(location.href);
       url.searchParams.delete(SHARE_QUERY_PARAM);
@@ -24,29 +32,30 @@ export class StorageMethods {
     }
     const fromUrl = { area_id: params.getAll("area_id"), device_id: params.getAll("device_id"), entity_id: params.getAll("entity_id") };
     const previous = this._loadCurrentSnapshot();
-    if (sharedSnapshot) {
+    const incomingSnapshot = handedOffSnapshot || sharedSnapshot;
+    if (incomingSnapshot) {
       this._loadedBookmarkId = null;
       if (
         previous?.targets &&
         this._targetCount(this._normalizeTargets(previous.targets)) &&
-        this._snapshotFingerprint(previous) !== this._snapshotFingerprint(sharedSnapshot)
+        this._snapshotFingerprint(previous) !== this._snapshotFingerprint(incomingSnapshot)
       ) {
         this._archiveSnapshot(previous);
         this._pushUndoSnapshot(previous);
         this._saveLibrary(REDO_STORAGE_KEY, []);
       }
-      this._targets = this._normalizeTargets(sharedSnapshot.targets);
-      this._hiddenTargets = this._normalizeTargets(sharedSnapshot.hidden_targets || {});
-      this._activeSnapshot = this._clone(sharedSnapshot.chart);
-      this._pendingPeriodRestore = this._clone(sharedSnapshot.period);
+      this._targets = this._normalizeTargets(incomingSnapshot.targets);
+      this._hiddenTargets = this._normalizeTargets(incomingSnapshot.hidden_targets || {});
+      this._activeSnapshot = this._clone(incomingSnapshot.chart);
+      this._pendingPeriodRestore = this._clone(incomingSnapshot.period);
       if (this._pendingPeriodRestore?.start) {
         this._beginPeriodRestore(this._pendingPeriodRestore);
       }
-      this._currentSnapshot = this._clone(sharedSnapshot);
+      this._currentSnapshot = this._clone(incomingSnapshot);
       this._incomingTargetOverride = true;
       this._pruneHiddenTargets();
-      this._saveCurrentSnapshot(sharedSnapshot);
-      this._replaceSharedUrlWithTargets();
+      this._saveCurrentSnapshot(incomingSnapshot);
+      this._replaceIncomingUrlWithTargets();
       return;
     }
     const hasUrlTargets = Object.values(fromUrl).some((items) => items.length);
@@ -113,6 +122,7 @@ export class StorageMethods {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(this._targets));
     const url = new URL(location.href);
     url.searchParams.delete(SHARE_QUERY_PARAM);
+    url.searchParams.delete(CARD_HANDOFF_QUERY_PARAM);
     ["area_id", "device_id", "entity_id"].forEach((key) => {
       url.searchParams.delete(key);
       this._targets[key].forEach((value) => url.searchParams.append(key, value));

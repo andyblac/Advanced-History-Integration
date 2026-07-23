@@ -1,4 +1,4 @@
-import { SHARE_QUERY_PARAM } from "./constants.js";
+import { CARD_HANDOFF_QUERY_PARAM, SHARE_QUERY_PARAM } from "./constants.js";
 
 const SHARE_SCHEMA = 1;
 const MAX_SHARE_PARAMETER_LENGTH = 250000;
@@ -100,9 +100,10 @@ export class ShareMethods {
     }
   }
 
-  _replaceSharedUrlWithTargets() {
+  _replaceIncomingUrlWithTargets() {
     const url = new URL(location.href);
     url.searchParams.delete(SHARE_QUERY_PARAM);
+    url.searchParams.delete(CARD_HANDOFF_QUERY_PARAM);
     ["area_id", "device_id", "entity_id"].forEach((key) => {
       url.searchParams.delete(key);
       this._targets[key].forEach((value) => url.searchParams.append(key, value));

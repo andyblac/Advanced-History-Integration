@@ -16,3 +16,6 @@ export const UNDO_STORAGE_KEY = "advanced-history-panel.undo.v1";
 export const REDO_STORAGE_KEY = "advanced-history-panel.redo.v1";
 export const UNDO_LIMIT = 50;
 export const SHARE_QUERY_PARAM = "chart";
+export const CARD_HANDOFF_QUERY_PARAM = "card_handoff";
+export const CARD_HANDOFF_STORAGE_PREFIX = "advanced-history.card-handoff.v1.";
+export const CARD_HANDOFF_SCHEMA = 1;
