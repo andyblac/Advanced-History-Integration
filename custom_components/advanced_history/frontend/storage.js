@@ -591,7 +591,7 @@ export class StorageMethods {
     return this.config.compare;
   }
 
-  _applyStoredPeriod(collection, period, clearPending = true) {
+  _applyStoredPeriod(collection, period, clearPending = true, refresh = true) {
     if (!period?.start || !collection) return false;
     const start = new Date(period.start);
     const end = period.end ? new Date(period.end) : undefined;
@@ -617,12 +617,17 @@ export class StorageMethods {
       if (compareChanged) collection.setCompare(compare);
     }
     if (clearPending) this._pendingPeriodRestore = null;
-    if (periodChanged || compareChanged) collection.refresh?.();
+    if (refresh && (periodChanged || compareChanged)) collection.refresh?.();
     return true;
   }
 
-  _restorePendingPeriod(collection) {
-    return this._applyStoredPeriod(collection, this._pendingPeriodRestore);
+  _restorePendingPeriod(collection, refresh = true) {
+    return this._applyStoredPeriod(
+      collection,
+      this._pendingPeriodRestore,
+      true,
+      refresh
+    );
   }
 
   _beginPeriodRestore(period) {
@@ -645,6 +650,8 @@ export class StorageMethods {
     this._periodRestoreTimer = null;
     const banner = this.shadowRoot?.getElementById("period-loading-banner");
     if (banner) banner.hidden = true;
+    const charts = this.shadowRoot?.getElementById("charts");
+    if (charts) charts.hidden = false;
   }
 
   _completePeriodRestoreFromData(data, collection) {
@@ -654,8 +661,11 @@ export class StorageMethods {
     // native picker updates only from the refreshed EnergyData payload. Use
     // that payload as the confirmation so stale cached data cannot complete
     // the restore early.
-    const actualStart = data?.start ?? collection?.start;
-    const actualEnd = data?.end ?? collection?.end;
+    // EnergyData carries the range used for the completed request. Never
+    // substitute the collection properties here: setPeriod() changes those
+    // synchronously before the refreshed data has arrived.
+    const actualStart = data?.start;
+    const actualEnd = data?.end;
     const expectedStart = new Date(expected.start).getTime();
     const expectedEnd = expected.end ? new Date(expected.end).getTime() : undefined;
     const start = actualStart instanceof Date
@@ -666,10 +676,7 @@ export class StorageMethods {
       : actualEnd instanceof Date
         ? actualEnd.getTime()
         : new Date(actualEnd).getTime();
-    if (start !== expectedStart || end !== expectedEnd) {
-      this._applyStoredPeriod(collection, expected, false);
-      return false;
-    }
+    if (start !== expectedStart || end !== expectedEnd) return false;
     this._finishPeriodRestore();
     return true;
   }

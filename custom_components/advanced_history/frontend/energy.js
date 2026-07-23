@@ -121,8 +121,16 @@ export class EnergyMethods {
     this._energyCollection = collection;
     this._activateGraphDataSourceTracking();
 
+    const restoringPeriod = Boolean(
+      this._periodRestoreLoading && this._periodRestoreExpected?.start
+    );
     if (this._energyResetPending || !this._targetCount()) {
       this._resetEnergySelection(collection);
+    } else if (restoringPeriod) {
+      // setPeriod() changes only the collection's selected dates. Mount the
+      // graph against those dates before refreshing so its Energy subscriber
+      // is present for the authoritative restored-range result.
+      this._restorePendingPeriod(collection, false);
     } else {
       this._restorePendingPeriod(collection);
     }
@@ -130,21 +138,39 @@ export class EnergyMethods {
     const applyMode = (mode = collection.compare, force = false) => {
       if (this._energyRenderToken !== token) return;
       compareHost.hidden = Boolean(compareCard.hidden);
-      if (this._periodRestoreLoading) return;
-      const next = mode === "previous" ? "previous_period" : mode === "yoy" ? "last_year" : null;
+      const effectiveMode = this._periodRestoreLoading ? collection.compare : mode;
+      const next = effectiveMode === "previous" ? "previous_period" : effectiveMode === "yoy" ? "last_year" : null;
       const nextDetailKey = this._largeRangeDetailRenderKey();
+      if (this._periodRestoreLoading) {
+        this._energyCompare = next;
+        this._largeRangeDetailStateKey = nextDetailKey;
+        return;
+      }
       if (!force && next === this._energyCompare && nextDetailKey === this._largeRangeDetailStateKey) return;
       this._energyCompare = next;
       this._largeRangeDetailStateKey = nextDetailKey;
       this._renderGraphs();
     };
     applyMode();
+    if (restoringPeriod) {
+      this._renderGraphs();
+      const charts = this.shadowRoot?.getElementById("charts");
+      if (charts) charts.hidden = true;
+    }
     this._energyUnsubscribe = collection.subscribe((data) => {
-      const restored = this._completePeriodRestoreFromData(data, collection);
-      applyMode(data?.compareMode, restored);
-      if (data?.start) this._recordChange();
+      this._completePeriodRestoreFromData(data, collection);
+      applyMode(data?.compareMode);
+      if (data?.start && !this._periodRestoreLoading) this._recordChange();
     });
-    this._recordChange();
+    if (restoringPeriod) {
+      // Give newly connected graph cards one render cycle to subscribe before
+      // the restored EnergyData is published.
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+      if (this._energyRenderToken !== token || !compareCard.isConnected) return;
+      collection.refresh?.();
+    } else {
+      this._recordChange();
+    }
     const syncAfterInteraction = () => {
       queueMicrotask(() => {
         applyMode(collection.compare);
