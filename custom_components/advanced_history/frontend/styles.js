@@ -53,6 +53,7 @@ export const panelStyles = `
   .add-target:hover { background:var(--secondary-background-color); }
   .add-target ha-icon { width:19px; height:19px; }
   .charts { display:grid; gap:16px; }
+  .charts[hidden] { display:none; }
   .graph-shell { position:relative; min-width:0; }
   .graph-shell > statistics-graph-chart-card { display:block; }
   .data-source-indicator {

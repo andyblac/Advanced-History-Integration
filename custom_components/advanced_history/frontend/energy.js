@@ -28,7 +28,9 @@ export class EnergyMethods {
       compareHost.replaceChildren(compareCard);
       compareHost.hidden = true;
       this._cards.push(compareCard);
-      compareCard.addEventListener("card-visibility-changed", () => { compareHost.hidden = Boolean(compareCard.hidden); });
+      compareCard.addEventListener("card-visibility-changed", () => {
+        compareHost.hidden = this._periodRestoreLoading || Boolean(compareCard.hidden);
+      });
       await this._bindEnergyCollection(token, host, compareHost, compareCard);
     } catch (error) {
       if (this._energyRenderToken !== token || !host.isConnected) return;
@@ -137,7 +139,7 @@ export class EnergyMethods {
 
     const applyMode = (mode = collection.compare, force = false) => {
       if (this._energyRenderToken !== token) return;
-      compareHost.hidden = Boolean(compareCard.hidden);
+      compareHost.hidden = this._periodRestoreLoading || Boolean(compareCard.hidden);
       const effectiveMode = this._periodRestoreLoading ? collection.compare : mode;
       const next = effectiveMode === "previous" ? "previous_period" : effectiveMode === "yoy" ? "last_year" : null;
       const nextDetailKey = this._largeRangeDetailRenderKey();
@@ -158,8 +160,12 @@ export class EnergyMethods {
       if (charts) charts.hidden = true;
     }
     this._energyUnsubscribe = collection.subscribe((data) => {
-      this._completePeriodRestoreFromData(data, collection);
+      const periodRestored = this._completePeriodRestoreFromData(data, collection);
       applyMode(data?.compareMode);
+      if (periodRestored) {
+        compareHost.hidden = Boolean(compareCard.hidden);
+        this._renderLargeRangeDetailBanner();
+      }
       if (data?.start && !this._periodRestoreLoading) this._recordChange();
     });
     if (restoringPeriod) {

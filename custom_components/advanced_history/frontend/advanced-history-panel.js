@@ -223,15 +223,15 @@ class AdvancedHistoryPanel extends HTMLElement {
           <div id="target-picker-host" class="native-target-picker">
             <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
           </div>
-        </section>
-        <section id="compare-banner" class="compare-banner" hidden></section>`}
+        </section>`}
         <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
           <ha-circular-progress active size="small"></ha-circular-progress>
           <span>${this._escape(this._customLocalize("loading_saved_range"))}</span>
         </section>
+        ${dependencyMissing ? "" : `<section id="compare-banner" class="compare-banner" hidden></section>`}
         <section id="detail-banner" class="detail-banner" hidden></section>
         ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
-        <section id="charts" class="charts"></section>
+        <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>
       </main>
       ${dependencyMissing ? "" : `<div id="date-controller" class="energy-nav-floating"></div>`}`;
     const menu = this.shadowRoot.getElementById("menu");

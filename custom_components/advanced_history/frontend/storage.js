@@ -348,7 +348,11 @@ export class StorageMethods {
     const freshSessionFingerprint = this._freshSnapshotSessionFingerprint;
     const restoringFreshSession = Boolean(
       freshSessionFingerprint &&
-      (this._periodRestoreLoading || sourceFingerprint === freshSessionFingerprint)
+      (
+        this._periodRestoreLoading ||
+        !bookmarkEdit ||
+        sourceFingerprint === freshSessionFingerprint
+      )
     );
 
     if (changed && !this._incomingTargetOverride && !restoringFreshSession) {
@@ -643,6 +647,13 @@ export class StorageMethods {
   _beginPeriodRestore(period) {
     this._periodRestoreExpected = this._clone(period);
     this._periodRestoreLoading = true;
+    const charts = this.shadowRoot?.getElementById("charts");
+    if (charts) {
+      charts.hidden = true;
+      charts.replaceChildren();
+    }
+    this._cards = this._cards.filter((card) => !this._graphCards.includes(card));
+    this._graphCards = [];
     if (this._periodRestoreTimer) window.clearTimeout(this._periodRestoreTimer);
     this._periodRestoreTimer = window.setTimeout(
       () => {

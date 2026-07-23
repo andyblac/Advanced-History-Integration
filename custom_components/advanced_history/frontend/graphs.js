@@ -164,7 +164,7 @@ export class GraphMethods {
   _renderLargeRangeDetailBanner(profile = this._largeRangeDetailProfile()) {
     const banner = this.shadowRoot?.getElementById("detail-banner");
     if (!banner) return;
-    if (!profile) {
+    if (this._periodRestoreLoading || !profile) {
       banner.hidden = true;
       banner.replaceChildren();
       return;
