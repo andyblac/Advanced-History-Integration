@@ -39,6 +39,15 @@ export class GraphMethods {
       return;
     }
     this._renderLargeRangeDetailBanner(detail);
+    if (this._activeSnapshot?.single_graph) {
+      const cardOptions = this._cardOptions();
+      const mode = cardOptions.chart_mode
+        || (entityIds.some((id) => this._isNumeric(id)) ? "timeline" : "state_timeline");
+      const title = cardOptions.card_header
+        || this._customLocalize(mode === "state_timeline" ? "state_history" : "numeric_history");
+      this._createGraph(host, entityIds, title, mode, detail);
+      return;
+    }
     const numeric = entityIds.filter((id) => this._isNumeric(id));
     const states = entityIds.filter((id) => !this._isNumeric(id));
     if (numeric.length) this._createGraph(host, numeric, this._customLocalize("numeric_history"), "timeline", detail);
@@ -61,7 +70,10 @@ export class GraphMethods {
     );
     card.__advancedHistoryChartMode = mode;
     card.__advancedHistorySourceKey = sourceKey;
-    const cardOptions = this._cardOptions();
+    const cardOptions = { ...this._cardOptions() };
+    if (cardOptions.chart_mode && cardOptions.chart_mode !== mode) {
+      delete cardOptions.chart_mode;
+    }
     const detailOptions = !detail
       ? {}
       : detail.automatic
@@ -434,9 +446,14 @@ export class GraphMethods {
   _graphEditorConfig(editDefaults = false) {
     const entityIds = this._resolvedEntityIds();
     const numeric = entityIds.filter((id) => this._isNumeric(id));
-    const editorEntities = numeric.length ? numeric : entityIds;
+    const editorEntities = this._activeSnapshot?.single_graph
+      ? entityIds
+      : (numeric.length ? numeric : entityIds);
+    const editorMode = numeric.length ? "timeline" : "state_timeline";
+    const editorHeader = this._customLocalize(numeric.length ? "numeric_history" : "state_history");
     const cardOptionsConfig = editDefaults ? this.config.card_options : this._effectiveCardOptionsConfig();
     const entityOptionsConfig = editDefaults ? this.config.entity_options : this._effectiveEntityOptionsConfig();
+    const cardOptions = this._cardOptions(cardOptionsConfig);
     const palette = customElements.get(CARD_TAG)?.PALETTE;
     this._editorAutoColors = new Map();
     const entities = editorEntities.map((id, index) => {
@@ -451,10 +468,10 @@ export class GraphMethods {
     return {
       hours_to_show: editDefaults ? Number(this.config.default_hours) || 24 : this._effectiveDefaultHours(),
       height: editDefaults ? Number(this.config.graph_height) || 300 : this._effectiveGraphHeight(),
-      ...this._cardOptions(cardOptionsConfig),
+      ...cardOptions,
       type: `custom:${CARD_TAG}`,
-      card_header: this._customLocalize("numeric_history"),
-      chart_mode: "timeline",
+      card_header: cardOptions.card_header ?? editorHeader,
+      chart_mode: cardOptions.chart_mode ?? editorMode,
       entities,
       energy_date_sync: true,
     };
@@ -466,7 +483,7 @@ export class GraphMethods {
     const integrationCardDefaults = this._cardOptions(this.config.card_options);
     const integrationEntityDefaults = this.config.entity_options || {};
     const protectedKeys = new Set([
-      "type", "card_header", "chart_mode", "entities", "energy_date_sync", "height", "hours_to_show",
+      "type", "entities", "energy_date_sync", "height", "hours_to_show",
     ]);
     const cardOptions = {};
     for (const [key, value] of Object.entries(config || {})) {
@@ -474,6 +491,28 @@ export class GraphMethods {
       if (editDefaults || !this._sameGraphOption(value, integrationCardDefaults[key])) {
         cardOptions[key] = structuredClone(value);
       }
+    }
+    const configuredHasHeader = Object.prototype.hasOwnProperty.call(
+      configuredCardOptions || {},
+      "card_header"
+    );
+    const configuredHasMode = Object.prototype.hasOwnProperty.call(
+      configuredCardOptions || {},
+      "chart_mode"
+    );
+    const editorEntityIds = (config?.entities || [])
+      .map((row) => typeof row === "string" ? row : row?.entity || row?.statistic_id)
+      .filter(Boolean);
+    const editorHasNumeric = editorEntityIds.some((entityId) => this._isNumeric(entityId));
+    const automaticHeader = this._customLocalize(
+      editorHasNumeric ? "numeric_history" : "state_history"
+    );
+    const automaticMode = editorHasNumeric ? "timeline" : "state_timeline";
+    if (!configuredHasHeader && cardOptions.card_header === automaticHeader) {
+      delete cardOptions.card_header;
+    }
+    if (!configuredHasMode && cardOptions.chart_mode === automaticMode) {
+      delete cardOptions.chart_mode;
     }
     for (const [key, value] of Object.entries(
       editDefaults ? this._cardOptions(configuredCardOptions) : {}
@@ -552,12 +591,14 @@ export class GraphMethods {
     const defaultHours = Number(config?.hours_to_show) || this._effectiveDefaultHours();
     const graphHeight = Number(config?.height) || this._effectiveGraphHeight();
     const compare = this._snapshotCompareSetting();
+    const singleGraph = Boolean(this._activeSnapshot?.single_graph);
     this._activeSnapshot = {
       card_options: cardOptions,
       entity_options: entityOptions,
       default_hours: defaultHours,
       graph_height: graphHeight,
     };
+    if (singleGraph) this._activeSnapshot.single_graph = true;
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
     this._recordChange(null, true);
     return { cardOptions, entityOptions, defaultHours, graphHeight };

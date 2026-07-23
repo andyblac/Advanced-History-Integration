@@ -9,8 +9,6 @@ const MAX_HANDOFF_BYTES = 2000000;
 const TOKEN_PATTERN = /^[A-Za-z0-9-]{8,128}$/;
 const OMITTED_CARD_KEYS = new Set([
   "type",
-  "card_header",
-  "chart_mode",
   "entities",
   "energy_date_sync",
   "height",
@@ -63,7 +61,7 @@ function cardRows(config) {
   return config.entities;
 }
 
-export function cardConfigToSnapshot(config, period = null) {
+export function cardConfigToSnapshot(config, period = null, singleGraph = false) {
   if (!config || typeof config !== "object" || Array.isArray(config)) return null;
 
   const entityIds = [];
@@ -96,6 +94,7 @@ export function cardConfigToSnapshot(config, period = null) {
     card_options: cardOptions,
     entity_options: entityOptions,
   };
+  if (singleGraph) chart.single_graph = true;
   if (
     comparisons.length
     && comparisons.every((value) => JSON.stringify(value) === JSON.stringify(comparisons[0]))
@@ -105,7 +104,7 @@ export function cardConfigToSnapshot(config, period = null) {
   const defaultHours = normalizeNumber(config.hours_to_show);
   const graphHeight = normalizeNumber(config.height);
   if (defaultHours !== undefined) chart.default_hours = defaultHours;
-  if (graphHeight !== undefined) chart.graph_height = graphHeight;
+  if (graphHeight !== undefined) chart.source_graph_height = graphHeight;
 
   return {
     schema: 1,
@@ -141,16 +140,29 @@ export function installCardHandoffApi() {
   const current = window.advancedHistory;
   const api = current && typeof current === "object" ? current : {};
   /**
-   * Open a Statistics Graph Chart Card configuration in Advanced History.
+   * Open entities or a Statistics Graph Chart Card configuration in Advanced
+   * History.
+   *
+   * Other card types should supply a plain array of entity IDs using
+   * `entities`. Their card and entity-row configuration is intentionally not
+   * imported because its schema may have different meanings.
    *
    * `period` is optional and accepts Date values or ISO strings:
    * { start, end, compare }. Supplying it lets the receiving panel reproduce
-  * the card's currently displayed range instead of retaining the Energy
-  * date picker's current selection.
-  */
-  api.openCard = ({ config, period } = {}) => {
+   * the card's currently displayed range instead of retaining the Energy
+   * date picker's current selection.
+   */
+  api.openCard = ({ config, entities, period } = {}) => {
     try {
-      const snapshot = cardConfigToSnapshot(config, period);
+      const hasCardConfig = Boolean(
+        config && typeof config === "object" && !Array.isArray(config)
+      );
+      const sourceConfig = hasCardConfig
+        ? config
+        : (Array.isArray(entities)
+          ? { entities: entities.filter((entityId) => validEntityId(entityId)) }
+          : null);
+      const snapshot = cardConfigToSnapshot(sourceConfig, period, hasCardConfig);
       if (!snapshot) {
         console.warn("Advanced History: card handoff requires at least one valid entity");
         return false;

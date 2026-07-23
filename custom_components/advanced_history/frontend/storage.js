@@ -282,6 +282,7 @@ export class StorageMethods {
       default_hours: this._effectiveDefaultHours(),
       graph_height: this._effectiveGraphHeight(),
     };
+    if (this._activeSnapshot?.single_graph) chart.single_graph = true;
     if (compare !== undefined) chart.compare = this._clone(compare);
     return {
       schema: 1,
@@ -588,7 +589,10 @@ export class StorageMethods {
   }
 
   _effectiveGraphHeight() {
-    return Number(this._activeSnapshot?.graph_height ?? this.config.graph_height) || 300;
+    const configuredHeight =
+      Number(this._activeSnapshot?.graph_height ?? this.config.graph_height) || 300;
+    const sourceHeight = Number(this._activeSnapshot?.source_graph_height) || 0;
+    return Math.max(configuredHeight, sourceHeight);
   }
 
   _effectiveCompare() {
