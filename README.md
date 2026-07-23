@@ -47,7 +47,7 @@ Advanced History brings those two ideas together: select targets as you would in
 
 - Home Assistant with support for custom integrations.
 - [HACS](https://www.hacs.xyz/) is recommended.
-- [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) is a separate required dependency.
+- [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) **v3.30 or newer** is a separate required dependency.
 
 If the graph card is missing, Advanced History displays an **Install using HACS** link and a **Retry** button.
 
@@ -55,7 +55,7 @@ If the graph card is missing, Advanced History displays an **Install using HACS*
 
 ### HACS
 
-1. Install [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) through HACS.
+1. Install [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) **v3.30 or newer** through HACS.
 2. Open **HACS → Integrations**.
 3. Open the three-dot menu and select **Custom repositories**.
 4. Add this repository as an **Integration**:
@@ -74,7 +74,7 @@ New installations create both services automatically. The More Info graph replac
 
 ### Manual
 
-1. Install Statistics Graph Chart Card and register it as a dashboard resource.
+1. Install Statistics Graph Chart Card **v3.30 or newer** and register it as a dashboard resource.
 2. Copy `custom_components/advanced_history` into `/config/custom_components/advanced_history`.
 3. Restart Home Assistant.
 4. Add **Advanced History** from **Settings → Devices & services**.
