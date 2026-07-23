@@ -126,13 +126,16 @@ export class EnergyMethods {
     const restoringPeriod = Boolean(
       this._periodRestoreLoading && this._periodRestoreExpected?.start
     );
-    if (this._energyResetPending || !this._targetCount()) {
-      this._resetEnergySelection(collection);
-    } else if (restoringPeriod) {
+    if (restoringPeriod) {
       // setPeriod() changes only the collection's selected dates. Mount the
       // graph against those dates before refreshing so its Energy subscriber
       // is present for the authoritative restored-range result.
+      // A saved-range restore must also take precedence over an empty-chart
+      // reset left pending before the bookmark was loaded.
+      this._energyResetPending = false;
       this._restorePendingPeriod(collection, false);
+    } else if (this._energyResetPending || !this._targetCount()) {
+      this._resetEnergySelection(collection);
     } else {
       this._restorePendingPeriod(collection);
     }
@@ -161,7 +164,10 @@ export class EnergyMethods {
     }
     this._energyUnsubscribe = collection.subscribe((data) => {
       const periodRestored = this._completePeriodRestoreFromData(data, collection);
-      applyMode(data?.compareMode);
+      // The mode is usually unchanged while restoring a bookmark, but the
+      // old graph cards were deliberately removed by _beginPeriodRestore().
+      // Force their recreation once the requested Energy data is confirmed.
+      applyMode(data?.compareMode, periodRestored);
       if (periodRestored) {
         compareHost.hidden = Boolean(compareCard.hidden);
         this._renderLargeRangeDetailBanner();
@@ -208,7 +214,11 @@ export class EnergyMethods {
       return false;
     }
 
-    this._energyResetPending = false;
+    // Keep the reset pending while the chart is empty. Home Assistant may
+    // remount its Energy collection after the targets are cleared and expose
+    // the previously cached period again. Reapply Today on that remount, then
+    // clear the flag when the first new target is added.
+    this._energyResetPending = !this._targetCount();
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     const end = new Date();
