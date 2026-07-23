@@ -183,7 +183,6 @@ export function installCardHandoffApi() {
       return false;
     }
   };
-  api.apiVersion = 1;
   window.advancedHistory = api;
 }
 
