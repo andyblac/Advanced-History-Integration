@@ -172,7 +172,11 @@ export class EnergyMethods {
         compareHost.hidden = Boolean(compareCard.hidden);
         this._renderLargeRangeDetailBanner();
       }
-      if (data?.start && !this._periodRestoreLoading) this._recordChange();
+      // The collection update is authoritative for picker changes that can
+      // finish after the click fallback, including clearing Compare.
+      if (data?.start && !this._periodRestoreLoading) {
+        this._recordChange(null, true);
+      }
     });
     if (restoringPeriod) {
       // Give newly connected graph cards one render cycle to subscribe before
