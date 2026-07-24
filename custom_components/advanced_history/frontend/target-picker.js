@@ -189,9 +189,26 @@ export class TargetPickerMethods {
   _syncNativeTargetVisibility() {
     const picker = this._nativeTargetPicker;
     if (!picker) return;
-    const apply = () => {
-      if (picker !== this._nativeTargetPicker || !picker.shadowRoot) return;
-      picker.shadowRoot.querySelectorAll("ha-target-picker-value-chip").forEach((chip) => {
+    const syncId = (this._nativeTargetSyncId || 0) + 1;
+    this._nativeTargetSyncId = syncId;
+    const apply = async () => {
+      await picker.updateComplete;
+      await new Promise((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolve))
+      );
+      if (
+        picker !== this._nativeTargetPicker ||
+        syncId !== this._nativeTargetSyncId ||
+        !picker.shadowRoot
+      ) return;
+      const chips = [
+        ...picker.shadowRoot.querySelectorAll("ha-target-picker-value-chip"),
+      ];
+      const entityIds = new Set(this._targets.entity_id || []);
+      picker.shadowRoot
+        .querySelectorAll("[data-advanced-history-series]")
+        .forEach((button) => button.remove());
+      chips.forEach((chip) => {
         const kind = `${chip.type}_id`;
         const hidden = Boolean(this._hiddenTargets[kind]?.includes(chip.itemId));
         const name = kind === "area_id"
@@ -205,10 +222,254 @@ export class TargetPickerMethods {
         chip.setAttribute("role", "button");
         chip.setAttribute("aria-pressed", hidden ? "true" : "false");
         chip.setAttribute("title", this._customLocalize(hidden ? "show_target" : "hide_target", { target: name }));
+        if (kind === "entity_id" && entityIds.has(chip.itemId)) {
+          this._syncSeriesButton(chip, name);
+        }
       });
     };
-    if (picker.updateComplete?.then) picker.updateComplete.then(apply);
-    else queueMicrotask(apply);
+    void apply();
+  }
+
+  _syncSeriesButton(chip, name) {
+    const entity = chip.itemId;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.advancedHistorySeries = entity;
+    button.setAttribute(
+      "aria-label",
+      this._customLocalize("configure_series", { target: name })
+    );
+    button.title = this._customLocalize("configure_series", { target: name });
+    button.innerHTML = '<ha-icon icon="mdi:tune-variant"></ha-icon>';
+    button.style.cssText = [
+      "width:28px",
+      "height:28px",
+      "margin-inline:-6px 4px",
+      "padding:4px",
+      "display:inline-flex",
+      "align-items:center",
+      "justify-content:center",
+      "align-self:center",
+      "border:0",
+      "border-radius:50%",
+      "color:var(--secondary-text-color)",
+      "background:transparent",
+      "cursor:pointer",
+    ].join(";");
+    button.querySelector("ha-icon").style.cssText = "width:18px;height:18px";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this._openSeriesDialog(entity);
+    });
+    chip.insertAdjacentElement("afterend", button);
+  }
+
+  _seriesChoiceValue(entity, attribute) {
+    const state = this._hass.states[entity];
+    const value = attribute ? this._attributeValue(state, attribute) : state?.state;
+    if (value == null || value === "") {
+      return this._localize("state.default.unknown", "Unknown");
+    }
+    if (typeof value === "object") return "";
+    return String(value);
+  }
+
+  _seriesStateMap(entity, attribute) {
+    const options = this._effectiveEntityOptionsConfig()?.[
+      this._seriesKey(entity, attribute)
+    ];
+    return Array.isArray(options?.state_map) ? options.state_map : [];
+  }
+
+  _seriesStateMapValues(entity, attribute) {
+    const values = this._seriesStateMap(entity, attribute)
+      .map((item) => item?.value)
+      .filter((value) => value != null && value !== "")
+      .map(String);
+    const current = this._attributeValue(this._hass.states[entity], attribute);
+    if (
+      current != null &&
+      current !== "" &&
+      typeof current !== "object" &&
+      !["unknown", "unavailable"].includes(String(current).toLowerCase())
+    ) {
+      values.push(String(current));
+    }
+    return [...new Set(values)];
+  }
+
+  _seriesStateLabel(value) {
+    return String(value)
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
+  _seriesChoices(entity) {
+    const state = this._hass.states[entity];
+    if (!state) return [];
+    const selected = new Set(
+      this._seriesDescriptors([entity]).map((item) => item.attribute || "state")
+    );
+    const configuredAttributes = Object.entries(this._effectiveEntityOptionsConfig() || {})
+      .filter(([key, options]) =>
+        key.startsWith(`${entity}::`) &&
+        options &&
+        typeof options === "object" &&
+        typeof options.attribute === "string"
+      )
+      .map(([, options]) => options.attribute);
+    const nativeAttributes = this._nativeHistorySeries(entity).map((item) => item.attribute);
+    const metadataAttributes = new Set([
+      "assumed_state",
+      "attribution",
+      "device_class",
+      "editable",
+      "entity_picture",
+      "friendly_name",
+      "icon",
+      "restored",
+      "state_class",
+      "supported_features",
+      "unit_of_measurement",
+    ]);
+    const availableAttributes = Object.entries(state.attributes || {})
+      .filter(([attribute, value]) =>
+        !metadataAttributes.has(attribute) &&
+        value !== "" &&
+        (typeof value === "string" || typeof value === "number")
+      );
+    const numericAttributes = availableAttributes
+      .filter(([, value]) => Number.isFinite(Number(value)))
+      .map(([attribute]) => attribute);
+    const categoricalAttributes = availableAttributes
+      .filter(([, value]) => !Number.isFinite(Number(value)))
+      .map(([attribute]) => attribute);
+    const attributes = [...new Set([
+      ...nativeAttributes,
+      ...configuredAttributes,
+      ...numericAttributes,
+      ...categoricalAttributes,
+      ...[...selected].filter((value) => value !== "state"),
+    ])];
+    return [
+      {
+        value: "state",
+        label: this._localize("ui.dialogs.more_info_control.state", "Entity state"),
+        current: this._seriesChoiceValue(entity, null),
+        detail: entity,
+        selected: selected.has("state"),
+      },
+      ...attributes.map((attribute) => ({
+        value: attribute,
+        label: this._attributeDisplayName(entity, attribute),
+        current: this._seriesChoiceValue(entity, attribute),
+        detail: attribute,
+        selected: selected.has(attribute),
+        categorical: categoricalAttributes.includes(attribute) ||
+          this._seriesStateMap(entity, attribute).length > 0,
+        mapValues: this._seriesStateMapValues(entity, attribute),
+      })),
+    ];
+  }
+
+  _openSeriesDialog(entity) {
+    if (!this._targets.entity_id.includes(entity)) return;
+    this.shadowRoot.querySelector(".series-backdrop")?.remove();
+    const name = this._entityName(entity);
+    const choices = this._seriesChoices(entity);
+    const cancel = this._localize("ui.common.cancel", "Cancel");
+    const apply = this._localize("ui.common.apply", "Apply");
+    const backdrop = document.createElement("div");
+    backdrop.className = "backdrop series-backdrop";
+    backdrop.innerHTML = `<section class="dialog series-dialog" role="dialog" aria-modal="true" aria-label="${this._escape(this._customLocalize("series_settings", { target: name }))}">
+      <header class="dialog-title"><h2>${this._escape(this._customLocalize("series_settings", { target: name }))}</h2></header>
+      <p class="series-note">${this._escape(this._customLocalize("series_settings_note"))}</p>
+      <div class="target-list series-list">
+        ${choices.map((choice) => `<div class="series-choice">
+          <label class="target-row series-row">
+            <input type="checkbox" data-series="${this._escape(choice.value)}" ${choice.selected ? "checked" : ""}>
+            <ha-icon icon="${choice.value === "state" ? "mdi:information-outline" : choice.categorical ? "mdi:format-list-bulleted" : "mdi:chart-line"}"></ha-icon>
+            <span class="row-name">${this._escape(choice.label)}<span class="row-secondary">${this._escape(choice.detail)} · ${this._escape(choice.current)}</span></span>
+          </label>
+          ${choice.categorical ? `<label class="series-map" ${choice.selected ? "" : "hidden"}>
+            <span>${this._escape(this._customLocalize("categorical_attribute_values"))}</span>
+            <input type="text" data-state-map="${this._escape(choice.value)}" value="${this._escape(choice.mapValues.join(", "))}" placeholder="${this._escape(this._customLocalize("categorical_attribute_values_hint"))}">
+          </label>` : ""}
+        </div>`).join("")}
+      </div>
+      <footer class="dialog-actions"><button data-action="cancel">${this._escape(cancel)}</button><button class="primary" data-action="apply">${this._escape(apply)}</button></footer>
+    </section>`;
+    const applyButton = backdrop.querySelector('[data-action="apply"]');
+    const updateApply = () => {
+      const selected = [...backdrop.querySelectorAll("[data-series]:checked")];
+      const missingMap = selected.some((checkbox) => {
+        const input = backdrop.querySelector(
+          `[data-state-map="${CSS.escape(checkbox.dataset.series)}"]`
+        );
+        return input && !input.value.split(",").some((value) => value.trim());
+      });
+      applyButton.disabled = !selected.length || missingMap;
+    };
+    backdrop.querySelectorAll("[data-series]").forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
+        const map = backdrop.querySelector(
+          `[data-state-map="${CSS.escape(checkbox.dataset.series)}"]`
+        )?.closest(".series-map");
+        if (map) map.hidden = !checkbox.checked;
+        updateApply();
+      });
+    });
+    backdrop.querySelectorAll("[data-state-map]").forEach((input) =>
+      input.addEventListener("input", updateApply)
+    );
+    backdrop.addEventListener("click", (event) => {
+      if (event.target === backdrop) backdrop.remove();
+    });
+    backdrop.querySelector('[data-action="cancel"]').addEventListener("click", () => backdrop.remove());
+    applyButton.addEventListener("click", () => {
+      const selection = [...backdrop.querySelectorAll("[data-series]:checked")]
+        .map((checkbox) => checkbox.dataset.series);
+      const chart = this._activeSnapshot
+        ? this._clone(this._activeSnapshot)
+        : this._captureSnapshot().chart;
+      chart.series_selection = {
+        ...(chart.series_selection || {}),
+        [entity]: selection,
+      };
+      const entityOptions = this._clone(
+        chart.entity_options || this._effectiveEntityOptionsConfig() || {}
+      );
+      for (const input of backdrop.querySelectorAll("[data-state-map]")) {
+        if (!selection.includes(input.dataset.stateMap)) continue;
+        const attribute = input.dataset.stateMap;
+        const key = this._seriesKey(entity, attribute);
+        const existing = entityOptions[key] || {};
+        const existingByValue = new Map(
+          this._seriesStateMap(entity, attribute)
+            .map((item) => [String(item?.value), item])
+        );
+        const values = [...new Set(
+          input.value.split(",").map((value) => value.trim()).filter(Boolean)
+        )];
+        entityOptions[key] = {
+          ...existing,
+          attribute,
+          state_map: values.map((value) => ({
+            ...(existingByValue.get(value) || {}),
+            value,
+            label: existingByValue.get(value)?.label || this._seriesStateLabel(value),
+          })),
+        };
+      }
+      chart.entity_options = entityOptions;
+      this._activeSnapshot = chart;
+      this._recordChange(null, true);
+      backdrop.remove();
+      this._renderGraphs();
+    });
+    updateApply();
+    this.shadowRoot.append(backdrop);
   }
 
   _toggleTargetVisibility(kind, id) {

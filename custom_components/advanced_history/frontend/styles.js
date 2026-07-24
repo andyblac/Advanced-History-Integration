@@ -13,6 +13,7 @@ export const panelStyles = `
   .icon-button:hover { background:rgba(255,255,255,.12); }
   .icon-button:disabled { opacity:.38; cursor:default; }
   .icon-button:disabled:hover { background:transparent; }
+  .icon-button[hidden] { display:none; }
   .content { max-width:1400px; margin:auto; padding:0 16px 104px; }
   .filters { display:flex; align-items:flex-start; gap:16px; margin-bottom:16px; }
   .energy-nav-floating {
@@ -56,6 +57,10 @@ export const panelStyles = `
   .charts[hidden] { display:none; }
   .graph-shell { position:relative; min-width:0; }
   .graph-shell > statistics-graph-chart-card { display:block; }
+  .graph-card-editor {
+    position:absolute; z-index:3; top:4px; right:44px;
+  }
+  .graph-shell.has-card-editor .data-source-indicator { right:88px; }
   .data-source-indicator {
     position:absolute; z-index:2; top:12px; right:46px; min-height:24px; padding:0 9px; display:inline-flex; align-items:center;
     border:1px solid var(--divider-color); border-radius:12px; color:var(--secondary-text-color);
@@ -143,6 +148,18 @@ export const panelStyles = `
   .dialog-actions { min-height:64px; padding:10px 18px; display:flex; align-items:center; justify-content:flex-end; gap:8px; border-top:1px solid var(--divider-color); }
   .dialog-actions button { min-width:84px; height:40px; padding:0 14px; border:0; border-radius:8px; cursor:pointer; color:var(--primary-color); background:transparent; font-weight:500; }
   .dialog-actions button.primary { color:var(--text-primary-color,white); background:var(--primary-color); }
+  .dialog-actions button:disabled { opacity:.45; cursor:default; }
+  .series-dialog { height:auto; max-height:min(680px,90vh); }
+  .series-note { margin:0; padding:16px 24px; color:var(--secondary-text-color); border-bottom:1px solid var(--divider-color); }
+  .series-list { max-height:min(480px,60vh); padding-top:10px; }
+  .series-row { grid-template-columns:28px 34px minmax(0,1fr); }
+  .series-choice { border-radius:8px; }
+  .series-choice:hover { background:var(--secondary-background-color); }
+  .series-choice .series-row:hover { background:transparent; }
+  .series-map { margin:-2px 12px 10px 80px; display:grid; gap:5px; color:var(--secondary-text-color); font-size:12px; }
+  .series-map[hidden] { display:none; }
+  .series-map input { min-width:0; height:38px; box-sizing:border-box; padding:0 10px; color:var(--primary-text-color); background:var(--card-background-color); border:1px solid var(--divider-color); border-radius:6px; font:inherit; font-size:14px; }
+  .series-map input:focus { outline:2px solid var(--primary-color); outline-offset:-1px; }
   .diagnostics-dialog { max-width:900px; }
   .diagnostics-note { padding:14px 24px; color:var(--secondary-text-color); border-bottom:1px solid var(--divider-color); }
   .diagnostics-preview { flex:1; min-height:0; margin:0; padding:18px 24px; overflow:auto; color:var(--primary-text-color); background:var(--primary-background-color); font:13px/1.5 var(--code-font-family,monospace); white-space:pre; tab-size:2; }

@@ -3,11 +3,18 @@ import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { CARD_DEFAULT_AGGREGATE, automaticEntityOptions } from "./entity-defaults.js";
 
 const DATA_SOURCE_CACHE = new Map();
+const NATIVE_HISTORY_ATTRIBUTES = {
+  climate: ["current_temperature", "temperature", "target_temp_low", "target_temp_high"],
+  humidifier: ["current_humidity", "humidity"],
+  water_heater: ["current_temperature", "temperature"],
+};
 
 export class GraphMethods {
   _renderGraphs() {
     const host = this.shadowRoot.getElementById("charts");
     if (!host) return;
+    const globalEditorButton = this.shadowRoot.getElementById("settings");
+    if (globalEditorButton) globalEditorButton.hidden = false;
     const detail = this._largeRangeDetailProfile();
     this._cards = this._cards.filter((card) => !this._graphCards.includes(card));
     this._graphCards = [];
@@ -31,6 +38,7 @@ export class GraphMethods {
       return;
     }
     const entityIds = this._resolvedEntityIds();
+    const series = this._seriesDescriptors(entityIds);
     if (this._notice && !this.shadowRoot.querySelector(".notice")) host.insertAdjacentHTML("beforebegin", `<div class="notice">${this._escape(this._notice)}</div>`);
     if (!entityIds.length) {
       this._renderLargeRangeDetailBanner(null);
@@ -42,19 +50,39 @@ export class GraphMethods {
     if (this._activeSnapshot?.single_graph) {
       const cardOptions = this._cardOptions();
       const mode = cardOptions.chart_mode
-        || (entityIds.some((id) => this._isNumeric(id)) ? "timeline" : "state_timeline");
+        || (series.some((item) => this._isNumeric(item)) ? "timeline" : "state_timeline");
       const title = cardOptions.card_header
         || this._customLocalize(mode === "state_timeline" ? "state_history" : "numeric_history");
-      this._createGraph(host, entityIds, title, mode, detail);
+      this._createGraph(host, series, title, mode, detail);
       return;
     }
-    const numeric = entityIds.filter((id) => this._isNumeric(id));
-    const states = entityIds.filter((id) => !this._isNumeric(id));
-    if (numeric.length) this._createGraph(host, numeric, this._customLocalize("numeric_history"), "timeline", detail);
-    if (states.length) this._createGraph(host, states, this._customLocalize("state_history"), "state_timeline", detail);
+    const numeric = series.filter((item) => this._isNumeric(item));
+    const states = series.filter((item) => !this._isNumeric(item));
+    const multipleCharts = Boolean(numeric.length && states.length);
+    if (globalEditorButton) globalEditorButton.hidden = multipleCharts;
+    if (numeric.length) {
+      this._createGraph(
+        host,
+        numeric,
+        this._customLocalize("numeric_history"),
+        "timeline",
+        detail,
+        multipleCharts,
+      );
+    }
+    if (states.length) {
+      this._createGraph(
+        host,
+        states,
+        this._customLocalize("state_history"),
+        "state_timeline",
+        detail,
+        multipleCharts,
+      );
+    }
   }
 
-  _createGraph(host, entityIds, title, mode, detail = null) {
+  _createGraph(host, series, title, mode, detail = null, showEditorButton = false) {
     const shell = document.createElement("div");
     shell.className = "graph-shell";
     const sourceIndicator = document.createElement("span");
@@ -62,7 +90,7 @@ export class GraphMethods {
     sourceIndicator.textContent = this._customLocalize("data_source_pending");
     sourceIndicator.title = this._customLocalize("data_source_help");
     const card = document.createElement(CARD_TAG);
-    const sourceKey = `${mode}:${entityIds.join("\u001f")}`;
+    const sourceKey = this._dataSourceCacheKey(mode, series);
     card.__advancedHistorySourceTracker = this._createDataSourceTracker(
       sourceIndicator,
       Boolean(this._energyCollection),
@@ -80,8 +108,8 @@ export class GraphMethods {
         ? { auto_scale_points: true }
         : { auto_scale_points: false, group_by: detail.groupBy, show_group_by_picker: true };
     const palette = customElements.get(CARD_TAG)?.PALETTE;
-    const entities = entityIds.map((id, index) => {
-      const entity = this._entityCardConfig(id, mode);
+    const entities = series.map((item, index) => {
+      const entity = this._entityCardConfig(item, mode);
       const configured = detail && mode === "state_timeline"
         ? { ...entity, aggregate_func: "last" }
         : entity;
@@ -93,11 +121,14 @@ export class GraphMethods {
       }
       return configured;
     });
+    const height = mode === "state_timeline"
+      ? this._stateTimelineHeight(entities)
+      : this._effectiveGraphHeight();
     const config = {
       type: `custom:${CARD_TAG}`, card_header: title, chart_mode: mode,
       entities,
       hours_to_show: this._effectiveDefaultHours(),
-      height: this._effectiveGraphHeight(),
+      height,
       ...(mode === "state_timeline" ? { group_by: "raw" } : {}),
       ...cardOptions,
       ...detailOptions,
@@ -121,11 +152,41 @@ export class GraphMethods {
       card.setConfig(config);
       this._setGraphCardHass(card, this._hass);
       shell.append(card, sourceIndicator);
+      if (
+        showEditorButton
+        && this.config.settings_path
+        && this._hass?.user?.is_admin
+      ) {
+        shell.classList.add("has-card-editor");
+        const editorButton = document.createElement("button");
+        editorButton.className = "graph-card-editor icon-button";
+        editorButton.title = this._customLocalize("graph_settings");
+        editorButton.setAttribute("aria-label", editorButton.title);
+        editorButton.innerHTML = '<ha-icon icon="mdi:cog-outline"></ha-icon>';
+        editorButton.addEventListener(
+          "click",
+          () => this._openGraphEditor(series, mode, title),
+        );
+        shell.append(editorButton);
+      }
       host.append(shell);
       this._cards.push(card);
       this._graphCards.push(card);
     }
     catch (error) { host.insertAdjacentHTML("beforeend", `<div class="error">${this._escape(error.message || error)}</div>`); }
+  }
+
+  _stateTimelineHeight(entities) {
+    // The card's height option controls only the timeline plot. State rows
+    // and legends are laid out outside the plot by the card itself, so adding
+    // their height here creates a large empty area between the timeline and
+    // the legend.
+    const visibleEntities = entities.filter((entity) => entity?.enabled !== false);
+    const visibleRows = Math.max(1, visibleEntities.length);
+    const contentHeight = 62 + (visibleRows - 1) * 36;
+
+    // Cap the plot at the normal configured graph height for large timelines.
+    return Math.min(this._effectiveGraphHeight(), contentHeight);
   }
 
   _largeRangePeriod() {
@@ -248,7 +309,10 @@ export class GraphMethods {
         render();
       },
       beginCycle: () => {
+        sources.clear();
         cyclePending = true;
+        if (sourceKey) sourceCache.delete(sourceKey);
+        render();
       },
       activate: () => {
         enabled = true;
@@ -268,6 +332,21 @@ export class GraphMethods {
     };
     render();
     return tracker;
+  }
+
+  _dataSourceCacheKey(mode, series) {
+    const start = this._energyCollection?.start;
+    const end = this._energyCollection?.end;
+    const startKey = Number.isFinite(start?.getTime?.()) ? start.toISOString() : "";
+    const endKey = Number.isFinite(end?.getTime?.()) ? end.toISOString() : "";
+    const compare = this._energyCollection?.compare || "";
+    return [
+      mode,
+      series.map((item) => item.key).join("\u001f"),
+      startKey,
+      endKey,
+      compare,
+    ].join("\u001e");
   }
 
   _beginGraphDataSourceCycle() {
@@ -299,6 +378,40 @@ export class GraphMethods {
     return null;
   }
 
+  _dataSourceResponseHasPoints(response) {
+    if (response == null) return false;
+    if (Array.isArray(response)) {
+      return response.some((item) => {
+        if (item && typeof item === "object") {
+          return this._dataSourceResponseHasPoints(item);
+        }
+        return item != null;
+      });
+    }
+    if (typeof response !== "object") return false;
+
+    const pointFields = [
+      "state",
+      "s",
+      "last_changed",
+      "lu",
+      "start",
+      "end",
+      "mean",
+      "min",
+      "max",
+      "sum",
+    ];
+    if (pointFields.some((field) => Object.prototype.hasOwnProperty.call(response, field))) {
+      return true;
+    }
+
+    return Object.values(response).some(
+      (value) => value && typeof value === "object"
+        && this._dataSourceResponseHasPoints(value)
+    );
+  }
+
   _setGraphCardHass(card, hass) {
     const tracker = card?.__advancedHistorySourceTracker;
     if (!card || !tracker || !hass) {
@@ -310,7 +423,20 @@ export class GraphMethods {
       return;
     }
 
-    const record = (message) => tracker.record(this._requestDataSource(message));
+    const recordResponse = (message, response) => {
+      const source = this._requestDataSource(message);
+      if (source && this._dataSourceResponseHasPoints(response)) {
+        tracker.record(source);
+      }
+      return response;
+    };
+    const trackResult = (message, result) => {
+      if (!this._requestDataSource(message)) return result;
+      if (result && typeof result.then === "function") {
+        return result.then((response) => recordResponse(message, response));
+      }
+      return recordResponse(message, result);
+    };
     const connection = hass.connection ? new Proxy(hass.connection, {
       get: (target, property) => {
         const value = Reflect.get(target, property, target);
@@ -319,8 +445,23 @@ export class GraphMethods {
           return value.bind(target);
         }
         return (...args) => {
-          record(args.find((argument) => argument?.type));
-          return value.apply(target, args);
+          const message = args.find((argument) => argument?.type);
+          if (property === "subscribeMessage" && this._requestDataSource(message)) {
+            const callbackIndex = args.findIndex((argument) => typeof argument === "function");
+            if (callbackIndex !== -1) {
+              const callback = args[callbackIndex];
+              args[callbackIndex] = (...callbackArgs) => {
+                for (const response of callbackArgs) {
+                  recordResponse(message, response);
+                }
+                return callback(...callbackArgs);
+              };
+            }
+          }
+          const result = value.apply(target, args);
+          return property === "sendMessagePromise"
+            ? trackResult(message, result)
+            : result;
         };
       },
     }) : null;
@@ -331,14 +472,15 @@ export class GraphMethods {
         if (typeof value !== "function") return value;
         if (property === "callWS") {
           return (message) => {
-            record(message);
-            return value.call(target, message);
+            return trackResult(message, value.call(target, message));
           };
         }
         if (property === "callApi") {
           return (...args) => {
-            record(args.find((argument) => typeof argument === "string" && argument.includes("history/period")));
-            return value.apply(target, args);
+            const message = args.find(
+              (argument) => typeof argument === "string" && argument.includes("history/period")
+            );
+            return trackResult(message, value.apply(target, args));
           };
         }
         return value.bind(target);
@@ -364,25 +506,168 @@ export class GraphMethods {
     return serverTimeZone || browserTimeZone || "UTC";
   }
 
-  _isNumeric(id) {
-    const state = this._hass.states[id];
-    const domain = id.split(".")[0];
-    if (["binary_sensor","input_boolean","input_select","select","person","device_tracker","alarm_control_panel","lock","cover","fan","switch","light","climate","media_player","date","datetime","time"].includes(domain)) return false;
+  _seriesKey(entity, attribute = null) {
+    return attribute ? `${entity}::${attribute}` : entity;
+  }
+
+  _seriesDescriptor(value) {
+    if (typeof value === "string") {
+      return { entity: value, attribute: null, key: value };
+    }
+    const entity = value?.entity || value?.statistic_id || "";
+    const attribute = value?.attribute || null;
+    return {
+      entity,
+      attribute,
+      key: value?.key || this._seriesKey(entity, attribute),
+    };
+  }
+
+  _nativeHistorySeries(entity) {
+    const state = this._hass.states[entity];
+    const domain = entity.split(".")[0];
+    const supported = NATIVE_HISTORY_ATTRIBUTES[domain];
+    if (!state || !supported) return [];
+    const attributes = state.attributes || {};
+    let names = supported.filter((attribute) =>
+      Object.prototype.hasOwnProperty.call(attributes, attribute)
+    );
+
+    // Native History uses either the single target temperature or the
+    // high/low target range. Do not render all three at the same time.
+    if (domain === "climate") {
+      const hasRange = names.includes("target_temp_low") || names.includes("target_temp_high");
+      names = hasRange
+        ? names.filter((attribute) => attribute !== "temperature")
+        : names.filter((attribute) =>
+          attribute !== "target_temp_low" && attribute !== "target_temp_high"
+        );
+    }
+    return names.map((attribute) => ({
+      entity,
+      attribute,
+      key: this._seriesKey(entity, attribute),
+    }));
+  }
+
+  _seriesDescriptors(
+    entityIds = this._resolvedEntityIds(),
+    entityOptionsConfig = this._effectiveEntityOptionsConfig()
+  ) {
+    const result = [];
+    const seen = new Set();
+    const selectedSeries = this._activeSnapshot?.series_selection;
+    const explicitlySelected = new Set();
+    const add = (descriptor) => {
+      const normalized = this._seriesDescriptor(descriptor);
+      if (!normalized.entity || seen.has(normalized.key)) return;
+      seen.add(normalized.key);
+      result.push(normalized);
+    };
+
+    for (const entity of entityIds) {
+      const selection = selectedSeries?.[entity];
+      if (Array.isArray(selection) && selection.length) {
+        explicitlySelected.add(entity);
+        for (const value of selection) {
+          if (value === "state") add(entity);
+          else if (typeof value === "string" && value) {
+            add({ entity, attribute: value });
+          }
+        }
+        continue;
+      }
+      const nativeSeries = this._nativeHistorySeries(entity);
+      if (nativeSeries.length) nativeSeries.forEach(add);
+      else add(entity);
+    }
+
+    // Attribute rows created in the card's visual editor are stored with a
+    // series-specific key. This permits several attributes from the same
+    // entity without collapsing them into one entity override.
+    for (const [key, options] of Object.entries(entityOptionsConfig || {})) {
+      if (!options || typeof options !== "object" || !options.attribute) continue;
+      const entity = key.includes("::") ? key.slice(0, key.indexOf("::")) : key;
+      if (!entityIds.includes(entity)) continue;
+      if (explicitlySelected.has(entity)) continue;
+      add({ entity, attribute: options.attribute });
+    }
+    return result;
+  }
+
+  _attributeValue(state, attribute) {
+    if (!state || !attribute) return state?.state;
+    return attribute.split(".").reduce(
+      (value, part) => value == null ? undefined : value[part],
+      state.attributes
+    );
+  }
+
+  _isNumeric(value) {
+    const { entity, attribute } = this._seriesDescriptor(value);
+    const state = this._hass.states[entity];
+    const domain = entity.split(".")[0];
+    if (attribute) {
+      if (NATIVE_HISTORY_ATTRIBUTES[domain]?.includes(attribute)) return true;
+      const attributeValue = this._attributeValue(state, attribute);
+      return attributeValue !== "" && Number.isFinite(Number(attributeValue));
+    }
+    if (["counter", "input_number", "number"].includes(domain)) return true;
+    if (state?.attributes?.state_class != null || state?.attributes?.unit_of_measurement != null) {
+      return true;
+    }
+    if (
+      domain === "sensor"
+      && state?.attributes?.device_class
+      && !["date", "enum", "timestamp"].includes(state.attributes.device_class)
+    ) {
+      return true;
+    }
+    if (["date", "datetime", "time"].includes(domain)) return false;
     return state && state.state !== "" && Number.isFinite(Number(state.state));
   }
 
+  _attributeSeriesName(entity, attribute) {
+    const entityName = this._entityName(entity);
+    return `${entityName} ${this._attributeDisplayName(entity, attribute)}`;
+  }
+
+  _attributeDisplayName(entity, attribute) {
+    const domain = entity.split(".")[0];
+    const key = `component.${domain}.entity_component._.state_attributes.${attribute}.name`;
+    const translated = this._hass.localize(key);
+    return translated || attribute
+      .split(".").pop()
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+  }
+
   _entityCardConfig(
-    entity,
+    value,
     mode,
     cardOptionsConfig = this._effectiveCardOptionsConfig(),
     entityOptionsConfig = this._effectiveEntityOptionsConfig()
   ) {
-    const savedOptions = entityOptionsConfig?.[entity];
+    const descriptor = this._seriesDescriptor(value);
+    const { entity, attribute, key } = descriptor;
+    const entitySavedOptions = entityOptionsConfig?.[entity];
+    const seriesSavedOptions = attribute ? entityOptionsConfig?.[key] : null;
     const entityOptions = {
       ...automaticEntityOptions(this._hass.states[entity], mode),
       ...this._defaultEntityOptions(cardOptionsConfig),
-      ...(savedOptions && typeof savedOptions === "object" ? savedOptions : {}),
+      ...(entitySavedOptions && typeof entitySavedOptions === "object" ? entitySavedOptions : {}),
+      ...(seriesSavedOptions && typeof seriesSavedOptions === "object" ? seriesSavedOptions : {}),
     };
+    if (attribute) {
+      entityOptions.attribute = attribute;
+      if (entityOptions.name == null) entityOptions.name = this._attributeSeriesName(entity, attribute);
+      const domain = entity.split(".")[0];
+      if (entityOptions.unit == null && ["climate", "water_heater"].includes(domain)) {
+        entityOptions.unit = this._hass.config?.unit_system?.temperature;
+      } else if (entityOptions.unit == null && domain === "humidifier") {
+        entityOptions.unit = "%";
+      }
+    }
     const enabled = this._enabledResolvedEntityIds?.has(entity) !== false;
     if (mode !== "state_timeline") {
       const { compare: compareDefaults, ...options } = entityOptions;
@@ -443,25 +728,41 @@ export class GraphMethods {
     return defaults;
   }
 
-  _graphEditorConfig(editDefaults = false) {
+  _graphEditorConfig(
+    editDefaults = false,
+    scopedSeries = null,
+    scopedMode = null,
+    scopedHeader = null,
+  ) {
     const entityIds = this._resolvedEntityIds();
-    const numeric = entityIds.filter((id) => this._isNumeric(id));
-    const editorEntities = this._activeSnapshot?.single_graph
-      ? entityIds
-      : (numeric.length ? numeric : entityIds);
-    const editorMode = numeric.length ? "timeline" : "state_timeline";
-    const editorHeader = this._customLocalize(numeric.length ? "numeric_history" : "state_history");
     const cardOptionsConfig = editDefaults ? this.config.card_options : this._effectiveCardOptionsConfig();
     const entityOptionsConfig = editDefaults ? this.config.entity_options : this._effectiveEntityOptionsConfig();
+    const series = this._seriesDescriptors(entityIds, entityOptionsConfig);
+    const numeric = series.filter((item) => this._isNumeric(item));
+    const editorEntities = Array.isArray(scopedSeries)
+      ? scopedSeries
+      : this._activeSnapshot?.single_graph
+        ? series
+        : (numeric.length ? numeric : series);
+    const editorHasNumeric = editorEntities.some((item) => this._isNumeric(item));
+    const editorMode = scopedMode || (editorHasNumeric ? "timeline" : "state_timeline");
+    const editorHeader = scopedHeader
+      || this._customLocalize(editorHasNumeric ? "numeric_history" : "state_history");
     const cardOptions = this._cardOptions(cardOptionsConfig);
     const palette = customElements.get(CARD_TAG)?.PALETTE;
     this._editorAutoColors = new Map();
-    const entities = editorEntities.map((id, index) => {
-      const entityConfig = this._entityCardConfig(id, "timeline", cardOptionsConfig, entityOptionsConfig);
+    const entities = editorEntities.map((item, index) => {
+      const entityConfig = this._entityCardConfig(
+        item,
+        editorMode,
+        cardOptionsConfig,
+        entityOptionsConfig,
+      );
+      const seriesKey = this._seriesDescriptor(item).key;
       if (entityConfig.color == null && Array.isArray(palette) && palette.length) {
         const color = palette[index % palette.length];
         entityConfig.color = color;
-        this._editorAutoColors.set(id, color);
+        this._editorAutoColors.set(seriesKey, color);
       }
       return entityConfig;
     });
@@ -500,10 +801,12 @@ export class GraphMethods {
       configuredCardOptions || {},
       "chart_mode"
     );
-    const editorEntityIds = (config?.entities || [])
-      .map((row) => typeof row === "string" ? row : row?.entity || row?.statistic_id)
-      .filter(Boolean);
-    const editorHasNumeric = editorEntityIds.some((entityId) => this._isNumeric(entityId));
+    const editorSeries = (config?.entities || [])
+      .map((row) => typeof row === "string"
+        ? this._seriesDescriptor(row)
+        : this._seriesDescriptor(row))
+      .filter((item) => item.entity);
+    const editorHasNumeric = editorSeries.some((item) => this._isNumeric(item));
     const automaticHeader = this._customLocalize(
       editorHasNumeric ? "numeric_history" : "state_history"
     );
@@ -528,6 +831,7 @@ export class GraphMethods {
       if (!raw || typeof raw === "string") continue;
       const entity = raw.entity || raw.statistic_id;
       if (!entity) continue;
+      const seriesKey = this._seriesKey(entity, raw.attribute);
       const options = structuredClone(raw);
       delete options.entity;
       delete options.statistic_id;
@@ -540,6 +844,7 @@ export class GraphMethods {
         ...automaticEntityOptions(this._hass.states[entity], "timeline"),
         ...this._defaultEntityOptions(this.config.card_options),
         ...(integrationEntityDefaults?.[entity] || {}),
+        ...(integrationEntityDefaults?.[seriesKey] || {}),
       };
       if (
         !Object.prototype.hasOwnProperty.call(options, "aggregate_func")
@@ -550,7 +855,7 @@ export class GraphMethods {
         // fallback would otherwise select a different aggregation.
         options.aggregate_func = CARD_DEFAULT_AGGREGATE;
       }
-      const automaticColor = this._editorAutoColors.get(entity);
+      const automaticColor = this._editorAutoColors.get(seriesKey);
       if (
         automaticColor &&
         typeof options.color === "string" &&
@@ -568,8 +873,8 @@ export class GraphMethods {
           if (this._sameGraphOption(value, integrationBase[key])) delete options[key];
         }
       }
-      if (Object.keys(options).length) entityOptions[entity] = options;
-      else delete entityOptions[entity];
+      if (Object.keys(options).length) entityOptions[seriesKey] = options;
+      else delete entityOptions[seriesKey];
     }
     return { cardOptions, entityOptions };
   }
@@ -586,12 +891,23 @@ export class GraphMethods {
     }
   }
 
-  _applyGraphEditorConfig(config) {
-    const { cardOptions, entityOptions } = this._splitGraphEditorConfig(config);
+  _applyGraphEditorConfig(config, scopedSeries = null) {
+    const { cardOptions, entityOptions: editedEntityOptions } = this._splitGraphEditorConfig(config);
+    let entityOptions = editedEntityOptions;
+    if (Array.isArray(scopedSeries)) {
+      entityOptions = structuredClone(this._activeSnapshot?.entity_options || {});
+      for (const item of scopedSeries) {
+        const descriptor = this._seriesDescriptor(item);
+        delete entityOptions[descriptor.key];
+        if (!descriptor.attribute) delete entityOptions[descriptor.entity];
+      }
+      Object.assign(entityOptions, editedEntityOptions);
+    }
     const defaultHours = Number(config?.hours_to_show) || this._effectiveDefaultHours();
     const graphHeight = Number(config?.height) || this._effectiveGraphHeight();
     const compare = this._snapshotCompareSetting();
     const singleGraph = Boolean(this._activeSnapshot?.single_graph);
+    const seriesSelection = this._clone(this._activeSnapshot?.series_selection);
     this._activeSnapshot = {
       card_options: cardOptions,
       entity_options: entityOptions,
@@ -599,15 +915,23 @@ export class GraphMethods {
       graph_height: graphHeight,
     };
     if (singleGraph) this._activeSnapshot.single_graph = true;
+    if (seriesSelection && Object.keys(seriesSelection).length) {
+      this._activeSnapshot.series_selection = seriesSelection;
+    }
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
     this._recordChange(null, true);
     return { cardOptions, entityOptions, defaultHours, graphHeight };
   }
 
-  async _openGraphEditor() {
+  async _openGraphEditor(scopedSeries = null, scopedMode = null, scopedHeader = null) {
     await openCardEditorDialog({
       hass: this._hass,
-      initialConfig: this._graphEditorConfig(),
+      initialConfig: this._graphEditorConfig(
+        false,
+        scopedSeries,
+        scopedMode,
+        scopedHeader,
+      ),
       title: this._customLocalize("graph_settings"),
       note: this._customLocalize("graph_editor_note"),
       labels: {
@@ -630,7 +954,7 @@ export class GraphMethods {
         onClick: () => this._openDiagnostics(),
       },
       onSave: (draft) => {
-        this._applyGraphEditorConfig(draft);
+        this._applyGraphEditorConfig(draft, scopedSeries);
         this._render();
       },
     });

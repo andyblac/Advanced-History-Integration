@@ -67,22 +67,40 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
   const entityIds = [];
   const hiddenEntityIds = [];
   const entityOptions = {};
+  const seriesSelection = {};
+  const seriesRows = {};
   const comparisons = [];
   for (const row of cardRows(config)) {
     const entityId = typeof row === "string" ? row : row?.entity;
-    if (!validEntityId(entityId) || entityIds.includes(entityId)) continue;
-    entityIds.push(entityId);
+    if (!validEntityId(entityId)) continue;
+    if (!entityIds.includes(entityId)) entityIds.push(entityId);
     if (row && typeof row === "object" && !Array.isArray(row)) {
-      if (row.enabled === false) hiddenEntityIds.push(entityId);
+      const series = typeof row.attribute === "string" && row.attribute
+        ? row.attribute
+        : "state";
+      seriesRows[entityId] ||= [];
+      seriesRows[entityId].push({ series, enabled: row.enabled !== false });
       const options = clone(row);
       delete options.entity;
       delete options.statistic_id;
-      delete options.enabled;
       if (options.compare !== undefined) comparisons.push(options.compare);
-      if (Object.keys(options).length) entityOptions[entityId] = options;
+      const key = series === "state" ? entityId : `${entityId}::${series}`;
+      if (Object.keys(options).length) entityOptions[key] = options;
+    } else {
+      seriesRows[entityId] ||= [];
+      seriesRows[entityId].push({ series: "state", enabled: true });
     }
   }
   if (!entityIds.length) return null;
+  for (const entityId of entityIds) {
+    const rows = seriesRows[entityId] || [];
+    const enabledRows = rows.filter((row) => row.enabled);
+    const selectedRows = enabledRows.length ? enabledRows : rows;
+    seriesSelection[entityId] = [
+      ...new Set(selectedRows.map((row) => row.series)),
+    ];
+    if (rows.length && !enabledRows.length) hiddenEntityIds.push(entityId);
+  }
 
   const cardOptions = {};
   for (const [key, value] of Object.entries(config)) {
@@ -93,6 +111,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
   const chart = {
     card_options: cardOptions,
     entity_options: entityOptions,
+    series_selection: seriesSelection,
   };
   if (singleGraph) chart.single_graph = true;
   if (

@@ -43,7 +43,8 @@ export class DiagnosticsMethods {
 
     const sanitized = {};
     for (const [rawKey, rawValue] of Object.entries(value)) {
-      const safeKey = aliases.get(rawKey) || rawKey;
+      let safeKey = aliases.get(rawKey) || rawKey;
+      for (const [entityId, alias] of aliases) safeKey = safeKey.replaceAll(entityId, alias);
       const safeValue = this._sanitizeDiagnosticValue(rawValue, aliases, rawKey);
       if (safeValue !== undefined) sanitized[safeKey] = safeValue;
     }
@@ -66,9 +67,11 @@ export class DiagnosticsMethods {
     const rawCardOptions = snapshot.chart?.card_options || this._effectiveCardOptionsConfig();
     const allEntityOptions = snapshot.chart?.entity_options || this._effectiveEntityOptionsConfig();
     const currentEntityOptions = Object.fromEntries(
-      [...resolvedEntities]
-        .filter((entityId) => allEntityOptions?.[entityId] !== undefined)
-        .map((entityId) => [entityId, allEntityOptions[entityId]])
+      Object.entries(allEntityOptions || {}).filter(([key]) =>
+        [...resolvedEntities].some((entityId) =>
+          key === entityId || key.startsWith(`${entityId}::`)
+        )
+      )
     );
     const aliases = this._diagnosticEntityAliases(rawCardOptions, currentEntityOptions);
     const cardOptions = this._sanitizeDiagnosticValue(
@@ -158,6 +161,10 @@ export class DiagnosticsMethods {
           chart_mode: card.__advancedHistoryChartMode || null,
           source: card.__advancedHistorySourceTracker?.source || "pending",
         })),
+        series_selection: this._sanitizeDiagnosticValue(
+          snapshot.chart?.series_selection || {},
+          aliases
+        ),
         card_options: cardOptions,
         entity_options: entityOptions,
       },

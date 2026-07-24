@@ -283,6 +283,12 @@ export class StorageMethods {
       graph_height: this._effectiveGraphHeight(),
     };
     if (this._activeSnapshot?.single_graph) chart.single_graph = true;
+    if (
+      this._activeSnapshot?.series_selection &&
+      Object.keys(this._activeSnapshot.series_selection).length
+    ) {
+      chart.series_selection = this._clone(this._activeSnapshot.series_selection);
+    }
     if (compare !== undefined) chart.compare = this._clone(compare);
     return {
       schema: 1,
