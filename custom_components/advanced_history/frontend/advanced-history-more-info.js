@@ -3,6 +3,11 @@ import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { installCardHandoffApi } from "./card-handoff.js";
 import { CARD_TAG } from "./constants.js";
 import { automaticEntityOptions } from "./entity-defaults.js";
+import {
+  historyAttributeDisplayName,
+  historyAttributeUnit,
+  nativeHistoryAttributes,
+} from "./history-series.js";
 import { customLocalize } from "./translations.js";
 
 // Keep the legacy global value so an update cannot install duplicate listeners
@@ -160,6 +165,11 @@ function isNumericMoreInfoHistory(historyView, nativeChart) {
     || (state?.state !== "" && Number.isFinite(Number(state?.state)));
 }
 
+function nativeMoreInfoAttributes(historyView) {
+  const entityId = historyView.entityId;
+  return nativeHistoryAttributes(entityId, historyView.hass?.states?.[entityId]);
+}
+
 function optionKeysToRemove(config, scope) {
   const configured = config?.[scope];
   return Array.isArray(configured)
@@ -169,7 +179,13 @@ function optionKeysToRemove(config, scope) {
 
 function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   const entityId = historyView.entityId;
-  const numeric = isNumericMoreInfoHistory(historyView, nativeChart);
+  const availableNativeAttributes = nativeMoreInfoAttributes(historyView);
+  const configuredSeries = entityConfig?.series_selection;
+  const nativeAttributes = Array.isArray(configuredSeries) && configuredSeries.length
+    ? availableNativeAttributes.filter((attribute) => configuredSeries.includes(attribute))
+    : availableNativeAttributes;
+  const numeric = nativeAttributes.length > 0
+    || isNumericMoreInfoHistory(historyView, nativeChart);
   const cardOptions = options && typeof options === "object" && !Array.isArray(options)
     ? structuredClone(options)
     : {};
@@ -193,7 +209,11 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   delete template.entity;
   delete template.statistic_id;
   delete template.compare;
-  if (numeric && !Object.prototype.hasOwnProperty.call(template, "color")) {
+  if (
+    numeric
+    && nativeAttributes.length < 2
+    && !Object.prototype.hasOwnProperty.call(template, "color")
+  ) {
     const color = nativeGraphColor(historyView);
     if (color) template.color = color;
   }
@@ -215,6 +235,30 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
     const stateMap = nativeBinaryStateMap(historyView);
     if (stateMap) template.state_map = stateMap;
   }
+  const entityRows = nativeAttributes.length
+    ? nativeAttributes.map((attribute) => {
+      const row = structuredClone(template);
+      const seriesConfig = entityConfig?.series_options?.[attribute];
+      const seriesOptions = seriesConfig?.options
+        || (seriesConfig?.remove_options ? null : seriesConfig);
+      for (const key of seriesConfig?.remove_options || []) delete row[key];
+      if (seriesOptions && typeof seriesOptions === "object") {
+        Object.assign(row, structuredClone(seriesOptions));
+      }
+      const unit = historyAttributeUnit(historyView.hass, entityId);
+      return {
+        ...row,
+        entity: entityId,
+        attribute,
+        name: row.name ?? historyAttributeDisplayName(
+          historyView.hass,
+          entityId,
+          attribute,
+        ),
+        ...(row.unit == null && unit != null ? { unit } : {}),
+      };
+    })
+    : [{ ...template, entity: entityId }];
   const configuredHeight = Number(cardOptions.height) || 240;
   return {
     ...cardOptions,
@@ -230,7 +274,7 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
       : Math.min(configuredHeight, MORE_INFO_STATE_TIMELINE_HEIGHT),
     time_zone: cardOptions.time_zone ?? resolvedTimeZone(historyView.hass),
     ...(numeric ? {} : { group_by: "raw" }),
-    entities: [{ ...template, entity: entityId }],
+    entities: entityRows,
   };
 }
 
@@ -313,6 +357,22 @@ function claimMoreInfoChart(historyView) {
   historyView.setAttribute(MORE_INFO_REPLACING_ATTRIBUTE, "");
 }
 
+function applyNativeSeriesMoreInfoLayout(historyView, host) {
+  host.style.removeProperty("margin-inline-start");
+  host.style.removeProperty("margin-inline-end");
+  host.style.removeProperty("margin-block-start");
+  host.style.removeProperty("inline-size");
+  host.style.marginBlockEnd =
+    "calc(var(--ha-space-6, 24px) * -1)";
+  if (!nativeMoreInfoAttributes(historyView).length) return;
+  host.style.marginInlineStart = "var(--ha-space-6, 24px)";
+  host.style.marginInlineEnd = "var(--ha-space-6, 24px)";
+  host.style.marginBlockStart = "var(--ha-space-4, 16px)";
+  host.style.marginBlockEnd = "10px";
+  host.style.inlineSize =
+    "calc(100% - var(--ha-space-6, 24px) - var(--ha-space-6, 24px))";
+}
+
 function showMoreInfoLoading(root, nativeChart) {
   let host = root.querySelector(`.${MORE_INFO_HOST_CLASS}`);
   if (host) return host;
@@ -324,6 +384,7 @@ function showMoreInfoLoading(root, nativeChart) {
   progress.setAttribute("active", "");
   progress.setAttribute("size", "small");
   host.append(progress);
+  applyNativeSeriesMoreInfoLayout(root.host, host);
   nativeChart.before(host);
   return host;
 }
@@ -367,20 +428,67 @@ function entityOverrideFromEditor(draft, base, numeric) {
       ...(numeric ? [] : ["group_by"]),
     ]),
   );
-  const draftEntity = Array.isArray(draft?.entities)
-    ? draft.entities.find((row) => row && typeof row === "object" && !Array.isArray(row)) || {}
-    : {};
-  const baseEntity = Array.isArray(base?.entities) ? base.entities[0] || {} : {};
-  const entityChanges = graphOptionChanges(
-    draftEntity,
-    baseEntity,
-    new Set(["entity", "statistic_id", "compare"]),
-  );
   const result = {};
   if (Object.keys(cardChanges.configured).length) result.card_options = cardChanges.configured;
   if (cardChanges.removed.length) result.remove_card_options = cardChanges.removed;
-  if (Object.keys(entityChanges.configured).length) result.entity_options = entityChanges.configured;
-  if (entityChanges.removed.length) result.remove_entity_options = entityChanges.removed;
+  const draftEntities = Array.isArray(draft?.entities)
+    ? draft.entities.filter((row) => row && typeof row === "object" && !Array.isArray(row))
+    : [];
+  const baseEntities = Array.isArray(base?.entities)
+    ? base.entities.filter((row) => row && typeof row === "object" && !Array.isArray(row))
+    : [];
+  if (baseEntities.length < 2) {
+    const entityChanges = graphOptionChanges(
+      draftEntities[0] || {},
+      baseEntities[0] || {},
+      new Set(["entity", "statistic_id", "compare"]),
+    );
+    if (Object.keys(entityChanges.configured).length) {
+      result.entity_options = entityChanges.configured;
+    }
+    if (entityChanges.removed.length) {
+      result.remove_entity_options = entityChanges.removed;
+    }
+  } else {
+    const baseByAttribute = new Map(
+      baseEntities
+        .filter((row) => typeof row.attribute === "string" && row.attribute)
+        .map((row) => [row.attribute, row]),
+    );
+    const selected = [];
+    const seriesOptions = {};
+    for (const row of draftEntities) {
+      const attribute = row.attribute;
+      if (!baseByAttribute.has(attribute)) continue;
+      selected.push(attribute);
+      const changes = graphOptionChanges(
+        row,
+        baseByAttribute.get(attribute),
+        new Set(["entity", "statistic_id", "attribute", "compare"]),
+      );
+      if (Object.keys(changes.configured).length || changes.removed.length) {
+        seriesOptions[attribute] = {
+          ...(Object.keys(changes.configured).length
+            ? { options: changes.configured }
+            : {}),
+          ...(changes.removed.length
+            ? { remove_options: changes.removed }
+            : {}),
+        };
+      }
+    }
+    const baseSelection = [...baseByAttribute.keys()];
+    if (
+      selected.length
+      && (
+        selected.length !== baseSelection.length
+        || selected.some((attribute, index) => attribute !== baseSelection[index])
+      )
+    ) {
+      result.series_selection = selected;
+    }
+    if (Object.keys(seriesOptions).length) result.series_options = seriesOptions;
+  }
   return Object.keys(result).length ? result : null;
 }
 
@@ -404,7 +512,8 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
 
   const hass = historyView.hass;
   const entityId = historyView.entityId;
-  const numeric = isNumericMoreInfoHistory(historyView, nativeChart);
+  const numeric = nativeMoreInfoAttributes(historyView).length > 0
+    || isNumericMoreInfoHistory(historyView, nativeChart);
   const baseConfig = moreInfoCardConfig(historyView, nativeChart, serviceConfig.card_options || {}, null);
   await openCardEditorDialog({
     hass,
@@ -550,6 +659,7 @@ async function replaceMoreInfoChart(historyView) {
       host.append(card);
       nativeChart.before(host);
     }
+    applyNativeSeriesMoreInfoLayout(historyView, host);
     card.hass = historyView.hass;
     nativeChart.style.display = "none";
     historyView.removeAttribute(MORE_INFO_REPLACING_ATTRIBUTE);

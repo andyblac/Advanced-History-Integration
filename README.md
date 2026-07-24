@@ -39,7 +39,7 @@ Advanced History brings those two ideas together: select targets as you would in
 - Choose an entity's state, numeric attributes, and categorical attribute timelines from a per-target series selector, including multiple attributes from one entity.
 - Preserve attribute series and their categorical value maps when a compatible card opens in Advanced History.
 - Size state-timeline graphs to their visible row count to avoid unused vertical space.
-- Show Home Assistant-style current and target series automatically for climate, humidifier, and water-heater entities.
+- Show Home Assistant-style current and target series automatically for climate, humidifier, and water-heater entities in both History and More Info.
 - Define integration-wide Card Defaults through YAML or the visual editor.
 - Save complete charts as user-scoped bookmarks synchronized across devices.
 - Restore recently cleared charts and use Undo/Redo for incremental changes.

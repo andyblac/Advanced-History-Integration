@@ -1,13 +1,14 @@
 import { CARD_HACS_INSTALL_URL, CARD_TAG } from "./constants.js";
 import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { CARD_DEFAULT_AGGREGATE, automaticEntityOptions } from "./entity-defaults.js";
+import {
+  NATIVE_HISTORY_ATTRIBUTES,
+  historyAttributeDisplayName,
+  historyAttributeUnit,
+  nativeHistoryAttributes,
+} from "./history-series.js";
 
 const DATA_SOURCE_CACHE = new Map();
-const NATIVE_HISTORY_ATTRIBUTES = {
-  climate: ["current_temperature", "temperature", "target_temp_low", "target_temp_high"],
-  humidifier: ["current_humidity", "humidity"],
-  water_heater: ["current_temperature", "temperature"],
-};
 
 export class GraphMethods {
   _renderGraphs() {
@@ -525,25 +526,7 @@ export class GraphMethods {
 
   _nativeHistorySeries(entity) {
     const state = this._hass.states[entity];
-    const domain = entity.split(".")[0];
-    const supported = NATIVE_HISTORY_ATTRIBUTES[domain];
-    if (!state || !supported) return [];
-    const attributes = state.attributes || {};
-    let names = supported.filter((attribute) =>
-      Object.prototype.hasOwnProperty.call(attributes, attribute)
-    );
-
-    // Native History uses either the single target temperature or the
-    // high/low target range. Do not render all three at the same time.
-    if (domain === "climate") {
-      const hasRange = names.includes("target_temp_low") || names.includes("target_temp_high");
-      names = hasRange
-        ? names.filter((attribute) => attribute !== "temperature")
-        : names.filter((attribute) =>
-          attribute !== "target_temp_low" && attribute !== "target_temp_high"
-        );
-    }
-    return names.map((attribute) => ({
+    return nativeHistoryAttributes(entity, state).map((attribute) => ({
       entity,
       attribute,
       key: this._seriesKey(entity, attribute),
@@ -633,13 +616,7 @@ export class GraphMethods {
   }
 
   _attributeDisplayName(entity, attribute) {
-    const domain = entity.split(".")[0];
-    const key = `component.${domain}.entity_component._.state_attributes.${attribute}.name`;
-    const translated = this._hass.localize(key);
-    return translated || attribute
-      .split(".").pop()
-      .replaceAll("_", " ")
-      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    return historyAttributeDisplayName(this._hass, entity, attribute);
   }
 
   _entityCardConfig(
@@ -661,12 +638,8 @@ export class GraphMethods {
     if (attribute) {
       entityOptions.attribute = attribute;
       if (entityOptions.name == null) entityOptions.name = this._attributeSeriesName(entity, attribute);
-      const domain = entity.split(".")[0];
-      if (entityOptions.unit == null && ["climate", "water_heater"].includes(domain)) {
-        entityOptions.unit = this._hass.config?.unit_system?.temperature;
-      } else if (entityOptions.unit == null && domain === "humidifier") {
-        entityOptions.unit = "%";
-      }
+      const unit = historyAttributeUnit(this._hass, entity);
+      if (entityOptions.unit == null && unit != null) entityOptions.unit = unit;
     }
     const enabled = this._enabledResolvedEntityIds?.has(entity) !== false;
     if (mode !== "state_timeline") {
