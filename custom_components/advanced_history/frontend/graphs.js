@@ -539,7 +539,7 @@ export class GraphMethods {
   ) {
     const result = [];
     const seen = new Set();
-    const selectedSeries = this._activeSnapshot?.series_selection;
+    const selectedAttributes = this._activeSnapshot?.attribute_selection;
     const explicitlySelected = new Set();
     const add = (descriptor) => {
       const normalized = this._seriesDescriptor(descriptor);
@@ -549,7 +549,7 @@ export class GraphMethods {
     };
 
     for (const entity of entityIds) {
-      const selection = selectedSeries?.[entity];
+      const selection = selectedAttributes?.[entity];
       if (Array.isArray(selection) && selection.length) {
         explicitlySelected.add(entity);
         for (const value of selection) {
@@ -880,7 +880,7 @@ export class GraphMethods {
     const graphHeight = Number(config?.height) || this._effectiveGraphHeight();
     const compare = this._snapshotCompareSetting();
     const singleGraph = Boolean(this._activeSnapshot?.single_graph);
-    const seriesSelection = this._clone(this._activeSnapshot?.series_selection);
+    const attributeSelection = this._clone(this._activeSnapshot?.attribute_selection);
     this._activeSnapshot = {
       card_options: cardOptions,
       entity_options: entityOptions,
@@ -888,8 +888,8 @@ export class GraphMethods {
       graph_height: graphHeight,
     };
     if (singleGraph) this._activeSnapshot.single_graph = true;
-    if (seriesSelection && Object.keys(seriesSelection).length) {
-      this._activeSnapshot.series_selection = seriesSelection;
+    if (attributeSelection && Object.keys(attributeSelection).length) {
+      this._activeSnapshot.attribute_selection = attributeSelection;
     }
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
     this._recordChange(null, true);

@@ -284,10 +284,10 @@ export class StorageMethods {
     };
     if (this._activeSnapshot?.single_graph) chart.single_graph = true;
     if (
-      this._activeSnapshot?.series_selection &&
-      Object.keys(this._activeSnapshot.series_selection).length
+      this._activeSnapshot?.attribute_selection &&
+      Object.keys(this._activeSnapshot.attribute_selection).length
     ) {
-      chart.series_selection = this._clone(this._activeSnapshot.series_selection);
+      chart.attribute_selection = this._clone(this._activeSnapshot.attribute_selection);
     }
     if (compare !== undefined) chart.compare = this._clone(compare);
     return {

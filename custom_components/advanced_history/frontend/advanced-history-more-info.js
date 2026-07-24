@@ -180,9 +180,9 @@ function optionKeysToRemove(config, scope) {
 function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   const entityId = historyView.entityId;
   const availableNativeAttributes = nativeMoreInfoAttributes(historyView);
-  const configuredSeries = entityConfig?.series_selection;
-  const nativeAttributes = Array.isArray(configuredSeries) && configuredSeries.length
-    ? availableNativeAttributes.filter((attribute) => configuredSeries.includes(attribute))
+  const configuredAttributes = entityConfig?.attribute_selection;
+  const nativeAttributes = Array.isArray(configuredAttributes) && configuredAttributes.length
+    ? availableNativeAttributes.filter((attribute) => configuredAttributes.includes(attribute))
     : availableNativeAttributes;
   const numeric = nativeAttributes.length > 0
     || isNumericMoreInfoHistory(historyView, nativeChart);
@@ -238,12 +238,12 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   const entityRows = nativeAttributes.length
     ? nativeAttributes.map((attribute) => {
       const row = structuredClone(template);
-      const seriesConfig = entityConfig?.series_options?.[attribute];
-      const seriesOptions = seriesConfig?.options
-        || (seriesConfig?.remove_options ? null : seriesConfig);
-      for (const key of seriesConfig?.remove_options || []) delete row[key];
-      if (seriesOptions && typeof seriesOptions === "object") {
-        Object.assign(row, structuredClone(seriesOptions));
+      const attributeConfig = entityConfig?.attribute_options?.[attribute];
+      const attributeOptions = attributeConfig?.options
+        || (attributeConfig?.remove_options ? null : attributeConfig);
+      for (const key of attributeConfig?.remove_options || []) delete row[key];
+      if (attributeOptions && typeof attributeOptions === "object") {
+        Object.assign(row, structuredClone(attributeOptions));
       }
       const unit = historyAttributeUnit(historyView.hass, entityId);
       return {
@@ -456,7 +456,7 @@ function entityOverrideFromEditor(draft, base, numeric) {
         .map((row) => [row.attribute, row]),
     );
     const selected = [];
-    const seriesOptions = {};
+    const attributeOptions = {};
     for (const row of draftEntities) {
       const attribute = row.attribute;
       if (!baseByAttribute.has(attribute)) continue;
@@ -467,7 +467,7 @@ function entityOverrideFromEditor(draft, base, numeric) {
         new Set(["entity", "statistic_id", "attribute", "compare"]),
       );
       if (Object.keys(changes.configured).length || changes.removed.length) {
-        seriesOptions[attribute] = {
+        attributeOptions[attribute] = {
           ...(Object.keys(changes.configured).length
             ? { options: changes.configured }
             : {}),
@@ -485,9 +485,11 @@ function entityOverrideFromEditor(draft, base, numeric) {
         || selected.some((attribute, index) => attribute !== baseSelection[index])
       )
     ) {
-      result.series_selection = selected;
+      result.attribute_selection = selected;
     }
-    if (Object.keys(seriesOptions).length) result.series_options = seriesOptions;
+    if (Object.keys(attributeOptions).length) {
+      result.attribute_options = attributeOptions;
+    }
   }
   return Object.keys(result).length ? result : null;
 }

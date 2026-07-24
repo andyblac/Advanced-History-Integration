@@ -67,7 +67,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
   const entityIds = [];
   const hiddenEntityIds = [];
   const entityOptions = {};
-  const seriesSelection = {};
+  const attributeSelection = {};
   const seriesRows = {};
   const comparisons = [];
   for (const row of cardRows(config)) {
@@ -96,7 +96,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
     const rows = seriesRows[entityId] || [];
     const enabledRows = rows.filter((row) => row.enabled);
     const selectedRows = enabledRows.length ? enabledRows : rows;
-    seriesSelection[entityId] = [
+    attributeSelection[entityId] = [
       ...new Set(selectedRows.map((row) => row.series)),
     ];
     if (rows.length && !enabledRows.length) hiddenEntityIds.push(entityId);
@@ -111,7 +111,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
   const chart = {
     card_options: cardOptions,
     entity_options: entityOptions,
-    series_selection: seriesSelection,
+    attribute_selection: attributeSelection,
   };
   if (singleGraph) chart.single_graph = true;
   if (

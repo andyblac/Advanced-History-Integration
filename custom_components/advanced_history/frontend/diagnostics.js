@@ -161,8 +161,8 @@ export class DiagnosticsMethods {
           chart_mode: card.__advancedHistoryChartMode || null,
           source: card.__advancedHistorySourceTracker?.source || "pending",
         })),
-        series_selection: this._sanitizeDiagnosticValue(
-          snapshot.chart?.series_selection || {},
+        attribute_selection: this._sanitizeDiagnosticValue(
+          snapshot.chart?.attribute_selection || {},
           aliases
         ),
         card_options: cardOptions,

@@ -237,9 +237,9 @@ export class TargetPickerMethods {
     button.dataset.advancedHistorySeries = entity;
     button.setAttribute(
       "aria-label",
-      this._customLocalize("configure_series", { target: name })
+      this._customLocalize("configure_attributes", { target: name })
     );
-    button.title = this._customLocalize("configure_series", { target: name });
+    button.title = this._customLocalize("configure_attributes", { target: name });
     button.innerHTML = '<ha-icon icon="mdi:tune-variant"></ha-icon>';
     button.style.cssText = [
       "width:28px",
@@ -382,9 +382,9 @@ export class TargetPickerMethods {
     const apply = this._localize("ui.common.apply", "Apply");
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop series-backdrop";
-    backdrop.innerHTML = `<section class="dialog series-dialog" role="dialog" aria-modal="true" aria-label="${this._escape(this._customLocalize("series_settings", { target: name }))}">
-      <header class="dialog-title"><h2>${this._escape(this._customLocalize("series_settings", { target: name }))}</h2></header>
-      <p class="series-note">${this._escape(this._customLocalize("series_settings_note"))}</p>
+    backdrop.innerHTML = `<section class="dialog series-dialog" role="dialog" aria-modal="true" aria-label="${this._escape(this._customLocalize("attributes_settings", { target: name }))}">
+      <header class="dialog-title"><h2>${this._escape(this._customLocalize("attributes_settings", { target: name }))}</h2></header>
+      <p class="series-note">${this._escape(this._customLocalize("attributes_settings_note"))}</p>
       <div class="target-list series-list">
         ${choices.map((choice) => `<div class="series-choice">
           <label class="target-row series-row">
@@ -433,8 +433,8 @@ export class TargetPickerMethods {
       const chart = this._activeSnapshot
         ? this._clone(this._activeSnapshot)
         : this._captureSnapshot().chart;
-      chart.series_selection = {
-        ...(chart.series_selection || {}),
+      chart.attribute_selection = {
+        ...(chart.attribute_selection || {}),
         [entity]: selection,
       };
       const entityOptions = this._clone(
