@@ -210,6 +210,7 @@ export class EnergyMethods {
     this._energyCompare = null;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
+    this._largeRangeDetailDismissedKey = null;
     const compareHost = this.shadowRoot?.getElementById("compare-banner");
     if (compareHost) compareHost.hidden = true;
 

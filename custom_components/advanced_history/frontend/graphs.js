@@ -238,7 +238,14 @@ export class GraphMethods {
   _renderLargeRangeDetailBanner(profile = this._largeRangeDetailProfile()) {
     const banner = this.shadowRoot?.getElementById("detail-banner");
     if (!banner) return;
-    if (this._periodRestoreLoading || !profile) {
+    const dismissalKey = profile
+      ? `${profile.automatic ? "automatic" : `fine|${profile.groupBy}`}|${profile.key}`
+      : null;
+    if (
+      this._periodRestoreLoading
+      || !profile
+      || dismissalKey === this._largeRangeDetailDismissedKey
+    ) {
       banner.hidden = true;
       banner.replaceChildren();
       return;
@@ -257,12 +264,22 @@ export class GraphMethods {
     banner.innerHTML = `
       <ha-icon icon="${profile.automatic ? "mdi:speedometer" : "mdi:alert-outline"}"></ha-icon>
       <span>${this._escape(text)}</span>
-      <ha-button appearance="plain">${this._escape(buttonText)}</ha-button>`;
+      <ha-button appearance="plain">${this._escape(buttonText)}</ha-button>
+      <button class="detail-dismiss" type="button" aria-label="${this._escape(
+        this._localize("ui.common.close", "Dismiss")
+      )}" title="${this._escape(this._localize("ui.common.close", "Dismiss"))}">
+        <ha-icon icon="mdi:close"></ha-icon>
+      </button>`;
     banner.hidden = false;
     banner.querySelector("ha-button")?.addEventListener("click", () => {
       this._largeRangeFineDetail = profile.automatic;
       this._largeRangeDetailStateKey = this._largeRangeDetailRenderKey();
       this._renderGraphs();
+    });
+    banner.querySelector(".detail-dismiss")?.addEventListener("click", () => {
+      this._largeRangeDetailDismissedKey = dismissalKey;
+      banner.hidden = true;
+      banner.replaceChildren();
     });
   }
 

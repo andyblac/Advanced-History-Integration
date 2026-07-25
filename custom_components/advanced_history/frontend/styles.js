@@ -91,6 +91,12 @@ export const panelStyles = `
   .detail-banner.warning ha-icon { color:var(--warning-color,#ffa600); }
   .detail-banner span { flex:1; min-width:0; line-height:1.35; }
   .detail-banner ha-button { flex:0 0 auto; }
+  .detail-banner .detail-dismiss {
+    width:32px; height:32px; padding:6px; display:inline-grid; place-items:center; flex:0 0 auto;
+    border:0; border-radius:50%; color:var(--secondary-text-color); background:transparent; cursor:pointer;
+  }
+  .detail-banner .detail-dismiss:hover { background:var(--secondary-background-color); }
+  .detail-banner .detail-dismiss ha-icon { width:20px; height:20px; color:inherit; }
   .start, .error {
     padding:32px 16px; color:var(--secondary-text-color); text-align:center;
     background:var(--card-background-color); border-radius:var(--ha-card-border-radius,12px);
@@ -170,7 +176,7 @@ export const panelStyles = `
   @media (max-width:600px) {
     .content { padding:0 12px 96px; }
     .detail-banner { align-items:flex-start; flex-wrap:wrap; }
-    .detail-banner span { flex:1 1 calc(100% - 40px); }
+    .detail-banner span { flex:1 1 calc(100% - 84px); }
     .detail-banner ha-button { margin-inline-start:36px; }
     .energy-nav-floating { left:8px; right:8px; bottom:max(8px,env(safe-area-inset-bottom)); width:calc(100vw - 16px); }
     .appbar { padding:0 4px; gap:0; }

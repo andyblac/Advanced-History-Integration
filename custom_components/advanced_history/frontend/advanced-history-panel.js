@@ -54,6 +54,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._energyResetPending = false;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
+    this._largeRangeDetailDismissedKey = null;
     this._versionLogged = false;
   }
 
