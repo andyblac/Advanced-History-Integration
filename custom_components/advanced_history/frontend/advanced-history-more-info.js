@@ -108,10 +108,11 @@ function resolvedTimeZone(hass) {
   return serverTimeZone || browserTimeZone || "UTC";
 }
 
-function nativeGraphColor(historyView) {
+function nativeGraphColor(historyView, index = 0) {
   const style = getComputedStyle(historyView);
-  return style.getPropertyValue("--graph-color-1").trim()
-    || style.getPropertyValue("--color-1").trim();
+  const position = index + 1;
+  return style.getPropertyValue(`--graph-color-${position}`).trim()
+    || style.getPropertyValue(`--color-${position}`).trim();
 }
 
 function cssVariableChain(properties) {
@@ -211,7 +212,7 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   delete template.compare;
   if (
     numeric
-    && nativeAttributes.length < 2
+    && nativeAttributes.length === 0
     && !Object.prototype.hasOwnProperty.call(template, "color")
   ) {
     const color = nativeGraphColor(historyView);
@@ -244,6 +245,13 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
       for (const key of attributeConfig?.remove_options || []) delete row[key];
       if (attributeOptions && typeof attributeOptions === "object") {
         Object.assign(row, structuredClone(attributeOptions));
+      }
+      if (!Object.prototype.hasOwnProperty.call(row, "color")) {
+        const color = nativeGraphColor(
+          historyView,
+          Math.max(0, availableNativeAttributes.indexOf(attribute)),
+        );
+        if (color) row.color = color;
       }
       const unit = historyAttributeUnit(historyView.hass, entityId);
       return {
@@ -282,6 +290,7 @@ function restoreNativeChart(historyView) {
   const root = historyView.shadowRoot;
   historyView[MORE_INFO_EDITOR_RESIZE_OBSERVER]?.disconnect();
   historyView[MORE_INFO_EDITOR_RESIZE_OBSERVER] = null;
+  resetMoreInfoContainerLayout(historyView);
   historyView.removeAttribute(MORE_INFO_REPLACING_ATTRIBUTE);
   root?.querySelector(`.${MORE_INFO_HOST_CLASS}`)?.remove();
   const actions = root?.querySelector(`.${MORE_INFO_EDITOR_ACTIONS_CLASS}`);
@@ -295,6 +304,41 @@ function restoreNativeChart(historyView) {
   for (const chart of root?.querySelectorAll("statistics-chart, state-history-charts") || []) {
     chart.style.removeProperty("display");
   }
+}
+
+function moreInfoHistoryContainer(historyView) {
+  const root = historyView.getRootNode();
+  return root instanceof ShadowRoot
+    && root.host.localName === "ha-more-info-history-and-logbook"
+    ? root.host
+    : null;
+}
+
+function isStandaloneMoreInfoHistory(historyView) {
+  const container = moreInfoHistoryContainer(historyView);
+  const root = container?.getRootNode();
+  return root instanceof ShadowRoot
+    && root.host.localName === "ha-more-info-dialog";
+}
+
+function resetMoreInfoContainerLayout(historyView) {
+  const container = moreInfoHistoryContainer(historyView);
+  container?.style.removeProperty("box-sizing");
+  container?.style.removeProperty("padding-inline");
+}
+
+function applyMoreInfoContainerLayout(historyView) {
+  const container = moreInfoHistoryContainer(historyView);
+  if (!container) return;
+  if (!isStandaloneMoreInfoHistory(historyView)) {
+    resetMoreInfoContainerLayout(historyView);
+    return;
+  }
+  // The normal More Info view supplies this inset through ha-more-info-info.
+  // The standalone History view renders the same history/logbook container
+  // directly in the dialog, so reproduce the shared content boundary here.
+  container.style.boxSizing = "border-box";
+  container.style.paddingInline = "var(--ha-space-6, 24px)";
 }
 
 function alignMoreInfoEditorActions(historyView) {
@@ -330,6 +374,7 @@ function observeMoreInfoEditorAlignment(historyView, chartHost) {
 function claimMoreInfoChart(historyView) {
   const root = historyView.shadowRoot;
   if (!root) return;
+  applyMoreInfoContainerLayout(historyView);
   if (!root.querySelector(`.${MORE_INFO_STYLE_CLASS}`)) {
     const style = document.createElement("style");
     style.className = MORE_INFO_STYLE_CLASS;
@@ -357,20 +402,14 @@ function claimMoreInfoChart(historyView) {
   historyView.setAttribute(MORE_INFO_REPLACING_ATTRIBUTE, "");
 }
 
-function applyNativeSeriesMoreInfoLayout(historyView, host) {
+function applyMoreInfoHostLayout(historyView, host) {
   host.style.removeProperty("margin-inline-start");
   host.style.removeProperty("margin-inline-end");
   host.style.removeProperty("margin-block-start");
   host.style.removeProperty("inline-size");
-  host.style.marginBlockEnd =
-    "calc(var(--ha-space-6, 24px) * -1)";
-  if (!nativeMoreInfoAttributes(historyView).length) return;
-  host.style.marginInlineStart = "var(--ha-space-6, 24px)";
-  host.style.marginInlineEnd = "var(--ha-space-6, 24px)";
-  host.style.marginBlockStart = "var(--ha-space-4, 16px)";
-  host.style.marginBlockEnd = "10px";
-  host.style.inlineSize =
-    "calc(100% - var(--ha-space-6, 24px) - var(--ha-space-6, 24px))";
+  host.style.marginBlockEnd = isStandaloneMoreInfoHistory(historyView)
+    ? "10px"
+    : "calc(var(--ha-space-6, 24px) * -1)";
 }
 
 function showMoreInfoLoading(root, nativeChart) {
@@ -384,7 +423,7 @@ function showMoreInfoLoading(root, nativeChart) {
   progress.setAttribute("active", "");
   progress.setAttribute("size", "small");
   host.append(progress);
-  applyNativeSeriesMoreInfoLayout(root.host, host);
+  applyMoreInfoHostLayout(root.host, host);
   nativeChart.before(host);
   return host;
 }
@@ -661,7 +700,7 @@ async function replaceMoreInfoChart(historyView) {
       host.append(card);
       nativeChart.before(host);
     }
-    applyNativeSeriesMoreInfoLayout(historyView, host);
+    applyMoreInfoHostLayout(historyView, host);
     card.hass = historyView.hass;
     nativeChart.style.display = "none";
     historyView.removeAttribute(MORE_INFO_REPLACING_ATTRIBUTE);
