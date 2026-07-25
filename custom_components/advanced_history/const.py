@@ -56,6 +56,7 @@ DEFAULT_CARD_OPTIONS = {
     "include_area_names": True,
     "show_full_period": True,
     "show_tooltip": True,
+    "state_timeline_label_font_size": 14,
     "zoom_sync": True,
     "zoom_sync_group": "advanced-history-panel",
     "tooltip_sync": True,
@@ -76,6 +77,7 @@ DEFAULT_MORE_INFO_CARD_OPTIONS = {
     "show_now_line": False,
     "show_tooltip": True,
     "state_timeline_corner_radius": 0,
+    "state_timeline_label_font_size": 14,
     "x_axis_color": "var(--primary-text-color)",
     "x_axis_date_color": "var(--primary-text-color)",
     "x_axis_font_size": 12,
@@ -168,9 +170,11 @@ def more_info_options_with_defaults(options: Mapping[str, Any]) -> dict[str, Any
     merged = {**deepcopy(DEFAULT_MORE_INFO_OPTIONS), **dict(options)}
     if CONF_MORE_INFO_CARD_OPTIONS in options:
         configured = options[CONF_MORE_INFO_CARD_OPTIONS]
-        merged[CONF_MORE_INFO_CARD_OPTIONS] = (
-            deepcopy(configured) if isinstance(configured, dict) else {}
-        )
+        merged[CONF_MORE_INFO_CARD_OPTIONS] = deepcopy(DEFAULT_MORE_INFO_CARD_OPTIONS)
+        if isinstance(configured, Mapping):
+            merged[CONF_MORE_INFO_CARD_OPTIONS] = _merge_new_defaults(
+                DEFAULT_MORE_INFO_CARD_OPTIONS, configured
+            )
     else:
         merged[CONF_MORE_INFO_CARD_OPTIONS] = deepcopy(DEFAULT_MORE_INFO_CARD_OPTIONS)
     # This has a dedicated config-flow toggle and must not appear twice.
