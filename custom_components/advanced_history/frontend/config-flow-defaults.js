@@ -150,6 +150,7 @@ async function openDefaultsEditor(selector, profile) {
   const title = custom(hass, isMoreInfo ? "more_info_card_defaults" : "card_defaults");
   await openCardEditorDialog({
     hass,
+    container: selector,
     initialConfig: editorConfig(hass, selector.value || {}, profile),
     title,
     note: custom(

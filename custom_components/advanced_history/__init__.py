@@ -23,7 +23,7 @@ from .websocket import async_register_websocket_commands
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate Advanced History config entries."""
-    if entry.version > 5:
+    if entry.version > 6:
         return False
 
     options = deepcopy(dict(entry.options))
@@ -80,7 +80,7 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             card_options.pop("hours_to_show")
         options[CONF_MORE_INFO_CARD_OPTIONS] = card_options
 
-    hass.config_entries.async_update_entry(entry, options=options, version=5)
+    hass.config_entries.async_update_entry(entry, options=options, version=6)
     return True
 
 

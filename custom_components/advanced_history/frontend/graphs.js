@@ -637,7 +637,12 @@ export class GraphMethods {
     };
     if (attribute) {
       entityOptions.attribute = attribute;
-      if (entityOptions.name == null) entityOptions.name = this._attributeSeriesName(entity, attribute);
+      // Let the card derive its own attribute label so card-level naming
+      // options, including area names, remain effective. Remove only the
+      // legacy name Advanced History generated; preserve custom names.
+      if (entityOptions.name === this._attributeSeriesName(entity, attribute)) {
+        delete entityOptions.name;
+      }
       const unit = historyAttributeUnit(this._hass, entity);
       if (entityOptions.unit == null && unit != null) entityOptions.unit = unit;
     }
@@ -899,6 +904,7 @@ export class GraphMethods {
   async _openGraphEditor(scopedSeries = null, scopedMode = null, scopedHeader = null) {
     await openCardEditorDialog({
       hass: this._hass,
+      container: this,
       initialConfig: this._graphEditorConfig(
         false,
         scopedSeries,

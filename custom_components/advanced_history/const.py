@@ -53,7 +53,7 @@ DEFAULT_MORE_INFO_ENTITY_OPTIONS = {
 
 DEFAULT_CARD_OPTIONS = {
     "auto_scale_points": True,
-    "include_area_on_duplicate_names": True,
+    "include_area_names": True,
     "show_full_period": True,
     "show_tooltip": True,
     "zoom_sync": True,
@@ -129,18 +129,32 @@ def config_entry_type(entry: Any) -> str:
     return ENTRY_TYPE_PANEL
 
 
+def _merge_new_defaults(
+    defaults: Mapping[str, Any], configured: Mapping[str, Any]
+) -> dict[str, Any]:
+    """Add missing defaults recursively while preserving configured values."""
+    merged = deepcopy(dict(defaults))
+    for key, value in configured.items():
+        if (
+            key in merged
+            and isinstance(merged[key], Mapping)
+            and isinstance(value, Mapping)
+        ):
+            merged[key] = _merge_new_defaults(merged[key], value)
+        else:
+            merged[key] = deepcopy(value)
+    return merged
+
+
 def options_with_defaults(options: Mapping[str, Any]) -> dict[str, Any]:
     """Apply visible config-flow defaults without replacing explicit values."""
     merged = {**deepcopy(DEFAULT_OPTIONS), **dict(options)}
     if CONF_CARD_OPTIONS in options:
         configured_card = options[CONF_CARD_OPTIONS]
-        card_options = (
-            deepcopy(configured_card) if isinstance(configured_card, dict) else {}
-        )
+        card_options = deepcopy(DEFAULT_CARD_OPTIONS)
+        if isinstance(configured_card, Mapping):
+            card_options = _merge_new_defaults(DEFAULT_CARD_OPTIONS, configured_card)
     else:
-        # Recommended values are offered for a new/legacy entry only. Once the
-        # field has been saved, its YAML is authoritative so removing a key
-        # genuinely hands that option back to the graph card's own default.
         card_options = deepcopy(DEFAULT_CARD_OPTIONS)
     # These have dedicated config-flow fields and must not appear twice.
     card_options.pop("height", None)

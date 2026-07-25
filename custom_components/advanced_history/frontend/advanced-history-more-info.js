@@ -558,6 +558,7 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
   const baseConfig = moreInfoCardConfig(historyView, nativeChart, serviceConfig.card_options || {}, null);
   await openCardEditorDialog({
     hass,
+    container: historyView,
     initialConfig: moreInfoCardConfig(
       historyView,
       nativeChart,

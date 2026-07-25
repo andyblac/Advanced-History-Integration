@@ -1,6 +1,7 @@
 import { CARD_TAG } from "./constants.js";
 
 const DIALOG_TAG = "advanced-history-card-editor-dialog";
+let activeDialogHost = null;
 
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (character) => ({
@@ -10,6 +11,7 @@ function escapeHtml(value) {
 
 export async function openCardEditorDialog({
   hass,
+  container,
   initialConfig,
   title,
   note = "",
@@ -21,9 +23,10 @@ export async function openCardEditorDialog({
   leadingAction,
   allowCode = true,
 }) {
-  if (document.querySelector(DIALOG_TAG)) return null;
+  if (activeDialogHost?.isConnected) return null;
   const dialogHost = document.createElement(DIALOG_TAG);
-  document.body.append(dialogHost);
+  activeDialogHost = dialogHost;
+  (container?.shadowRoot || container || document.body).append(dialogHost);
   const root = dialogHost.attachShadow({ mode: "open" });
   const strings = {
     loading: "Loading",
@@ -112,6 +115,7 @@ export async function openCardEditorDialog({
   const close = () => {
     if (modal.open) modal.close();
     dialogHost.remove();
+    if (activeDialogHost === dialogHost) activeDialogHost = null;
   };
   const showError = (error, fallback = strings.loadError) => {
     console.error("Advanced History: card editor failed", error);
@@ -146,11 +150,11 @@ export async function openCardEditorDialog({
         editor = document.createElement("statistics-graph-chart-card-editor");
       }
       if (token !== renderToken || !dialogHost.isConnected) return;
-      editor.hass = hass;
-      editor.setConfig(draft);
       editor.addEventListener("config-changed", (event) => {
         if (event.detail?.config) draft = event.detail.config;
       });
+      editor.hass = hass;
+      editor.setConfig(draft);
       editorHost.replaceChildren(editor);
     } catch (error) {
       if (token !== renderToken) return;
