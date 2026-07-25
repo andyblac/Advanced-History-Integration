@@ -222,7 +222,11 @@ export class TargetPickerMethods {
         chip.setAttribute("role", "button");
         chip.setAttribute("aria-pressed", hidden ? "true" : "false");
         chip.setAttribute("title", this._customLocalize(hidden ? "show_target" : "hide_target", { target: name }));
-        if (kind === "entity_id" && entityIds.has(chip.itemId)) {
+        if (
+          kind === "entity_id"
+          && entityIds.has(chip.itemId)
+          && this._seriesChoices(chip.itemId).length > 1
+        ) {
           this._syncSeriesButton(chip, name);
         }
       });
@@ -376,7 +380,7 @@ export class TargetPickerMethods {
   _openSeriesDialog(entity) {
     if (!this._targets.entity_id.includes(entity)) return;
     this.shadowRoot.querySelector(".series-backdrop")?.remove();
-    const name = this._entityName(entity);
+    const name = this._entityDisplayName(entity);
     const choices = this._seriesChoices(entity);
     const cancel = this._localize("ui.common.cancel", "Cancel");
     const apply = this._localize("ui.common.apply", "Apply");
@@ -594,4 +598,19 @@ export class TargetPickerMethods {
   _areaName(id) { return this._areas.find((area) => area.area_id === id)?.name || id || this._localize("ui.components.device-picker.no_area", "No area"); }
   _deviceName(id) { const device = this._devices.find((item) => item.id === id); return device?.name_by_user || device?.name || id; }
   _entityName(id) { const state = this._hass.states[id]; const registry = this._entities.find((item) => item.entity_id === id); return registry?.name || state?.attributes?.friendly_name || id; }
+  _entityDisplayName(id) {
+    const name = this._entityName(id);
+    const entity = this._entities.find((item) => item.entity_id === id);
+    const device = entity?.device_id
+      ? this._devices.find((item) => item.id === entity.device_id)
+      : null;
+    const areaId = entity?.area_id || device?.area_id;
+    const areaName = areaId
+      ? this._areas.find((area) => area.area_id === areaId)?.name
+      : null;
+    if (!areaName || name.toLocaleLowerCase().includes(areaName.toLocaleLowerCase())) {
+      return name;
+    }
+    return `${name} · ${areaName}`;
+  }
 }
