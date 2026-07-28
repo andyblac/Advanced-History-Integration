@@ -49,6 +49,31 @@ export class EnergyMethods {
         selector.verticalOpeningDirection = "up";
         selector.openingDirection = "center";
         selector.requestUpdate?.();
+        await selector.updateComplete;
+        const attachDatePickerListener = () => {
+          const datePicker = selector.shadowRoot?.querySelector("ha-date-range-picker");
+          if (!datePicker || datePicker.__advancedHistoryDetailListener) return;
+          datePicker.__advancedHistoryDetailListener = true;
+          datePicker.addEventListener("value-changed", () => {
+            requestAnimationFrame(() => {
+              const nextDetailKey = this._largeRangeDetailRenderKey();
+              if (nextDetailKey !== this._largeRangeDetailStateKey) {
+                this._largeRangeDetailStateKey = nextDetailKey;
+                this._renderGraphs();
+              }
+            });
+          });
+        };
+        attachDatePickerListener();
+        if (selector.shadowRoot && !selector.__advancedHistoryDetailObserver) {
+          selector.__advancedHistoryDetailObserver = new MutationObserver(
+            attachDatePickerListener,
+          );
+          selector.__advancedHistoryDetailObserver.observe(
+            selector.shadowRoot,
+            { childList: true, subtree: true },
+          );
+        }
         return;
       }
       await new Promise((resolve) => requestAnimationFrame(resolve));

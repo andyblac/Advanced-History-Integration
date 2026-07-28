@@ -210,10 +210,20 @@ export class GraphMethods {
     if (this.config.large_range_automatic_detail === false) return null;
     const period = this._largeRangePeriod();
     const thresholdDays = Math.max(7, Number(this.config.large_range_detail_threshold_days) || 31);
-    // Calendar periods end one millisecond before midnight and DST can add or
-    // remove an hour. A two-hour tolerance makes a configured 31-day
-    // threshold reliably include a selected calendar month.
-    if (!period || period.hours < thresholdDays * 24 - 2) return null;
+    if (!period) return null;
+    const nextMonth = new Date(period.start);
+    nextMonth.setMonth(nextMonth.getMonth() + 1);
+    const calendarMonth = period.start.getDate() === 1
+      && period.start.getHours() === 0
+      && period.start.getMinutes() === 0
+      && Math.abs(period.end.getTime() - (nextMonth.getTime() - 1)) < 7_200_000;
+    // The default 31-day threshold represents a calendar month, including
+    // February and 30-day months. The normal duration rule remains exact for
+    // user-configured thresholds and non-calendar ranges.
+    if (
+      period.hours < thresholdDays * 24 - 2
+      && !(thresholdDays === 31 && calendarMonth)
+    ) return null;
     const groupBy = period.hours > 730 * 24
       ? "week"
       : period.hours > 92 * 24
