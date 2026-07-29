@@ -8,6 +8,7 @@ import {
   historyAttributeUnit,
   nativeHistoryAttributes,
 } from "./history-series.js";
+import { mergeStateMaps, nativeStateMap } from "./state-colors.js";
 import { customLocalize } from "./translations.js";
 
 // Keep the legacy global value so an update cannot install duplicate listeners
@@ -26,6 +27,7 @@ const MORE_INFO_EDITOR_BUTTON_CLASS = "advanced-history-more-info-editor-button"
 const MORE_INFO_EDITOR_LINK_CLASS = "advanced-history-more-info-editor-link";
 const MORE_INFO_EDITOR_ACTIONS_CLASS = "advanced-history-more-info-editor-actions";
 const MORE_INFO_EDITOR_RESIZE_OBSERVER = "__advancedHistoryMoreInfoEditorResizeObserver";
+const MORE_INFO_DATE_SYNC_HANDLER = "__advancedHistoryMoreInfoDateSyncHandler";
 const MORE_INFO_CONFIG_TYPE = "advanced_history/more_info/config";
 const MORE_INFO_ENTITY_CONFIG_SET_TYPE = "advanced_history/more_info/entity_config/set";
 const moreInfoConfigCache = new Map();
@@ -115,47 +117,6 @@ function nativeGraphColor(historyView, index = 0) {
     || style.getPropertyValue(`--color-${position}`).trim();
 }
 
-function cssVariableChain(properties) {
-  return properties.reduceRight(
-    (fallback, property) => `var(${property}${fallback ? `, ${fallback}` : ""})`,
-    "",
-  );
-}
-
-function nativeStateColor(domain, deviceClass, state, active) {
-  if (state === "unavailable") {
-    return "var(--history-unavailable-color, var(--state-unavailable-color))";
-  }
-  if (state === "unknown") {
-    return "var(--history-unknown-color, var(--state-inactive-color))";
-  }
-  const stateKey = state.replace(/[^a-z0-9_]+/gi, "_").toLowerCase();
-  const properties = [];
-  if (deviceClass) {
-    properties.push(`--state-${domain}-${deviceClass}-${stateKey}-color`);
-  }
-  properties.push(
-    `--state-${domain}-${stateKey}-color`,
-    `--state-${domain}-${active ? "active" : "inactive"}-color`,
-    `--state-${active ? "active" : "inactive"}-color`,
-  );
-  return cssVariableChain(properties);
-}
-
-function nativeBinaryStateMap(historyView) {
-  const entityId = historyView.entityId;
-  const domain = entityId?.split(".", 1)[0];
-  if (!new Set(["binary_sensor", "input_boolean"]).has(domain)) return undefined;
-  const stateObj = historyView.hass?.states?.[entityId];
-  if (!stateObj) return undefined;
-  const deviceClass = stateObj.attributes?.device_class;
-  return ["off", "on", "unknown", "unavailable"].map((state) => ({
-    value: state,
-    label: historyView.hass?.formatEntityState?.(stateObj, state) || state,
-    color: nativeStateColor(domain, deviceClass, state, state === "on"),
-  }));
-}
-
 function isNumericMoreInfoHistory(historyView, nativeChart) {
   if (nativeChart?.localName === "statistics-chart") return true;
 
@@ -230,10 +191,12 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   }
   if (
     !numeric
-    && !Object.prototype.hasOwnProperty.call(template, "state_map")
     && !Object.prototype.hasOwnProperty.call(template, "color")
   ) {
-    const stateMap = nativeBinaryStateMap(historyView);
+    const stateMap = mergeStateMaps(
+      nativeStateMap(historyView.hass, entityId),
+      template.state_map
+    );
     if (stateMap) template.state_map = stateMap;
   }
   const entityRows = nativeAttributes.length
@@ -268,6 +231,8 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
     })
     : [{ ...template, entity: entityId }];
   const configuredHeight = Number(cardOptions.height) || 240;
+  const datePickerGroup = cardOptions.date_picker_group
+    || `advanced-history-more-info:${entityId}`;
   return {
     ...cardOptions,
     type: `custom:${CARD_TAG}`,
@@ -281,13 +246,124 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
       ? configuredHeight
       : Math.min(configuredHeight, MORE_INFO_STATE_TIMELINE_HEIGHT),
     time_zone: cardOptions.time_zone ?? resolvedTimeZone(historyView.hass),
-    ...(numeric ? {} : { group_by: "raw" }),
+    ...(numeric ? {} : { auto_scale_points: false, group_by: "raw" }),
+    ...(cardOptions.show_date_picker ? { date_picker_group: datePickerGroup } : {}),
     entities: entityRows,
   };
 }
 
+function moreInfoLogbook(historyView) {
+  const root = historyView?.getRootNode?.();
+  if (!(root instanceof ShadowRoot)) return null;
+
+  // Home Assistant has used both a shared history/logbook wrapper and a
+  // layout where the two views are direct siblings. Find the sibling from
+  // the real root first instead of depending on one container generation.
+  const sibling = root.querySelector("ha-more-info-logbook");
+  if (sibling) return sibling;
+
+  const nested = root
+    .querySelector("ha-more-info-history-and-logbook")
+    ?.shadowRoot
+    ?.querySelector("ha-more-info-logbook");
+  if (nested) return nested;
+
+  return root.host?.shadowRoot?.querySelector("ha-more-info-logbook") || null;
+}
+
+function sameLogbookTime(left, right) {
+  if (!left || !right) return false;
+  if ("recent" in right) return left.recent === right.recent;
+  return (
+    Array.isArray(left.range)
+    && left.range[0]?.getTime?.() === right.range[0]?.getTime?.()
+    && left.range[1]?.getTime?.() === right.range[1]?.getTime?.()
+  );
+}
+
+function setMoreInfoLogbookTime(historyView, time) {
+  const logbookView = moreInfoLogbook(historyView);
+  if (!logbookView) return false;
+  if (sameLogbookTime(logbookView._time, time)) return true;
+  logbookView._time = time;
+  logbookView.requestUpdate?.();
+  return true;
+}
+
+function removeMoreInfoDateSync(historyView, resetLogbook = false) {
+  const installed = historyView[MORE_INFO_DATE_SYNC_HANDLER];
+  if (installed?.handler) {
+    window.removeEventListener("sgc-datepicker-sync", installed.handler);
+  }
+  if (installed?.interactionHandler && installed.card) {
+    installed.card.removeEventListener("click", installed.interactionHandler, true);
+    installed.card.removeEventListener("change", installed.interactionHandler, true);
+  }
+  if (installed?.timer) clearTimeout(installed.timer);
+  historyView[MORE_INFO_DATE_SYNC_HANDLER] = null;
+  if (resetLogbook) setMoreInfoLogbookTime(historyView, { recent: 86400 });
+}
+
+function syncMoreInfoLogbookRange(historyView, card) {
+  const range = card?._computeDatePickerWindow?.(false);
+  const start = range?.start instanceof Date ? range.start : new Date(range?.start);
+  const end = range?.end instanceof Date ? range.end : new Date(range?.end);
+  if (
+    !range
+    || Number.isNaN(start.getTime())
+    || Number.isNaN(end.getTime())
+    || end <= start
+  ) return;
+  setMoreInfoLogbookTime(historyView, { range: [start, end] });
+}
+
+function scheduleMoreInfoLogbookRangeSync(historyView, card) {
+  const installed = historyView[MORE_INFO_DATE_SYNC_HANDLER];
+  if (!installed || installed.card !== card) return;
+  if (installed.timer) clearTimeout(installed.timer);
+  installed.timer = setTimeout(() => {
+    installed.timer = null;
+    if (
+      historyView[MORE_INFO_DATE_SYNC_HANDLER] === installed
+      && historyView.isConnected
+      && card.isConnected
+    ) {
+      syncMoreInfoLogbookRange(historyView, card);
+    }
+  });
+}
+
+function installMoreInfoDateSync(historyView, card, config) {
+  const installed = historyView[MORE_INFO_DATE_SYNC_HANDLER];
+  if (
+    installed?.card === card
+    && installed.group === config.date_picker_group
+  ) {
+    return;
+  }
+  removeMoreInfoDateSync(historyView);
+  if (!config.show_date_picker || !config.date_picker_group) return;
+  const handler = (event) => {
+    if (event.detail?.group !== config.date_picker_group) return;
+    scheduleMoreInfoLogbookRangeSync(historyView, card);
+  };
+  const interactionHandler = () => scheduleMoreInfoLogbookRangeSync(historyView, card);
+  historyView[MORE_INFO_DATE_SYNC_HANDLER] = {
+    card,
+    group: config.date_picker_group,
+    handler,
+    interactionHandler,
+    timer: null,
+  };
+  window.addEventListener("sgc-datepicker-sync", handler);
+  card.addEventListener("click", interactionHandler, true);
+  card.addEventListener("change", interactionHandler, true);
+  scheduleMoreInfoLogbookRangeSync(historyView, card);
+}
+
 function restoreNativeChart(historyView) {
   const root = historyView.shadowRoot;
+  removeMoreInfoDateSync(historyView, true);
   historyView[MORE_INFO_EDITOR_RESIZE_OBSERVER]?.disconnect();
   historyView[MORE_INFO_EDITOR_RESIZE_OBSERVER] = null;
   resetMoreInfoContainerLayout(historyView);
@@ -703,6 +779,7 @@ async function replaceMoreInfoChart(historyView) {
     }
     applyMoreInfoHostLayout(historyView, host);
     card.hass = historyView.hass;
+    installMoreInfoDateSync(historyView, card, config);
     nativeChart.style.display = "none";
     historyView.removeAttribute(MORE_INFO_REPLACING_ATTRIBUTE);
     observeMoreInfoEditorAlignment(historyView, host);
@@ -730,6 +807,7 @@ async function installMoreInfoReplacement() {
   if (!prototype || prototype[MORE_INFO_PATCH_KEY]) return;
   prototype[MORE_INFO_PATCH_KEY] = true;
   const originalConnected = prototype.connectedCallback;
+  const originalDisconnected = prototype.disconnectedCallback;
   const originalUpdated = prototype.updated;
   prototype.connectedCallback = function (...args) {
     const result = originalConnected?.apply(this, args);
@@ -740,6 +818,10 @@ async function installMoreInfoReplacement() {
     const result = originalUpdated?.apply(this, args);
     scheduleMoreInfoReplacement(this);
     return result;
+  };
+  prototype.disconnectedCallback = function (...args) {
+    removeMoreInfoDateSync(this);
+    return originalDisconnected?.apply(this, args);
   };
 }
 

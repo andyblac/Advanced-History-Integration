@@ -7,8 +7,79 @@ import {
   historyAttributeUnit,
   nativeHistoryAttributes,
 } from "./history-series.js";
+import {
+  mergeStateMaps,
+  nativeStateMap,
+  stateMapLegendColor,
+} from "./state-colors.js";
 
 const DATA_SOURCE_CACHE = new Map();
+
+function historyTimestamp(value) {
+  const numeric = Number(value);
+  if (Number.isFinite(numeric)) {
+    // Home Assistant's compact history API uses Unix seconds, while some
+    // history consumers use milliseconds.
+    return new Date(numeric < 1_000_000_000_000 ? numeric * 1000 : numeric).toISOString();
+  }
+  return value;
+}
+
+function normalizeCompactHistoryResponse(response) {
+  if (Array.isArray(response)) {
+    let attributes = response.find(
+      (item) => item && typeof item === "object" && item.a
+    )?.a;
+    let changed = false;
+    const normalized = response.map((item) => {
+      if (!item || typeof item !== "object") return item;
+      if (item.a) attributes = item.a;
+      const value = normalizeCompactHistoryResponse(item);
+      if (
+        value !== item
+        && value
+        && typeof value === "object"
+        && Object.prototype.hasOwnProperty.call(value, "state")
+        && value.attributes == null
+      ) {
+        value.attributes = attributes || {};
+      }
+      changed ||= value !== item;
+      return value;
+    });
+    return changed ? normalized : response;
+  }
+  if (!response || typeof response !== "object") return response;
+
+  const compactState = (
+    !Object.prototype.hasOwnProperty.call(response, "state")
+    && Object.prototype.hasOwnProperty.call(response, "s")
+    && (
+      Object.prototype.hasOwnProperty.call(response, "lu")
+      || Object.prototype.hasOwnProperty.call(response, "lc")
+    )
+  );
+  if (compactState) {
+    const lastUpdated = historyTimestamp(response.lu ?? response.lc);
+    const lastChanged = historyTimestamp(response.lc ?? response.lu);
+    return {
+      ...response,
+      state: response.s,
+      attributes: response.a,
+      last_updated: lastUpdated,
+      last_changed: lastChanged,
+    };
+  }
+
+  let changed = false;
+  const normalized = {};
+  for (const [key, value] of Object.entries(response)) {
+    const next = normalizeCompactHistoryResponse(value);
+    normalized[key] = next;
+    changed ||= next !== value;
+  }
+  return changed ? normalized : response;
+}
 
 export class GraphMethods {
   _renderGraphs() {
@@ -47,18 +118,20 @@ export class GraphMethods {
       host.innerHTML = `<div class="start"><ha-icon icon="mdi:chart-timeline-variant"></ha-icon><p>${this._escape(prompt)}</p></div>`;
       return;
     }
-    this._renderLargeRangeDetailBanner(detail);
     if (this._activeSnapshot?.single_graph) {
       const cardOptions = this._cardOptions();
       const mode = cardOptions.chart_mode
         || (series.some((item) => this._isNumeric(item)) ? "timeline" : "state_timeline");
       const title = cardOptions.card_header
         || this._customLocalize(mode === "state_timeline" ? "state_history" : "numeric_history");
-      this._createGraph(host, series, title, mode, detail);
+      const graphDetail = mode === "state_timeline" ? null : detail;
+      this._renderLargeRangeDetailBanner(graphDetail);
+      this._createGraph(host, series, title, mode, graphDetail);
       return;
     }
     const numeric = series.filter((item) => this._isNumeric(item));
     const states = series.filter((item) => !this._isNumeric(item));
+    this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
     const multipleCharts = Boolean(numeric.length && states.length);
     if (globalEditorButton) globalEditorButton.hidden = multipleCharts;
     if (numeric.length) {
@@ -77,7 +150,7 @@ export class GraphMethods {
         states,
         this._customLocalize("state_history"),
         "state_timeline",
-        detail,
+        null,
         multipleCharts,
       );
     }
@@ -110,14 +183,16 @@ export class GraphMethods {
         : { auto_scale_points: false, group_by: detail.groupBy, show_group_by_picker: true };
     const palette = customElements.get(CARD_TAG)?.PALETTE;
     const entities = series.map((item, index) => {
-      const entity = this._entityCardConfig(item, mode);
-      const configured = detail && mode === "state_timeline"
-        ? { ...entity, aggregate_func: "last" }
-        : entity;
+      const configured = this._entityCardConfig(item, mode);
       // Keep automatically assigned colors stable when entities are toggled.
       // The card otherwise reindexes its palette after disabled entities are
       // removed, causing the remaining series to change color.
-      if (configured.color == null && Array.isArray(palette) && palette.length) {
+      if (
+        mode !== "state_timeline"
+        && configured.color == null
+        && Array.isArray(palette)
+        && palette.length
+      ) {
         configured.color = palette[index % palette.length];
       }
       return configured;
@@ -130,9 +205,11 @@ export class GraphMethods {
       entities,
       hours_to_show: this._effectiveDefaultHours(),
       height,
-      ...(mode === "state_timeline" ? { group_by: "raw" } : {}),
       ...cardOptions,
       ...detailOptions,
+      ...(mode === "state_timeline"
+        ? { auto_scale_points: false, group_by: "raw" }
+        : {}),
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
       energy_date_sync: true,
     };
@@ -402,7 +479,11 @@ export class GraphMethods {
     const type = typeof message === "string" ? message : message?.type;
     if (typeof type !== "string") return null;
     if (type.includes("statistics_during_period")) return "statistics";
-    if (type.includes("history/period") || type.includes("history_during_period")) return "history";
+    if (
+      type.includes("history/period")
+      || type.includes("history_during_period")
+      || type.includes("history/stream")
+    ) return "history";
     return null;
   }
 
@@ -453,10 +534,13 @@ export class GraphMethods {
 
     const recordResponse = (message, response) => {
       const source = this._requestDataSource(message);
-      if (source && this._dataSourceResponseHasPoints(response)) {
+      const normalized = source === "history"
+        ? normalizeCompactHistoryResponse(response)
+        : response;
+      if (source && this._dataSourceResponseHasPoints(normalized)) {
         tracker.record(source);
       }
-      return response;
+      return normalized;
     };
     const trackResult = (message, result) => {
       if (!this._requestDataSource(message)) return result;
@@ -479,10 +563,10 @@ export class GraphMethods {
             if (callbackIndex !== -1) {
               const callback = args[callbackIndex];
               args[callbackIndex] = (...callbackArgs) => {
-                for (const response of callbackArgs) {
-                  recordResponse(message, response);
-                }
-                return callback(...callbackArgs);
+                const normalizedArgs = callbackArgs.map(
+                  (response) => recordResponse(message, response)
+                );
+                return callback(...normalizedArgs);
               };
             }
           }
@@ -682,19 +766,19 @@ export class GraphMethods {
         ? { ...options, entity, enabled }
         : { ...options, entity, enabled, compare };
     }
-    const state = this._hass.states[entity];
-    const domain = entity.split(".")[0];
-    let values = [];
-    if (["binary_sensor","input_boolean","switch","light","fan"].includes(domain)) values = ["off","on"];
-    else if (domain === "cover") values = ["closed","closing","open","opening"];
-    else if (domain === "lock") values = ["locked","locking","unlocked","unlocking","jammed"];
-    else if (["person","device_tracker"].includes(domain)) values = ["not_home","home"];
-    else if (domain === "alarm_control_panel") values = ["disarmed","arming","armed_home","armed_away","armed_night","pending","triggered"];
-    else if (domain === "climate") values = state?.attributes?.hvac_modes || [];
-    else if (["select","input_select"].includes(domain)) values = state?.attributes?.options || [];
-    if (state?.state && !values.includes(state.state)) values.push(state.state);
-    const generated = values.length ? { entity, state_map: values.map((value) => ({ value })) } : { entity };
-    return { ...generated, ...entityOptions, entity, enabled };
+    const stateMap = mergeStateMaps(
+      nativeStateMap(this._hass, entity),
+      entityOptions.state_map
+    );
+    const legendColor = stateMapLegendColor(entity, stateMap);
+    const generated = {
+      entity,
+      ...(stateMap ? { state_map: stateMap } : {}),
+      // A state timeline's base color is used by the legend. Keep it aligned
+      // with its mapped active state instead of an unrelated series palette.
+      ...(legendColor ? { color: legendColor } : {}),
+    };
+    return { ...entityOptions, ...generated, entity, enabled };
   }
 
   _mergeCompareOptions(activeCompare, defaults) {
@@ -764,7 +848,12 @@ export class GraphMethods {
         entityOptionsConfig,
       );
       const seriesKey = this._seriesDescriptor(item).key;
-      if (entityConfig.color == null && Array.isArray(palette) && palette.length) {
+      if (
+        editorMode !== "state_timeline"
+        && entityConfig.color == null
+        && Array.isArray(palette)
+        && palette.length
+      ) {
         const color = palette[index % palette.length];
         entityConfig.color = color;
         this._editorAutoColors.set(seriesKey, color);
