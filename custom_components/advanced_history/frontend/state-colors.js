@@ -7,10 +7,12 @@ const DOMAIN_STATES = {
     "armed_night",
     "armed_vacation",
     "armed_custom_bypass",
+    "disarming",
     "pending",
     "triggered",
   ],
   alert: ["idle", "off", "on"],
+  assist_satellite: ["idle", "listening", "responding", "processing"],
   automation: ["off", "on"],
   binary_sensor: ["off", "on"],
   calendar: ["off", "on"],
@@ -21,9 +23,9 @@ const DOMAIN_STATES = {
   group: ["off", "on", "not_home", "home", "closed", "open", "locked", "unlocked", "ok", "problem"],
   humidifier: ["off", "on"],
   input_boolean: ["off", "on"],
-  lawn_mower: ["docked", "mowing", "paused", "error"],
+  lawn_mower: ["docked", "mowing", "paused", "returning", "error"],
   light: ["off", "on"],
-  lock: ["locked", "locking", "unlocked", "unlocking", "jammed"],
+  lock: ["locked", "locking", "unlocked", "unlocking", "opening", "open", "jammed"],
   media_player: ["off", "on", "idle", "playing", "paused", "standby", "buffering"],
   person: ["not_home", "home"],
   plant: ["ok", "problem"],
@@ -65,6 +67,11 @@ function cssVariableChain(properties) {
 
 function stateKey(value) {
   return String(value).replace(/[^a-z0-9_]+/gi, "_").toLowerCase();
+}
+
+function graphPaletteColor(index) {
+  const position = (index % 54) + 1;
+  return `var(--graph-color-${position}, var(--color-${position}))`;
 }
 
 function stateIsActive(domain, state) {
@@ -111,12 +118,22 @@ export function nativeStateMap(hass, entityId) {
   if (!stateObj) return undefined;
   const domain = entityId?.split(".", 1)[0];
   let values = DOMAIN_STATES[domain];
-  let useNativeColors = true;
+  let paletteValues;
   if (domain === "climate") values = stateObj.attributes?.hvac_modes;
   else if (domain === "water_heater") values = stateObj.attributes?.operation_list;
-  else if (domain === "select" || domain === "input_select") {
+  else if (
+    domain === "select"
+    || domain === "input_select"
+    || (domain === "sensor" && stateObj.attributes?.device_class === "enum")
+  ) {
     values = stateObj.attributes?.options;
-    useNativeColors = false;
+    paletteValues = values;
+  } else if (
+    domain === "sensor"
+    && (stateObj.state === "off" || stateObj.state === "on")
+  ) {
+    values = ["off", "on"];
+    paletteValues = values;
   }
   if (!Array.isArray(values)) return undefined;
 
@@ -127,11 +144,16 @@ export function nativeStateMap(hass, entityId) {
     "unavailable",
   ].filter(Boolean))];
   const deviceClass = stateObj.attributes?.device_class;
-  return states.map((state) => ({
-    value: state,
-    label: hass?.formatEntityState?.(stateObj, state) || state,
-    ...(useNativeColors ? { color: nativeStateColor(domain, deviceClass, state) } : {}),
-  }));
+  return states.map((state) => {
+    const paletteIndex = paletteValues?.indexOf(state) ?? -1;
+    return {
+      value: state,
+      label: hass?.formatEntityState?.(stateObj, state) || state,
+      color: paletteIndex >= 0
+        ? graphPaletteColor(paletteIndex)
+        : nativeStateColor(domain, deviceClass, state),
+    };
+  });
 }
 
 export function mergeStateMaps(nativeMap, configuredMap) {
