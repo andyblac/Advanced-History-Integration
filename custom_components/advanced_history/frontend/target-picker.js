@@ -364,16 +364,25 @@ export class TargetPickerMethods {
         detail: entity,
         selected: selected.has("state"),
       },
-      ...attributes.map((attribute) => ({
-        value: attribute,
-        label: this._attributeDisplayName(entity, attribute),
-        current: this._seriesChoiceValue(entity, attribute),
-        detail: attribute,
-        selected: selected.has(attribute),
-        categorical: categoricalAttributes.includes(attribute) ||
-          this._seriesStateMap(entity, attribute).length > 0,
-        mapValues: this._seriesStateMapValues(entity, attribute),
-      })),
+      ...attributes.map((attribute) => {
+        const numeric = numericAttributes.includes(attribute) ||
+          nativeAttributes.includes(attribute);
+        const categorical = !numeric && (
+          categoricalAttributes.includes(attribute) ||
+          this._seriesStateMap(entity, attribute).length > 0
+        );
+        return {
+          value: attribute,
+          label: this._attributeDisplayName(entity, attribute),
+          current: this._seriesChoiceValue(entity, attribute),
+          detail: attribute,
+          selected: selected.has(attribute),
+          categorical,
+          mapValues: categorical
+            ? this._seriesStateMapValues(entity, attribute)
+            : [],
+        };
+      }),
     ];
   }
 
@@ -444,6 +453,23 @@ export class TargetPickerMethods {
       const entityOptions = this._clone(
         chart.entity_options || this._effectiveEntityOptionsConfig() || {}
       );
+      const choicesByValue = new Map(
+        choices.map((choice) => [choice.value, choice])
+      );
+      for (const attribute of selection) {
+        if (attribute === "state" || choicesByValue.get(attribute)?.categorical) continue;
+        const key = this._seriesKey(entity, attribute);
+        const existing = entityOptions[key];
+        if (
+          existing &&
+          typeof existing === "object" &&
+          !Array.isArray(existing) &&
+          Object.prototype.hasOwnProperty.call(existing, "state_map")
+        ) {
+          entityOptions[key] = { ...existing };
+          delete entityOptions[key].state_map;
+        }
+      }
       for (const input of backdrop.querySelectorAll("[data-state-map]")) {
         if (!selection.includes(input.dataset.stateMap)) continue;
         const attribute = input.dataset.stateMap;

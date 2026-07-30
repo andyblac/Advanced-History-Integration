@@ -1,19 +1,32 @@
 """Constants for Advanced History."""
 
+import hashlib
 import json
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Mapping
 
 DOMAIN = "advanced_history"
+_INTEGRATION_DIR = Path(__file__).parent
+_FRONTEND_DIR = _INTEGRATION_DIR / "frontend"
 # Keep manifest.json as the single editable source for the integration version.
 VERSION = json.loads(
-    Path(__file__).with_name("manifest.json").read_text(encoding="utf-8")
+    (_INTEGRATION_DIR / "manifest.json").read_text(encoding="utf-8")
 )["version"]
+
+
+def _frontend_build_id() -> str:
+    """Return a stable fingerprint for the complete frontend module tree."""
+    digest = hashlib.sha256()
+    for path in sorted(_FRONTEND_DIR.glob("*.js")):
+        digest.update(path.name.encode())
+        digest.update(path.read_bytes())
+    return digest.hexdigest()[:12]
+
 
 PANEL_URL_PATH = "advanced-history"
 PANEL_ELEMENT = "advanced-history-panel"
-FRONTEND_BASE_URL = f"/advanced_history/{VERSION}"
+FRONTEND_BASE_URL = f"/advanced_history/{VERSION}-{_frontend_build_id()}"
 PANEL_MODULE_URL = f"{FRONTEND_BASE_URL}/advanced-history-panel.js"
 MORE_INFO_MODULE_URL = f"{FRONTEND_BASE_URL}/advanced-history-more-info.js"
 

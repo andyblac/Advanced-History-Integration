@@ -759,6 +759,7 @@ export class GraphMethods {
     const enabled = this._enabledResolvedEntityIds?.has(entity) !== false;
     if (mode !== "state_timeline") {
       const { compare: compareDefaults, ...options } = entityOptions;
+      delete options.state_map;
       const activeCompare = this._effectiveCompare();
       const compare = this._mergeCompareOptions(activeCompare, compareDefaults);
       return compare == null
