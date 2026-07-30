@@ -173,19 +173,3 @@ export function mergeStateMaps(nativeMap, configuredMap) {
   });
   return [...merged, ...configuredByValue.values()];
 }
-
-export function stateMapLegendColor(entityId, stateMap) {
-  if (!Array.isArray(stateMap)) return undefined;
-  const domain = entityId?.split(".", 1)[0];
-  const active = stateMap.find((entry) => String(entry?.value) === "on")
-    || stateMap.find((entry) => {
-      const state = String(entry?.value ?? "");
-      return (
-        state
-        && state !== "unknown"
-        && state !== "unavailable"
-        && stateIsActive(domain, state)
-      );
-    });
-  return active?.color;
-}

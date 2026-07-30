@@ -15,6 +15,7 @@ from .const import (
     CONF_SIDEBAR_ICON,
     CONF_TITLE,
     DOMAIN,
+    FRONTEND_BASE_URL,
     MORE_INFO_MODULE_URL,
     PANEL_ELEMENT,
     PANEL_MODULE_URL,
@@ -38,7 +39,7 @@ async def _async_register_static_files(hass: HomeAssistant) -> None:
             return
         frontend_dir = Path(__file__).parent / "frontend"
         await hass.http.async_register_static_paths(
-            [StaticPathConfig("/advanced_history", str(frontend_dir), False)]
+            [StaticPathConfig(FRONTEND_BASE_URL, str(frontend_dir), False)]
         )
         hass.data[_STATIC_REGISTERED] = True
 

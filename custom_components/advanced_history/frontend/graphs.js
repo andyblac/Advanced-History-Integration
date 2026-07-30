@@ -10,7 +10,6 @@ import {
 import {
   mergeStateMaps,
   nativeStateMap,
-  stateMapLegendColor,
 } from "./state-colors.js";
 
 const DATA_SOURCE_CACHE = new Map();
@@ -770,13 +769,9 @@ export class GraphMethods {
       nativeStateMap(this._hass, entity),
       entityOptions.state_map
     );
-    const legendColor = stateMapLegendColor(entity, stateMap);
     const generated = {
       entity,
       ...(stateMap ? { state_map: stateMap } : {}),
-      // A state timeline's base color is used by the legend. Keep it aligned
-      // with its mapped active state instead of an unrelated series palette.
-      ...(legendColor ? { color: legendColor } : {}),
     };
     return { ...entityOptions, ...generated, entity, enabled };
   }

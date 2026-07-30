@@ -13,8 +13,9 @@ VERSION = json.loads(
 
 PANEL_URL_PATH = "advanced-history"
 PANEL_ELEMENT = "advanced-history-panel"
-PANEL_MODULE_URL = f"/advanced_history/advanced-history-panel.js?v={VERSION}"
-MORE_INFO_MODULE_URL = f"/advanced_history/advanced-history-more-info.js?v={VERSION}"
+FRONTEND_BASE_URL = f"/advanced_history/{VERSION}"
+PANEL_MODULE_URL = f"{FRONTEND_BASE_URL}/advanced-history-panel.js"
+MORE_INFO_MODULE_URL = f"{FRONTEND_BASE_URL}/advanced-history-more-info.js"
 
 CONF_TITLE = "title"
 CONF_ENTRY_TYPE = "entry_type"
@@ -54,6 +55,7 @@ DEFAULT_MORE_INFO_ENTITY_OPTIONS = {
 DEFAULT_CARD_OPTIONS = {
     "auto_scale_points": True,
     "include_area_names": True,
+    "include_attribute_name": True,
     "show_full_period": True,
     "show_tooltip": True,
     "state_timeline_label_font_size": 14,
@@ -73,6 +75,7 @@ DEFAULT_MORE_INFO_CARD_OPTIONS = {
     "date_picker_default_mode": "last_24h",
     "date_picker_modes": ["day", "week", "month", "year", "last_24h"],
     "height": 240,
+    "include_attribute_name": True,
     "show_legend": False,
     "show_now_line": False,
     "show_tooltip": True,
