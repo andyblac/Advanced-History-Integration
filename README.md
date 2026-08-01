@@ -10,13 +10,10 @@
 
 <p align="center">
   <img alt="Home Assistant custom integration" src="https://img.shields.io/badge/Home%20Assistant-Custom%20Integration-18BCF2?logo=home-assistant&logoColor=white">
-  <img alt="HACS custom repository" src="https://img.shields.io/badge/HACS-Custom%20Repository-41BDF5">
+  <img alt="HACS Default" src="https://img.shields.io/badge/HACS-Default-41BDF5">
   <img alt="Version" src="https://img.shields.io/github/v/release/andyblac/Advanced-History-Integration?include_prereleases">
   <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-green">
 </p>
-
-> [!NOTE]
-> Advanced History is currently in pre-release development. Configuration and behavior may change before version 1.0.0.
 
 ## What is Advanced History?
 
@@ -63,18 +60,11 @@ If the graph card is missing, Advanced History displays an **Install using HACS*
 
 1. Install [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) **v3.32 or newer** through HACS.
 2. Open **HACS → Integrations**.
-3. Open the three-dot menu and select **Custom repositories**.
-4. Add this repository as an **Integration**:
-
-   ```text
-   https://github.com/andyblac/Advanced-History-Integration
-   ```
-
-5. Search for **Advanced History** and install it.
-6. Restart Home Assistant.
-7. Open **Settings → Devices & services → Add integration**.
-8. Search for **Advanced History** and complete setup.
-9. Confirm the integration contains separate **Advanced History** and **More-Info** services, then open Advanced History from the sidebar.
+3. Search for **Advanced History** and install it.
+4. Restart Home Assistant.
+5. Open **Settings → Devices & services → Add integration**.
+6. Search for **Advanced History** and complete setup.
+7. Confirm the integration contains separate **Advanced History** and **More-Info** services, then open Advanced History from the sidebar.
 
 New installations create both services automatically. The More Info graph replacement has its own enable switch, optional calendar, YAML defaults, and visual editor.
 
