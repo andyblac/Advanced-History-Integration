@@ -24,6 +24,8 @@ Advanced History provides a dedicated Home Assistant sidebar panel that keeps th
 
 It includes native target selection, Energy-style date navigation and comparisons, visual graph editing, reusable bookmarks, chart history, Undo/Redo, and independent defaults for the sidebar and More Info graphs.
 
+![Advanced History graphing multiple climate attributes](https://raw.githubusercontent.com/andyblac/Advanced-History-Integration/master/docs/images/advanced-history-attributes.jpeg)
+
 ## Why was it created?
 
 Home Assistant's built-in History page is quick and convenient, but its graph customization is intentionally limited. Statistics Graph Chart Card offers much more control, but normally needs a dashboard card to be configured in advance.
@@ -96,6 +98,7 @@ Full setup, usage, configuration, and troubleshooting documentation is available
 - [Configuration reference](https://github.com/andyblac/Advanced-History-Integration/wiki/Configuration-Reference)
 - [More Info graphs](https://github.com/andyblac/Advanced-History-Integration/wiki/More-Info-Graphs)
 - [Troubleshooting](https://github.com/andyblac/Advanced-History-Integration/wiki/Troubleshooting)
+- [Community forum topic](https://community.home-assistant.io/t/advanced-history-a-more-powerful-home-assistant-history-panel-more-info-dialog-uses-the-excellent-statistics-graph-chart-card-for-graph-rendering/1017971)
 
 ## Special thanks
 
