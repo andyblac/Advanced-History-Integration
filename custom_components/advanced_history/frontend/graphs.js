@@ -196,9 +196,7 @@ export class GraphMethods {
       }
       return configured;
     });
-    const height = mode === "state_timeline"
-      ? this._stateTimelineHeight(entities)
-      : this._effectiveGraphHeight();
+    const height = this._effectiveGraphHeight();
     const config = {
       type: `custom:${CARD_TAG}`, card_header: title, chart_mode: mode,
       entities,
@@ -207,7 +205,7 @@ export class GraphMethods {
       ...cardOptions,
       ...detailOptions,
       ...(mode === "state_timeline"
-        ? { auto_scale_points: false, group_by: "raw" }
+        ? { height: "auto", auto_scale_points: false, group_by: "raw" }
         : {}),
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
       energy_date_sync: true,
@@ -251,19 +249,6 @@ export class GraphMethods {
       this._graphCards.push(card);
     }
     catch (error) { host.insertAdjacentHTML("beforeend", `<div class="error">${this._escape(error.message || error)}</div>`); }
-  }
-
-  _stateTimelineHeight(entities) {
-    // The card's height option controls only the timeline plot. State rows
-    // and legends are laid out outside the plot by the card itself, so adding
-    // their height here creates a large empty area between the timeline and
-    // the legend.
-    const visibleEntities = entities.filter((entity) => entity?.enabled !== false);
-    const visibleRows = Math.max(1, visibleEntities.length);
-    const contentHeight = 62 + (visibleRows - 1) * 36;
-
-    // Cap the plot at the normal configured graph height for large timelines.
-    return Math.min(this._effectiveGraphHeight(), contentHeight);
   }
 
   _largeRangePeriod() {
