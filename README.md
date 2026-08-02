@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="custom_components/advanced_history/brand/icon@2x.png" width="160" alt="Advanced History icon">
+  <img src="https://raw.githubusercontent.com/andyblac/Advanced-History-Integration/master/custom_components/advanced_history/brand/icon@2x.png" width="160" alt="Advanced History icon">
 </p>
 
 <h1 align="center">Advanced History</h1>
