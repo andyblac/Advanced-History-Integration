@@ -548,12 +548,21 @@ export class StorageMethods {
   _startFreshSnapshotSession(snapshot) {
     const current = this._clone(snapshot);
     current.source_bookmark_id = this._loadedBookmarkId || null;
-    this._freshSnapshotSessionFingerprint = this._snapshotFingerprint(current);
+    this._applySnapshot(current, false);
+    // A saved bookmark can predate newly introduced card defaults. Loading it
+    // applies those defaults immediately, so use the resulting effective
+    // configuration as the session baseline. Otherwise the first Energy or
+    // target-picker update after the restore looks like a user edit and adds
+    // both an Undo entry and an Update Bookmark action.
+    const effective = this._captureSnapshot(current.name);
+    effective.id = current.id;
+    effective.saved_at = current.saved_at;
+    effective.source_bookmark_id = current.source_bookmark_id;
+    this._freshSnapshotSessionFingerprint = this._snapshotFingerprint(effective);
     this._loadedBookmarkBaselineFingerprint = this._freshSnapshotSessionFingerprint;
     this._loadedBookmarkDirty = false;
-    this._currentSnapshot = this._clone(current);
-    this._saveCurrentSnapshot(current);
-    this._applySnapshot(current, false);
+    this._currentSnapshot = this._clone(effective);
+    this._saveCurrentSnapshot(effective);
     this._clearUndoRedoHistory();
   }
 
@@ -657,6 +666,10 @@ export class StorageMethods {
   _beginPeriodRestore(period) {
     this._periodRestoreExpected = this._clone(period);
     this._periodRestoreLoading = true;
+    const banner = this.shadowRoot?.getElementById("period-loading-banner");
+    if (banner) banner.hidden = false;
+    const compareBanner = this.shadowRoot?.getElementById("compare-banner");
+    if (compareBanner) compareBanner.hidden = true;
     const charts = this.shadowRoot?.getElementById("charts");
     if (charts) {
       charts.hidden = true;
@@ -699,6 +712,8 @@ export class StorageMethods {
     const actualEnd = data?.end;
     const expectedStart = new Date(expected.start).getTime();
     const expectedEnd = expected.end ? new Date(expected.end).getTime() : undefined;
+    const expectedCompare = expected.compare || "";
+    const actualCompare = data?.compareMode || "";
     const start = actualStart instanceof Date
       ? actualStart.getTime()
       : new Date(actualStart).getTime();
@@ -707,7 +722,11 @@ export class StorageMethods {
       : actualEnd instanceof Date
         ? actualEnd.getTime()
         : new Date(actualEnd).getTime();
-    if (start !== expectedStart || end !== expectedEnd) return false;
+    if (
+      start !== expectedStart
+      || end !== expectedEnd
+      || actualCompare !== expectedCompare
+    ) return false;
     this._finishPeriodRestore();
     return true;
   }
