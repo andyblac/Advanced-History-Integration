@@ -1,0 +1,32 @@
+name: Build release asset
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build integration ZIP
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out release
+        uses: actions/checkout@v5
+
+      - name: Build integration ZIP
+        working-directory: custom_components/advanced_history
+        run: |
+          zip -r "$GITHUB_WORKSPACE/advanced_history.zip" . \
+            -x "*/__pycache__/*" "*.pyc" "*/.DS_Store" ".DS_Store"
+
+      - name: Attach ZIP to release
+        run: |
+          gh release upload "$GITHUB_REF_NAME" \
+            advanced_history.zip \
+            --clobber
+        env:
+          GH_TOKEN: ${{ github.token }}
