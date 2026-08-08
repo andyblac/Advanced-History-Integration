@@ -13,6 +13,8 @@
   <img alt="HACS Default" src="https://img.shields.io/badge/HACS-Default-41BDF5">
   <img alt="Version" src="https://img.shields.io/github/v/release/andyblac/Advanced-History-Integration?include_prereleases">
   <img alt="MIT licence" src="https://img.shields.io/badge/licence-MIT-green">
+  <img alt="GitHub Downloads (all assets, all releases)" src="https://img.shields.io/github/downloads/andyblac/Advanced-History-Integration/total?logo=home-assistant&logoColor=41BDF5">
+  <img alt="GitHub Issues" src="https://img.shields.io/github/issues/andyblac/Advanced-History-Integration">
 </p>
 
 ## What is Advanced History?
