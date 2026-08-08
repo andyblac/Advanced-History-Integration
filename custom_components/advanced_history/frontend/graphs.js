@@ -84,8 +84,6 @@ export class GraphMethods {
   _renderGraphs() {
     const host = this.shadowRoot.getElementById("charts");
     if (!host) return;
-    const globalEditorButton = this.shadowRoot.getElementById("settings");
-    if (globalEditorButton) globalEditorButton.hidden = false;
     const detail = this._largeRangeDetailProfile();
     this._cards = this._cards.filter((card) => !this._graphCards.includes(card));
     this._graphCards = [];
@@ -131,8 +129,6 @@ export class GraphMethods {
     const numeric = series.filter((item) => this._isNumeric(item));
     const states = series.filter((item) => !this._isNumeric(item));
     this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
-    const multipleCharts = Boolean(numeric.length && states.length);
-    if (globalEditorButton) globalEditorButton.hidden = multipleCharts;
     if (numeric.length) {
       this._createGraph(
         host,
@@ -140,7 +136,6 @@ export class GraphMethods {
         this._customLocalize("numeric_history"),
         "timeline",
         detail,
-        multipleCharts,
       );
     }
     if (states.length) {
@@ -150,12 +145,11 @@ export class GraphMethods {
         this._customLocalize("state_history"),
         "state_timeline",
         null,
-        multipleCharts,
       );
     }
   }
 
-  _createGraph(host, series, title, mode, detail = null, showEditorButton = false) {
+  _createGraph(host, series, title, mode, detail = null) {
     const shell = document.createElement("div");
     shell.className = "graph-shell";
     const sourceIndicator = document.createElement("span");
@@ -228,8 +222,7 @@ export class GraphMethods {
       this._setGraphCardHass(card, this._hass);
       shell.append(card, sourceIndicator);
       if (
-        showEditorButton
-        && this.config.settings_path
+        this.config.settings_path
         && this._hass?.user?.is_admin
       ) {
         shell.classList.add("has-card-editor");

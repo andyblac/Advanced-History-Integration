@@ -203,7 +203,6 @@ class AdvancedHistoryPanel extends HTMLElement {
     const removeAll = this._localize("ui.panel.history.remove_all", "Remove all selections");
     const bookmarks = this._customLocalize("bookmarks");
     const chartHistory = this._customLocalize("chart_history");
-    const graphSettings = this._customLocalize("graph_settings");
     const undo = this._localize("ui.common.undo", "Undo");
     const redo = this._localize("ui.common.redo", "Redo");
     const dependencyMissing = Boolean(this._cardLoadError);
@@ -216,7 +215,6 @@ class AdvancedHistoryPanel extends HTMLElement {
         <button id="chart-history" class="icon-button" title="${this._escape(chartHistory)}"><ha-icon icon="mdi:history"></ha-icon></button>
         <button id="undo" class="icon-button" title="${this._escape(undo)}"><ha-icon icon="mdi:undo"></ha-icon></button>
         <button id="redo" class="icon-button" title="${this._escape(redo)}"><ha-icon icon="mdi:redo"></ha-icon></button>
-        ${this.config.settings_path && this._hass?.user?.is_admin ? `<button id="settings" class="icon-button" title="${this._escape(graphSettings)}"><ha-icon icon="mdi:cog-outline"></ha-icon></button>` : ""}
         <button id="remove-all" class="icon-button" title="${this._escape(removeAll)}" ${this._targetCount() ? "" : "hidden"}><ha-icon icon="mdi:filter-remove-outline"></ha-icon></button>
       </header>
       <main class="content">
@@ -242,7 +240,6 @@ class AdvancedHistoryPanel extends HTMLElement {
     this.shadowRoot.getElementById("chart-history")?.addEventListener("click", () => this._openLibrary("history"));
     this.shadowRoot.getElementById("undo")?.addEventListener("click", () => this._undo());
     this.shadowRoot.getElementById("redo")?.addEventListener("click", () => this._redo());
-    this.shadowRoot.getElementById("settings")?.addEventListener("click", () => this._openGraphEditor());
     this._updateUndoRedoButtons();
     if (!dependencyMissing) this._renderNativeTargetPicker();
     this._renderContent();
