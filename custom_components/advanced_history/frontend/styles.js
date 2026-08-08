@@ -30,7 +30,7 @@ export const panelStyles = `
     background:var(--card-background-color); display:flex; align-items:center; flex-wrap:wrap; gap:7px; cursor:text;
   }
   .native-target-picker { flex:1; min-width:0; }
-  .native-target-picker ha-target-picker { display:block; width:100%; --ha-space-3:4px; }
+  .native-target-picker ha-target-picker { display:block; width:100%; }
   .native-picker-status {
     min-height:56px; padding:0 12px; display:flex; align-items:center;
     color:var(--secondary-text-color); border:1px solid var(--divider-color); border-radius:4px;
