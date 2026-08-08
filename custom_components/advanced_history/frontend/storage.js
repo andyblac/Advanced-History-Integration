@@ -897,20 +897,36 @@ export class StorageMethods {
     backdrop.querySelectorAll("[data-open-snapshot]").forEach((button) => button.addEventListener("click", async () => {
       const snapshot = items.find((item) => item.id === button.dataset.openSnapshot);
       if (!snapshot) return;
-      if (
-        isBookmarks
-        && this._loadedBookmarkId
+      const changedLoadedBookmark = Boolean(
+        this._loadedBookmarkId
         && this._loadedBookmarkDirty
         && snapshot.id !== this._loadedBookmarkId
-      ) {
+      );
+      const unsavedNewChart = Boolean(
+        !this._loadedBookmarkId && this._targetCount()
+      );
+      if (isBookmarks && (changedLoadedBookmark || unsavedNewChart)) {
         const action = await this._showUnsavedChangesDialog({
-          title: this._customLocalize("unsaved_bookmark_title"),
-          message: this._customLocalize("switch_bookmark_message"),
-          saveLabel: this._localize("ui.common.save", "Save"),
+          title: this._customLocalize(
+            changedLoadedBookmark
+              ? "unsaved_bookmark_title"
+              : "unsaved_chart_title"
+          ),
+          message: this._customLocalize(
+            changedLoadedBookmark
+              ? "switch_bookmark_message"
+              : "load_bookmark_new_chart_message"
+          ),
+          saveLabel: changedLoadedBookmark
+            ? this._localize("ui.common.save", "Save")
+            : this._customLocalize("create_bookmark"),
           discardLabel: this._localize("ui.common.dont_save", "Don't save"),
         });
         if (action === "save") {
-          if (!this._updateBookmark(this._loadedBookmarkId)) return;
+          const saved = changedLoadedBookmark
+            ? this._updateBookmark(this._loadedBookmarkId)
+            : this._saveCurrentBookmark(this._snapshotLabel());
+          if (!saved) return;
         } else if (action !== "discard") {
           return;
         }
