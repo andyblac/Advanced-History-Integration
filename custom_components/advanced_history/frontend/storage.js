@@ -528,9 +528,13 @@ export class StorageMethods {
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;
     if (this._energyCollection && this._pendingPeriodRestore?.start) {
+      // Update the selector synchronously, but leave the refresh to
+      // _bindEnergyCollection(). Starting it here can publish the restored
+      // data before the replacement graph cards have subscribed to Energy.
       this._applyStoredPeriod(
         this._energyCollection,
         this._pendingPeriodRestore,
+        false,
         false
       );
     }
