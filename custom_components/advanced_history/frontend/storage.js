@@ -421,6 +421,76 @@ export class StorageMethods {
     this._clearUndoRedoHistory();
   }
 
+  _clearCurrentChart() {
+    if (!this._targetCount()) return;
+    this._archiveCurrentChart();
+    this._activeSnapshot = null;
+    this._targets = { area_id: [], device_id: [], entity_id: [] };
+    this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
+    this._resetEnergySelection();
+    this._saveTargets();
+    this._recordChange();
+    this._clearChartSessionHistory();
+    this._notice = "";
+    this._render();
+  }
+
+  async _requestClearCurrentChart() {
+    if (!this._targetCount()) return;
+    const loadedBookmarkChanged = Boolean(
+      this._loadedBookmarkId && this._loadedBookmarkDirty
+    );
+    const newChart = !this._loadedBookmarkId;
+    if (!newChart && !loadedBookmarkChanged) {
+      this._clearCurrentChart();
+      return;
+    }
+
+    const action = await this._showUnsavedChangesDialog({
+      title: this._customLocalize("unsaved_chart_title"),
+      message: this._customLocalize(
+        loadedBookmarkChanged
+          ? "clear_changed_bookmark_message"
+          : "clear_new_chart_message"
+      ),
+      saveLabel: loadedBookmarkChanged
+        ? this._localize("ui.common.save", "Save")
+        : this._customLocalize("create_bookmark"),
+      discardLabel: this._localize("ui.common.clear", "Clear"),
+    });
+    if (action === "save") {
+      const saved = loadedBookmarkChanged
+        ? this._updateBookmark(this._loadedBookmarkId)
+        : this._saveCurrentBookmark(this._snapshotLabel());
+      if (!saved) return;
+    } else if (action !== "discard") {
+      return;
+    }
+    this._clearCurrentChart();
+  }
+
+  _showUnsavedChangesDialog({ title, message, saveLabel, discardLabel }) {
+    if (this._unsavedDialogPromise) return this._unsavedDialogPromise;
+    this._unsavedDialogPromise = (async () => {
+      try {
+        if (typeof window.loadCardHelpers !== "function") return null;
+        const helpers = await window.loadCardHelpers();
+        if (typeof helpers.showConfirmationDialog !== "function") return null;
+        const discard = await helpers.showConfirmationDialog(this, {
+          title,
+          text: message,
+          dismissText: saveLabel,
+          confirmText: discardLabel,
+          destructive: true,
+        });
+        return discard ? "discard" : "save";
+      } finally {
+        this._unsavedDialogPromise = null;
+      }
+    })();
+    return this._unsavedDialogPromise;
+  }
+
   _updateUndoRedoButtons() {
     const undo = this.shadowRoot?.getElementById("undo");
     const redo = this.shadowRoot?.getElementById("redo");
@@ -824,9 +894,27 @@ export class StorageMethods {
       this._saveLibrary(key, []);
       this._renderLibrary(kind);
     });
-    backdrop.querySelectorAll("[data-open-snapshot]").forEach((button) => button.addEventListener("click", () => {
+    backdrop.querySelectorAll("[data-open-snapshot]").forEach((button) => button.addEventListener("click", async () => {
       const snapshot = items.find((item) => item.id === button.dataset.openSnapshot);
       if (!snapshot) return;
+      if (
+        isBookmarks
+        && this._loadedBookmarkId
+        && this._loadedBookmarkDirty
+        && snapshot.id !== this._loadedBookmarkId
+      ) {
+        const action = await this._showUnsavedChangesDialog({
+          title: this._customLocalize("unsaved_bookmark_title"),
+          message: this._customLocalize("switch_bookmark_message"),
+          saveLabel: this._localize("ui.common.save", "Save"),
+          discardLabel: this._localize("ui.common.dont_save", "Don't save"),
+        });
+        if (action === "save") {
+          if (!this._updateBookmark(this._loadedBookmarkId)) return;
+        } else if (action !== "discard") {
+          return;
+        }
+      }
       this._loadedBookmarkId = isBookmarks ? snapshot.id : null;
       if (isBookmarks) this._startFreshSnapshotSession(snapshot);
       else this._applySnapshot(snapshot);

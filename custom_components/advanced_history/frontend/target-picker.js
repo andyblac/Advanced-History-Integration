@@ -103,8 +103,12 @@ export class TargetPickerMethods {
     const nextTargets = this._normalizeTargets(event.detail?.value || {});
     const clearedAll = Boolean(this._targetCount(this._targets) && !this._targetCount(nextTargets));
     if (clearedAll) {
-      this._archiveCurrentChart();
-      this._activeSnapshot = null;
+      if (this._nativeTargetPicker) {
+        this._nativeTargetPicker.value = structuredClone(this._targets);
+        this._nativeTargetPicker.requestUpdate?.();
+      }
+      this._requestClearCurrentChart();
+      return;
     }
     this._targets = nextTargets;
     this._pruneHiddenTargets();
@@ -586,7 +590,24 @@ export class TargetPickerMethods {
     const search = backdrop.querySelector(".search");
     search.addEventListener("input", () => { this._dialogSearch = search.value; backdrop.querySelector(".target-list").innerHTML = this._dialogRows(); this._bindDialogRows(backdrop); });
     backdrop.querySelector('[data-action="cancel"]').addEventListener("click", () => backdrop.remove());
-    backdrop.querySelector('[data-action="apply"]').addEventListener("click", () => { const nextTargets = this._normalizeTargets(this._draftTargets); const clearedAll = Boolean(this._targetCount(this._targets) && !this._targetCount(nextTargets)); if (clearedAll) { this._archiveCurrentChart(); this._activeSnapshot = null; } this._targets = nextTargets; this._pruneHiddenTargets(); if (!this._targetCount()) this._resetEnergySelection(); this._saveTargets(); this._recordChange(null, true); if (clearedAll) this._clearChartSessionHistory(); this._notice = ""; backdrop.remove(); this._render(); });
+    backdrop.querySelector('[data-action="apply"]').addEventListener("click", () => {
+      const nextTargets = this._normalizeTargets(this._draftTargets);
+      const clearedAll = Boolean(
+        this._targetCount(this._targets) && !this._targetCount(nextTargets)
+      );
+      if (clearedAll) {
+        backdrop.remove();
+        this._requestClearCurrentChart();
+        return;
+      }
+      this._targets = nextTargets;
+      this._pruneHiddenTargets();
+      this._saveTargets();
+      this._recordChange(null, true);
+      this._notice = "";
+      backdrop.remove();
+      this._render();
+    });
     this.shadowRoot.append(backdrop);
     this._bindDialogRows(backdrop);
     search.focus();
@@ -620,7 +641,18 @@ export class TargetPickerMethods {
     }));
   }
 
-  _removeTarget(kind, id) { const clearedAll = this._targetCount() === 1; if (clearedAll) { this._archiveCurrentChart(); this._activeSnapshot = null; } this._targets[kind] = this._targets[kind].filter((value) => value !== id); this._pruneHiddenTargets(); if (!this._targetCount()) this._resetEnergySelection(); this._saveTargets(); this._recordChange(null, true); if (clearedAll) this._clearChartSessionHistory(); this._notice = ""; this._render(); }
+  _removeTarget(kind, id) {
+    if (this._targetCount() === 1) {
+      this._requestClearCurrentChart();
+      return;
+    }
+    this._targets[kind] = this._targets[kind].filter((value) => value !== id);
+    this._pruneHiddenTargets();
+    this._saveTargets();
+    this._recordChange(null, true);
+    this._notice = "";
+    this._render();
+  }
   _areaName(id) { return this._areas.find((area) => area.area_id === id)?.name || id || this._localize("ui.components.device-picker.no_area", "No area"); }
   _deviceName(id) { const device = this._devices.find((item) => item.id === id); return device?.name_by_user || device?.name || id; }
   _entityName(id) { const state = this._hass.states[id]; const registry = this._entities.find((item) => item.entity_id === id); return registry?.name || state?.attributes?.friendly_name || id; }
