@@ -35,6 +35,10 @@ export class EnergyMethods {
     const period = this._panelDayPeriod();
     const range = this._panelTimeRange;
     if (!period || !range) return {};
+    // A wrapping window is stored as the Energy collection period itself.
+    // Applying the daily hour filters as well would require a point to be
+    // both after the start hour and before the end hour, hiding everything.
+    if (range.end <= range.start) return {};
     return {
       graph_start_hour: range.start / 60,
       graph_end_hour: range.end / 60,
@@ -55,6 +59,18 @@ export class EnergyMethods {
     dayStart.setHours(0, 0, 0, 0);
     const dayEnd = new Date(start);
     dayEnd.setHours(23, 59, 59, 999);
+    const range = this._panelTimeRange;
+    if (range && range.end <= range.start) {
+      const rangeStart = new Date(dayStart);
+      rangeStart.setMinutes(range.start, 0, 0);
+      const rangeEnd = new Date(dayStart);
+      rangeEnd.setMinutes(range.end, 0, 0);
+      rangeEnd.setDate(rangeEnd.getDate() + 1);
+      if (
+        Math.abs(start.getTime() - rangeStart.getTime()) < 60_000
+        && Math.abs(end.getTime() - rangeEnd.getTime()) < 60_000
+      ) return false;
+    }
     const alreadyFullDay = start.getTime() === dayStart.getTime()
       && Math.abs(end.getTime() - dayEnd.getTime()) < 60_000;
     if (alreadyFullDay) return false;
@@ -227,12 +243,8 @@ export class EnergyMethods {
     const next = start === 0 && end === 1439 ? null : { start, end };
     const changed = JSON.stringify(this._panelTimeRange) !== JSON.stringify(next);
     if (!changed) return true;
-    this._beginGraphDataSourceCycle();
     this._panelTimeRange = next;
-    this._renderGraphs();
-    this._syncPanelTimeRangeControl();
-    this._recordChange(null, true);
-    return true;
+    return this._applyPanelTimeRangePeriod(period.dayStart);
   }
 
   _resetPanelTimeRangeOutsideDayView() {
@@ -259,28 +271,48 @@ export class EnergyMethods {
       start: wrap(shiftedStart),
       end: wrap(shiftedEnd),
     };
-    if (dayShift) return this._shiftPanelDay(dayShift);
+    const dayStart = new Date(period.dayStart);
+    dayStart.setDate(dayStart.getDate() + dayShift);
+    return this._applyPanelTimeRangePeriod(dayStart);
+  }
+
+  _applyPanelTimeRangePeriod(dayStart) {
+    const collection = this._energyCollection;
+    if (!collection || !(dayStart instanceof Date)) return false;
+    const start = new Date(dayStart);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    const range = this._panelTimeRange;
+    if (range && range.end <= range.start) {
+      start.setMinutes(range.start, 0, 0);
+      end.setMinutes(range.end, 0, 0);
+      end.setDate(end.getDate() + 1);
+    } else {
+      end.setHours(23, 59, 59, 999);
+    }
+    const changed = collection.start?.getTime?.() !== start.getTime()
+      || collection.end?.getTime?.() !== end.getTime();
     this._beginGraphDataSourceCycle();
+    if (changed) {
+      this._beginEnergyInteractionLoading();
+      collection.setPeriod(start, end);
+    }
+    // Mount the cards against the final period before a changed collection
+    // publishes its fresh payload.
     this._renderGraphs();
     this._syncPanelTimeRangeControl();
-    this._recordChange(null, true);
+    if (changed) collection.refresh?.();
+    else this._recordChange(null, true);
     return true;
   }
 
   _shiftPanelDay(direction) {
-    const collection = this._energyCollection;
     const period = this._panelDayPeriod();
-    if (!collection || !period || ![-1, 1].includes(direction)) return false;
+    if (!this._energyCollection || !period || ![-1, 1].includes(direction)) return false;
     const start = new Date(period.dayStart);
-    const end = new Date(period.dayEnd);
     start.setDate(start.getDate() + direction);
-    end.setDate(end.getDate() + direction);
     this._closePanelTimeRangeDialog?.();
-    this._beginGraphDataSourceCycle();
-    this._beginEnergyInteractionLoading();
-    collection.setPeriod(start, end);
-    collection.refresh?.();
-    return true;
+    return this._applyPanelTimeRangePeriod(start);
   }
 
   _bindPanelTimeNavigation(host) {

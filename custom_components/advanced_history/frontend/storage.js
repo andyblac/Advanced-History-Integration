@@ -719,14 +719,20 @@ export class StorageMethods {
       dayEnd.setHours(23, 59, 59, 999);
       const storedFullDay = start.getTime() === dayStart.getTime()
         && Math.abs(end.getTime() - dayEnd.getTime()) < 60_000;
+      const storedWrappingWindow = Boolean(
+        this._panelTimeRange
+        && this._panelTimeRange.end <= this._panelTimeRange.start
+      );
       if (!storedFullDay && !this._panelTimeRange) {
         this._panelTimeRange = {
           start: start.getHours() * 60 + start.getMinutes(),
           end: end.getHours() * 60 + end.getMinutes(),
         };
       }
-      start.setTime(dayStart.getTime());
-      end.setTime(dayEnd.getTime());
+      if (!storedWrappingWindow) {
+        start.setTime(dayStart.getTime());
+        end.setTime(dayEnd.getTime());
+      }
     }
     const currentStart = collection.start instanceof Date
       ? collection.start.getTime()
@@ -776,14 +782,20 @@ export class StorageMethods {
       const storedFullDay = start.getTime() === dayStart.getTime()
         && Math.abs(end.getTime() - dayEnd.getTime()) < 60_000;
       if (!storedFullDay) {
+        const storedWrappingWindow = Boolean(
+          this._panelTimeRange
+          && this._panelTimeRange.end <= this._panelTimeRange.start
+        );
         if (!this._panelTimeRange) {
           this._panelTimeRange = {
             start: start.getHours() * 60 + start.getMinutes(),
             end: end.getHours() * 60 + end.getMinutes(),
           };
         }
-        expected.start = dayStart.toISOString();
-        expected.end = dayEnd.toISOString();
+        if (!storedWrappingWindow) {
+          expected.start = dayStart.toISOString();
+          expected.end = dayEnd.toISOString();
+        }
       }
     }
     this._periodRestoreExpected = expected;
