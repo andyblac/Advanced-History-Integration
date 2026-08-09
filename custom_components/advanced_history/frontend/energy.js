@@ -251,12 +251,16 @@ export class EnergyMethods {
     const duration = (end - start + 1440) % 1440;
     if (!duration) return false;
     const wrap = (minutes) => (minutes % 1440 + 1440) % 1440;
+    const shiftedStart = start + direction * duration;
+    const shiftedEnd = end + direction * duration;
+    const dayShift = Math.floor(shiftedStart / 1440);
     this._closePanelTimeRangeDialog?.();
-    this._beginGraphDataSourceCycle();
     this._panelTimeRange = {
-      start: wrap(start + direction * duration),
-      end: wrap(end + direction * duration),
+      start: wrap(shiftedStart),
+      end: wrap(shiftedEnd),
     };
+    if (dayShift) return this._shiftPanelDay(dayShift);
+    this._beginGraphDataSourceCycle();
     this._renderGraphs();
     this._syncPanelTimeRangeControl();
     this._recordChange(null, true);
@@ -643,7 +647,7 @@ export class EnergyMethods {
     };
     this._bindPanelTimeNavigation(host);
     const beginDataSourceCycle = () => this._beginGraphDataSourceCycle();
-    const energyActionLabels = new Set([
+    const navigationActionLabels = new Set([
       this._localize(
         "ui.panel.lovelace.components.energy_period_selector.previous",
         "Previous"
@@ -652,6 +656,9 @@ export class EnergyMethods {
         "ui.panel.lovelace.components.energy_period_selector.next",
         "Next"
       ),
+    ]);
+    const energyActionLabels = new Set([
+      ...navigationActionLabels,
       this._localize(
         "ui.panel.lovelace.components.energy_period_selector.now",
         "Now"
@@ -662,13 +669,30 @@ export class EnergyMethods {
       ),
     ]);
     const beginChangedSelectionCycle = (event) => {
-      const directEnergyAction = event.composedPath().some((node) => {
+      let directEnergyAction = null;
+      event.composedPath().some((node) => {
         const label = node?.label || node?.getAttribute?.("aria-label");
-        if (label && energyActionLabels.has(label)) return true;
+        if (label && energyActionLabels.has(label)) {
+          directEnergyAction = label;
+          return true;
+        }
         if (!["ha-button", "ha-dropdown-item"].includes(node?.localName)) return false;
-        return energyActionLabels.has(node.textContent?.trim());
+        const text = node.textContent?.trim();
+        if (!energyActionLabels.has(text)) return false;
+        directEnergyAction = text;
+        return true;
       });
       if (directEnergyAction) {
+        // In Day view these arrows are intercepted by
+        // _bindPanelTimeNavigation(): tap moves the visible hour window and
+        // hold calls _shiftPanelDay(), which starts its own Energy loading
+        // cycle. Starting one here for the tap would never be completed,
+        // because changing graph hours does not publish Energy collection
+        // data.
+        if (
+          this._panelDayPeriod()
+          && navigationActionLabels.has(directEnergyAction)
+        ) return;
         this._beginEnergyInteractionLoading();
         return;
       }

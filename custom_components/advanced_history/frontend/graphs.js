@@ -165,6 +165,7 @@ export class GraphMethods {
     );
     card.__advancedHistoryChartMode = mode;
     card.__advancedHistorySourceKey = sourceKey;
+    this._guardFutureEnergySeries(card);
     const cardOptions = { ...this._cardOptions() };
     if (cardOptions.chart_mode && cardOptions.chart_mode !== mode) {
       delete cardOptions.chart_mode;
@@ -434,6 +435,53 @@ export class GraphMethods {
       endKey,
       compare,
     ].join("\u001e");
+  }
+
+  _guardFutureEnergySeries(card) {
+    const shouldTrackLive = card?._isLiveTrackingNeeded;
+    if (typeof shouldTrackLive === "function") {
+      card._isLiveTrackingNeeded = (...args) => {
+        // The card otherwise relocates the live state to the end of a future
+        // visible window, which its bucketing turns into a flat series.
+        const start = this._panelDayPeriod?.()?.start
+          || card._energyStart
+          || this._energyCollection?.start;
+        const startTime = start instanceof Date
+          ? start.getTime()
+          : new Date(start).getTime();
+        if (Number.isFinite(startTime) && startTime > Date.now()) return false;
+        return shouldTrackLive.apply(card, args);
+      };
+    }
+
+    const bucketSeries = card?._bucketSeries;
+    if (typeof bucketSeries !== "function") return;
+    card._bucketSeries = (...args) => {
+      const result = bucketSeries.apply(card, args);
+      const entity = args[1];
+      const windowEnd = Number(args[4]);
+      const offsetHours = Number(entity?.offset);
+      if (
+        entity?._compareOf == null
+        || !Number.isFinite(offsetHours)
+        || offsetHours <= 0
+        || !Number.isFinite(windowEnd)
+      ) return result;
+
+      const shiftedNow = Date.now() + offsetHours * 60 * 60 * 1000;
+      if (shiftedNow >= windowEnd) return result;
+      // A partial current period compared in a future window must stop at its
+      // shifted "now", rather than carrying its last bucket to the window end.
+      const beforeShiftedNow = (point) => point?.t <= shiftedNow;
+      return {
+        ...result,
+        points: result?.points?.filter(beforeShiftedNow) || [],
+        maSeries: result?.maSeries?.map((series) => ({
+          ...series,
+          points: series.points?.filter(beforeShiftedNow) || [],
+        })) || result?.maSeries,
+      };
+    };
   }
 
   _beginGraphDataSourceCycle() {
