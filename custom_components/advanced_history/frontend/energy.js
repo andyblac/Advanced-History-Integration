@@ -446,7 +446,12 @@ export class EnergyMethods {
           if (!datePicker || datePicker.__advancedHistoryDetailListener) return;
           datePicker.__advancedHistoryDetailListener = true;
           datePicker.addEventListener("value-changed", () => {
-            this._beginGraphDataSourceCycle();
+            const hadPanelTimeRange = Boolean(this._panelTimeRange);
+            if (hadPanelTimeRange) {
+              this._setPanelTimeRange("00:00:00", "23:59:00");
+            } else {
+              this._beginGraphDataSourceCycle();
+            }
             this._beginEnergyInteractionLoading();
             requestAnimationFrame(() => {
               const nextDetailKey = this._largeRangeDetailRenderKey();
