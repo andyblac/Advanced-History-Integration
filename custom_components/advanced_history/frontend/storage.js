@@ -47,6 +47,7 @@ export class StorageMethods {
       this._targets = this._normalizeTargets(incomingSnapshot.targets);
       this._hiddenTargets = this._normalizeTargets(incomingSnapshot.hidden_targets || {});
       this._activeSnapshot = this._clone(incomingSnapshot.chart);
+      this._panelTimeRange = this._clone(incomingSnapshot.chart?.time_range) || null;
       this._pendingPeriodRestore = this._clone(incomingSnapshot.period);
       if (this._pendingPeriodRestore?.start) {
         this._beginPeriodRestore(this._pendingPeriodRestore);
@@ -100,6 +101,7 @@ export class StorageMethods {
         this._snapshotFingerprint(previous) !== this._loadedBookmarkBaselineFingerprint
       );
       this._activeSnapshot = this._clone(previous.chart);
+      this._panelTimeRange = this._clone(previous.chart?.time_range) || null;
       this._pendingPeriodRestore = this._clone(previous.period);
       if (this._pendingPeriodRestore?.start) {
         this._beginPeriodRestore(this._pendingPeriodRestore);
@@ -282,6 +284,7 @@ export class StorageMethods {
       default_hours: this._effectiveDefaultHours(),
       graph_height: this._effectiveGraphHeight(),
     };
+    if (this._panelTimeRange) chart.time_range = this._clone(this._panelTimeRange);
     if (this._activeSnapshot?.single_graph) chart.single_graph = true;
     if (
       this._activeSnapshot?.attribute_selection &&
@@ -578,7 +581,7 @@ export class StorageMethods {
     this._saveCurrentSnapshot(this._currentSnapshot);
   }
 
-  _applySnapshot(snapshot, recordChange = true) {
+  _applySnapshot(snapshot, recordChange = true, loadingSavedRange = false) {
     if (!snapshot?.targets || !snapshot?.chart) return;
     if (
       recordChange &&
@@ -588,10 +591,11 @@ export class StorageMethods {
       this._archiveCurrentChart();
     }
     this._activeSnapshot = this._clone(snapshot.chart);
+    this._panelTimeRange = this._clone(snapshot.chart.time_range) || null;
     if (this._activeSnapshot?.compare === undefined) delete this._activeSnapshot.compare;
     this._pendingPeriodRestore = this._clone(snapshot.period);
     if (this._pendingPeriodRestore?.start) {
-      this._beginPeriodRestore(this._pendingPeriodRestore);
+      this._beginPeriodRestore(this._pendingPeriodRestore, loadingSavedRange);
     } else {
       this._finishPeriodRestore();
     }
@@ -622,7 +626,7 @@ export class StorageMethods {
   _startFreshSnapshotSession(snapshot) {
     const current = this._clone(snapshot);
     current.source_bookmark_id = this._loadedBookmarkId || null;
-    this._applySnapshot(current, false);
+    this._applySnapshot(current, false, true);
     // A saved bookmark can predate newly introduced card defaults. Loading it
     // applies those defaults immediately, so use the resulting effective
     // configuration as the session baseline. Otherwise the first Energy or
@@ -707,6 +711,23 @@ export class StorageMethods {
       this._finishPeriodRestore();
       return false;
     }
+    const duration = end?.getTime() - start.getTime();
+    if (end && duration > 0 && duration <= 25 * 60 * 60 * 1000) {
+      const dayStart = new Date(start);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(start);
+      dayEnd.setHours(23, 59, 59, 999);
+      const storedFullDay = start.getTime() === dayStart.getTime()
+        && Math.abs(end.getTime() - dayEnd.getTime()) < 60_000;
+      if (!storedFullDay && !this._panelTimeRange) {
+        this._panelTimeRange = {
+          start: start.getHours() * 60 + start.getMinutes(),
+          end: end.getHours() * 60 + end.getMinutes(),
+        };
+      }
+      start.setTime(dayStart.getTime());
+      end.setTime(dayEnd.getTime());
+    }
     const currentStart = collection.start instanceof Date
       ? collection.start.getTime()
       : new Date(collection.start).getTime();
@@ -737,11 +758,45 @@ export class StorageMethods {
     );
   }
 
-  _beginPeriodRestore(period) {
-    this._periodRestoreExpected = this._clone(period);
+  _beginPeriodRestore(period, loadingSavedRange = false) {
+    const expected = this._clone(period);
+    const start = expected?.start ? new Date(expected.start) : null;
+    const end = expected?.end ? new Date(expected.end) : null;
+    if (
+      start && end
+      && !Number.isNaN(start.getTime())
+      && !Number.isNaN(end.getTime())
+      && end.getTime() > start.getTime()
+      && end.getTime() - start.getTime() <= 25 * 60 * 60 * 1000
+    ) {
+      const dayStart = new Date(start);
+      dayStart.setHours(0, 0, 0, 0);
+      const dayEnd = new Date(start);
+      dayEnd.setHours(23, 59, 59, 999);
+      const storedFullDay = start.getTime() === dayStart.getTime()
+        && Math.abs(end.getTime() - dayEnd.getTime()) < 60_000;
+      if (!storedFullDay) {
+        if (!this._panelTimeRange) {
+          this._panelTimeRange = {
+            start: start.getHours() * 60 + start.getMinutes(),
+            end: end.getHours() * 60 + end.getMinutes(),
+          };
+        }
+        expected.start = dayStart.toISOString();
+        expected.end = dayEnd.toISOString();
+      }
+    }
+    this._periodRestoreExpected = expected;
     this._periodRestoreLoading = true;
+    this._energyInteractionLoading = false;
     const banner = this.shadowRoot?.getElementById("period-loading-banner");
     if (banner) banner.hidden = false;
+    const loadingText = this.shadowRoot?.getElementById("period-loading-text");
+    if (loadingText) {
+      loadingText.textContent = loadingSavedRange
+        ? this._customLocalize("loading_saved_range")
+        : this._customLocalize("loading_requested_range");
+    }
     const compareBanner = this.shadowRoot?.getElementById("compare-banner");
     if (compareBanner) compareBanner.hidden = true;
     const charts = this.shadowRoot?.getElementById("charts");
@@ -772,6 +827,38 @@ export class StorageMethods {
     if (charts) charts.hidden = false;
   }
 
+  _restoredPeriodMatches(expected, actualStart, actualEnd) {
+    const expectedStart = new Date(expected?.start).getTime();
+    const expectedEnd = expected?.end == null
+      ? undefined
+      : new Date(expected.end).getTime();
+    const start = actualStart instanceof Date
+      ? actualStart.getTime()
+      : new Date(actualStart).getTime();
+    const end = actualEnd == null
+      ? undefined
+      : actualEnd instanceof Date
+        ? actualEnd.getTime()
+        : new Date(actualEnd).getTime();
+    if (!Number.isFinite(expectedStart) || !Number.isFinite(start)) return false;
+    if (start !== expectedStart) return false;
+    if (end === expectedEnd) return true;
+
+    // HA Energy data can describe a full local day using either the final
+    // millisecond of that day or midnight at the start of the next day. Both
+    // boundaries refer to the same selected day and must complete a restore.
+    const dayStart = new Date(expectedStart);
+    dayStart.setHours(0, 0, 0, 0);
+    if (expectedStart !== dayStart.getTime()) return false;
+    const nextDay = new Date(dayStart);
+    nextDay.setDate(nextDay.getDate() + 1);
+    const nextDayTime = nextDay.getTime();
+    const isFullDayEnd = (value) => Number.isFinite(value)
+      && value >= nextDayTime - 60_000
+      && value <= nextDayTime;
+    return isFullDayEnd(expectedEnd) && isFullDayEnd(end);
+  }
+
   _completePeriodRestoreFromData(data, collection) {
     const expected = this._periodRestoreExpected;
     if (!this._periodRestoreLoading || !expected?.start) return false;
@@ -784,21 +871,10 @@ export class StorageMethods {
     // synchronously before the refreshed data has arrived.
     const actualStart = data?.start;
     const actualEnd = data?.end;
-    const expectedStart = new Date(expected.start).getTime();
-    const expectedEnd = expected.end ? new Date(expected.end).getTime() : undefined;
     const expectedCompare = expected.compare || "";
-    const actualCompare = data?.compareMode || "";
-    const start = actualStart instanceof Date
-      ? actualStart.getTime()
-      : new Date(actualStart).getTime();
-    const end = actualEnd == null
-      ? undefined
-      : actualEnd instanceof Date
-        ? actualEnd.getTime()
-        : new Date(actualEnd).getTime();
+    const actualCompare = data?.compareMode ?? collection?.compare ?? "";
     if (
-      start !== expectedStart
-      || end !== expectedEnd
+      !this._restoredPeriodMatches(expected, actualStart, actualEnd)
       || actualCompare !== expectedCompare
     ) return false;
     this._finishPeriodRestore();

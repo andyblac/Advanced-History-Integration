@@ -21,9 +21,23 @@ export const panelStyles = `
     width:min(600px,calc(100vw - 32px)); margin-inline:auto;
     filter:drop-shadow(0 3px 8px rgba(0,0,0,.28));
   }
-  .energy-nav-floating > * {
+  .energy-nav-floating > .energy-date-controller {
     display:block; width:100%; height:56px !important; min-height:0; max-height:56px;
     --ha-card-border-radius:28px;
+  }
+  .panel-time-range {
+    position:absolute; z-index:2; top:8px; left:50%; transform:translateX(-50%);
+    height:40px; padding:0 9px; display:flex; align-items:center; gap:5px;
+    color:var(--primary-text-color); background:var(--secondary-background-color);
+    border:0; border-radius:20px; box-shadow:0 0 0 1px var(--divider-color); cursor:pointer;
+  }
+  .panel-time-range[hidden] { display:none; }
+  .panel-time-range ha-icon { width:18px; height:18px; color:var(--secondary-text-color); }
+  .panel-time-range-value { min-width:105px; white-space:nowrap; font-weight:500; }
+  @media (max-width:520px) {
+    .panel-time-range { left:43%; padding:0 7px; gap:3px; }
+    .panel-time-range ha-icon { display:none; }
+    .panel-time-range-value { min-width:96px; }
   }
   .target-picker {
     flex:1; min-height:56px; padding:7px 10px; border:1px solid var(--divider-color); border-radius:4px;
@@ -156,6 +170,16 @@ export const panelStyles = `
   .dialog-actions button.primary { color:var(--text-primary-color,white); background:var(--primary-color); }
   .dialog-actions button:disabled { opacity:.45; cursor:default; }
   .series-dialog { height:auto; max-height:min(680px,90vh); }
+  .time-range-popover { --wa-space-l:0; z-index:19; }
+  .time-range-popover::part(body) { width:310px; max-width:calc(100vw - 20px); padding:0; overflow:hidden; }
+  .time-range-sheet { z-index:19; }
+  .time-range-fields { width:100%; box-sizing:border-box; padding:var(--ha-space-3,12px); display:grid; grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr); align-items:end; gap:0; }
+  .time-range-fields label { min-width:0; display:grid; gap:4px; color:var(--secondary-text-color); font-size:13px; }
+  .time-range-fields ha-time-input { width:100%; color:var(--primary-text-color); font-size:16px; }
+  .time-range-separator { justify-self:center; padding-bottom:18px; color:var(--secondary-text-color); font-size:20px; }
+  .time-range-actions { padding:var(--ha-space-2,8px); display:flex; align-items:center; justify-content:space-between; border-top:1px solid var(--divider-color); }
+  .time-range-primary-actions { display:flex; align-items:center; }
+  .time-range-sheet .time-range-fields { width:min(310px,100%); margin:0 auto; box-sizing:border-box; }
   .series-note { margin:0; padding:16px 24px; color:var(--secondary-text-color); border-bottom:1px solid var(--divider-color); }
   .series-list { max-height:min(480px,60vh); padding-top:10px; }
   .series-row { grid-template-columns:28px 34px minmax(0,1fr); }

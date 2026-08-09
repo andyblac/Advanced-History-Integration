@@ -203,6 +203,7 @@ export class GraphMethods {
         : {}),
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
       energy_date_sync: true,
+      ...this._panelGraphHourOptions(),
     };
     try {
       if (detail?.automatic) {
@@ -391,9 +392,13 @@ export class GraphMethods {
         render();
       },
       beginCycle: () => {
-        sources.clear();
+        // Keep showing the last confirmed source while the card processes a
+        // new Energy range. The card may satisfy the new range from its own
+        // cache without issuing another websocket request; clearing here left
+        // the indicator stuck on "Determining source…" even though the graph
+        // had finished rendering. A new request still replaces the retained
+        // source through cyclePending in record().
         cyclePending = true;
-        if (sourceKey) sourceCache.delete(sourceKey);
         render();
       },
       activate: () => {

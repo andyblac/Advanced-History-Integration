@@ -39,6 +39,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._editorAutoColors = new Map();
     this._activeSnapshot = null;
     this._energyCollection = null;
+    this._panelTimeRange = null;
     this._pendingPeriodRestore = null;
     this._currentSnapshot = null;
     this._freshSnapshotSessionFingerprint = null;
@@ -52,6 +53,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._periodRestoreLoading = false;
     this._periodRestoreExpected = null;
     this._periodRestoreTimer = null;
+    this._energyInteractionLoading = false;
     this._energyResetPending = false;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
@@ -226,7 +228,7 @@ class AdvancedHistoryPanel extends HTMLElement {
         </section>`}
         <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
           <ha-circular-progress active size="small"></ha-circular-progress>
-          <span>${this._escape(this._customLocalize("loading_saved_range"))}</span>
+          <span id="period-loading-text">${this._escape(this._customLocalize("loading_requested_range"))}</span>
         </section>
         ${dependencyMissing ? "" : `<section id="compare-banner" class="compare-banner" hidden></section>`}
         <section id="detail-banner" class="detail-banner" hidden></section>
