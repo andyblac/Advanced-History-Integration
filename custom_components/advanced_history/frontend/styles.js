@@ -32,7 +32,10 @@ export const panelStyles = `
     border:0; border-radius:20px; box-shadow:0 0 0 1px var(--divider-color); cursor:pointer;
   }
   .panel-time-range[hidden] { display:none; }
-  .panel-time-range ha-icon { width:18px; height:18px; color:var(--secondary-text-color); }
+  .panel-time-range ha-icon {
+    display:block; flex:0 0 18px; width:18px; height:18px; line-height:0;
+    color:var(--secondary-text-color); transform:translateY(-3px);
+  }
   .panel-time-range-value { min-width:105px; white-space:nowrap; font-weight:500; }
   @media (max-width:520px) {
     .panel-time-range { left:43%; padding:0 7px; gap:3px; }
