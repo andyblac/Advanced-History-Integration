@@ -76,6 +76,13 @@ export class EnergyMethods {
     return [previousPeriod, previousDay, previousWeek, previousMonth, previousYear];
   }
 
+  _energyComparePeriodKindChanged(start, end) {
+    const nextKind = this._energyPeriodKind(start, end);
+    const previousKind = this._energyComparePeriodKind;
+    this._energyComparePeriodKind = nextKind;
+    return previousKind != null && previousKind !== nextKind;
+  }
+
   _energyCompareLabel(value, fallbackKey) {
     if (value === "yesterday") {
       return this._localize(
@@ -808,10 +815,29 @@ export class EnergyMethods {
         ? this._completePeriodRestoreFromData(data, collection)
         : false;
       const timeRangeReset = this._resetPanelTimeRangeOutsideDayView();
+      const periodKindChanged = this._energyComparePeriodKindChanged(
+        collection.start,
+        collection.end,
+      );
+      const resetComparePeriod = Boolean(
+        periodKindChanged
+        && !periodRestored
+        && !this._periodRestoreLoading
+        && (data?.compareMode || collection.compare),
+      );
+      let compareMode = data?.compareMode;
+      if (resetComparePeriod) {
+        this._energyCompareChoice = "previous_period";
+        compareMode = "previous";
+        if (collection.compare !== compareMode) {
+          collection.setCompare?.(compareMode);
+          collection.refresh?.();
+        }
+      }
       // The mode is usually unchanged while restoring a bookmark, but the
       // old graph cards were deliberately removed by _beginPeriodRestore().
       // Force their recreation once the requested Energy data is confirmed.
-      applyMode(data?.compareMode, periodRestored || timeRangeReset);
+      applyMode(compareMode, periodRestored || timeRangeReset || resetComparePeriod);
       this._syncEnergyCompareControl(compareCard, collection, applyMode);
       if (periodRestored) {
         compareHost.hidden = Boolean(compareCard.hidden);

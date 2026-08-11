@@ -35,6 +35,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._energyRenderToken = null;
     this._energyCompare = null;
     this._energyCompareChoice = null;
+    this._energyComparePeriodKind = null;
     this._energyUnsubscribe = null;
     this._nativeTargetPicker = null;
     this._editorAutoColors = new Map();
