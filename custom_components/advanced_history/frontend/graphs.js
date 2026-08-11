@@ -253,12 +253,13 @@ export class GraphMethods {
     const endMs = end?.getTime?.();
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return null;
     const hours = (endMs - startMs) / 3_600_000;
-    const compare = this._energyCollection?.compare || "";
+    const compare = this._effectiveCompare?.() || "";
+    const compareKey = typeof compare === "string" ? compare : JSON.stringify(compare);
     return {
       start,
       end,
       hours,
-      key: `${start.toISOString()}|${end.toISOString()}|${compare}`,
+      key: `${start.toISOString()}|${end.toISOString()}|${compareKey}`,
     };
   }
 
@@ -427,13 +428,14 @@ export class GraphMethods {
     const end = this._energyCollection?.end;
     const startKey = Number.isFinite(start?.getTime?.()) ? start.toISOString() : "";
     const endKey = Number.isFinite(end?.getTime?.()) ? end.toISOString() : "";
-    const compare = this._energyCollection?.compare || "";
+    const compare = this._effectiveCompare?.() || "";
+    const compareKey = typeof compare === "string" ? compare : JSON.stringify(compare);
     return [
       mode,
       series.map((item) => item.key).join("\u001f"),
       startKey,
       endKey,
-      compare,
+      compareKey,
     ].join("\u001e");
   }
 

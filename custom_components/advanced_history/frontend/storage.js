@@ -276,6 +276,7 @@ export class StorageMethods {
       start: collection.start.toISOString(),
       end: collection.end?.toISOString?.() || null,
       compare: collection.compare ?? "",
+      compare_choice: this._energyCompareChoice || null,
     } : this._clone(this._pendingPeriodRestore);
     const compare = this._snapshotCompareSetting();
     const chart = {
@@ -745,6 +746,7 @@ export class StorageMethods {
     const periodChanged = currentStart !== start.getTime()
       || currentEnd !== end?.getTime();
     const compare = period.compare || "";
+    this._energyCompareChoice = period.compare_choice || null;
     const compareChanged = collection.compare !== compare;
     if (periodChanged) collection.setPeriod(start, end);
     if (typeof collection.setCompare === "function") {

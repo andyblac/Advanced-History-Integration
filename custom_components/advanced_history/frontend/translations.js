@@ -71,7 +71,13 @@ const TRANSLATIONS = {
     "data_source_history": "Recorder history",
     "data_source_statistics": "Long-term statistics",
     "data_source_mixed": "Mixed sources",
-    "data_source_help": "The data source actually requested by Statistics Graph Chart Card."
+    "data_source_help": "The data source actually requested by Statistics Graph Chart Card.",
+    "comparison_period": "Comparison period",
+    "compare_previous_period": "Previous period",
+    "compare_previous_day": "Previous day",
+    "compare_previous_week": "Previous week",
+    "compare_previous_month": "Previous month",
+    "compare_previous_year": "Previous year"
   },
   "en-GB": {
     "bookmarks": "Bookmarks",
@@ -138,7 +144,13 @@ const TRANSLATIONS = {
     "data_source_history": "Recorder history",
     "data_source_statistics": "Long-term statistics",
     "data_source_mixed": "Mixed sources",
-    "data_source_help": "The data source actually requested by Statistics Graph Chart Card."
+    "data_source_help": "The data source actually requested by Statistics Graph Chart Card.",
+    "comparison_period": "Comparison period",
+    "compare_previous_period": "Previous period",
+    "compare_previous_day": "Previous day",
+    "compare_previous_week": "Previous week",
+    "compare_previous_month": "Previous month",
+    "compare_previous_year": "Previous year"
   },
   "de": {
     "bookmarks": "Lesezeichen",
@@ -205,7 +217,13 @@ const TRANSLATIONS = {
     "data_source_history": "Recorder-Verlauf",
     "data_source_statistics": "Langzeitstatistiken",
     "data_source_mixed": "Gemischte Quellen",
-    "data_source_help": "Die von Statistics Graph Chart Card tatsächlich angeforderte Datenquelle."
+    "data_source_help": "Die von Statistics Graph Chart Card tatsächlich angeforderte Datenquelle.",
+    "comparison_period": "Vergleichszeitraum",
+    "compare_previous_period": "Vorheriger Zeitraum",
+    "compare_previous_day": "Vorheriger Tag",
+    "compare_previous_week": "Vorherige Woche",
+    "compare_previous_month": "Vorheriger Monat",
+    "compare_previous_year": "Vorheriges Jahr"
   },
   "es": {
     "bookmarks": "Marcadores",
@@ -272,7 +290,13 @@ const TRANSLATIONS = {
     "data_source_history": "Historial del Recorder",
     "data_source_statistics": "Estadísticas a largo plazo",
     "data_source_mixed": "Orígenes combinados",
-    "data_source_help": "El origen de datos solicitado realmente por Statistics Graph Chart Card."
+    "data_source_help": "El origen de datos solicitado realmente por Statistics Graph Chart Card.",
+    "comparison_period": "Periodo de comparación",
+    "compare_previous_period": "Periodo anterior",
+    "compare_previous_day": "Día anterior",
+    "compare_previous_week": "Semana anterior",
+    "compare_previous_month": "Mes anterior",
+    "compare_previous_year": "Año anterior"
   },
   "fr": {
     "bookmarks": "Favoris",
@@ -339,7 +363,13 @@ const TRANSLATIONS = {
     "data_source_history": "Historique Recorder",
     "data_source_statistics": "Statistiques à long terme",
     "data_source_mixed": "Sources mixtes",
-    "data_source_help": "La source de données réellement demandée par Statistics Graph Chart Card."
+    "data_source_help": "La source de données réellement demandée par Statistics Graph Chart Card.",
+    "comparison_period": "Période de comparaison",
+    "compare_previous_period": "Période précédente",
+    "compare_previous_day": "Jour précédent",
+    "compare_previous_week": "Semaine précédente",
+    "compare_previous_month": "Mois précédent",
+    "compare_previous_year": "Année précédente"
   },
   "it": {
     "bookmarks": "Segnalibri",
@@ -406,7 +436,13 @@ const TRANSLATIONS = {
     "data_source_history": "Cronologia Recorder",
     "data_source_statistics": "Statistiche a lungo termine",
     "data_source_mixed": "Origini miste",
-    "data_source_help": "L’origine dati effettivamente richiesta da Statistics Graph Chart Card."
+    "data_source_help": "L’origine dati effettivamente richiesta da Statistics Graph Chart Card.",
+    "comparison_period": "Periodo di confronto",
+    "compare_previous_period": "Periodo precedente",
+    "compare_previous_day": "Giorno precedente",
+    "compare_previous_week": "Settimana precedente",
+    "compare_previous_month": "Mese precedente",
+    "compare_previous_year": "Anno precedente"
   },
   "nl": {
     "bookmarks": "Bladwijzers",
@@ -473,7 +509,13 @@ const TRANSLATIONS = {
     "data_source_history": "Recorder-geschiedenis",
     "data_source_statistics": "Langetermijnstatistieken",
     "data_source_mixed": "Gemengde bronnen",
-    "data_source_help": "De gegevensbron die Statistics Graph Chart Card daadwerkelijk heeft aangevraagd."
+    "data_source_help": "De gegevensbron die Statistics Graph Chart Card daadwerkelijk heeft aangevraagd.",
+    "comparison_period": "Vergelijkingsperiode",
+    "compare_previous_period": "Vorige periode",
+    "compare_previous_day": "Vorige dag",
+    "compare_previous_week": "Vorige week",
+    "compare_previous_month": "Vorige maand",
+    "compare_previous_year": "Vorig jaar"
   },
   "pt-BR": {
     "bookmarks": "Favoritos",
@@ -540,7 +582,13 @@ const TRANSLATIONS = {
     "data_source_history": "Histórico do Recorder",
     "data_source_statistics": "Estatísticas de longo prazo",
     "data_source_mixed": "Fontes combinadas",
-    "data_source_help": "A fonte de dados realmente solicitada pelo Statistics Graph Chart Card."
+    "data_source_help": "A fonte de dados realmente solicitada pelo Statistics Graph Chart Card.",
+    "comparison_period": "Período de comparação",
+    "compare_previous_period": "Período anterior",
+    "compare_previous_day": "Dia anterior",
+    "compare_previous_week": "Semana anterior",
+    "compare_previous_month": "Mês anterior",
+    "compare_previous_year": "Ano anterior"
   }
 };
 

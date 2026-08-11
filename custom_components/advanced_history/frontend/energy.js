@@ -1,4 +1,167 @@
 export class EnergyMethods {
+  _energyCompareChoiceFromNative(mode, dayPeriod = false) {
+    return mode === "previous"
+      ? (dayPeriod ? "yesterday" : "previous_period")
+      : mode === "yoy" ? "last_year" : null;
+  }
+
+  _nativeEnergyCompareMode(choice) {
+    return choice === "last_year" ? "yoy" : choice ? "previous" : "";
+  }
+
+  _energyCompareRange(start, end, choice) {
+    if (!(start instanceof Date) || !(end instanceof Date)) return null;
+    if (choice === "last_month") {
+      const compareStart = new Date(start);
+      const dayOfMonth = compareStart.getDate();
+      compareStart.setDate(1);
+      compareStart.setMonth(compareStart.getMonth() - 1);
+      const lastTargetDay = new Date(
+        compareStart.getFullYear(),
+        compareStart.getMonth() + 1,
+        0,
+      ).getDate();
+      compareStart.setDate(Math.min(dayOfMonth, lastTargetDay));
+      const offset = start.getTime() - compareStart.getTime();
+      return { start: compareStart, end: new Date(end.getTime() - offset) };
+    }
+    const days = choice === "yesterday" ? 1 : choice === "last_week" ? 7 : 0;
+    if (!days) return null;
+    const compareStart = new Date(start);
+    const compareEnd = new Date(end);
+    compareStart.setDate(compareStart.getDate() - days);
+    compareEnd.setDate(compareEnd.getDate() - days);
+    return { start: compareStart, end: compareEnd };
+  }
+
+  _energyPeriodKind(start, end) {
+    if (!(start instanceof Date) || !(end instanceof Date)) return "other";
+    const duration = end.getTime() - start.getTime();
+    const day = 24 * 60 * 60 * 1000;
+    if (duration > 0 && duration <= 25 * 60 * 60 * 1000) return "day";
+    if (duration >= 6.5 * day && duration <= 7.5 * day) return "week";
+    const nextMonth = new Date(start);
+    nextMonth.setMonth(start.getMonth() + 1, 1);
+    nextMonth.setHours(0, 0, 0, 0);
+    if (
+      start.getDate() === 1
+      && start.getHours() === 0
+      && end.getTime() >= nextMonth.getTime() - 60_000
+      && end.getTime() <= nextMonth.getTime()
+    ) return "month";
+    const nextYear = new Date(start);
+    nextYear.setFullYear(start.getFullYear() + 1, 0, 1);
+    nextYear.setHours(0, 0, 0, 0);
+    if (
+      start.getMonth() === 0
+      && start.getDate() === 1
+      && start.getHours() === 0
+      && end.getTime() >= nextYear.getTime() - 60_000
+      && end.getTime() <= nextYear.getTime()
+    ) return "year";
+    return "other";
+  }
+
+  _energyCompareOptions(collection) {
+    const periodKind = this._energyPeriodKind(collection?.start, collection?.end);
+    const previousPeriod = ["previous_period", "compare_previous_period"];
+    const previousDay = ["yesterday", "compare_previous_day"];
+    const previousWeek = ["last_week", "compare_previous_week"];
+    const previousMonth = ["last_month", "compare_previous_month"];
+    const previousYear = ["last_year", "compare_previous_year"];
+    if (periodKind === "day") return [previousPeriod, previousWeek, previousYear];
+    if (periodKind === "week") return [previousPeriod, previousMonth, previousYear];
+    if (periodKind === "month") return [previousPeriod, previousYear];
+    if (periodKind === "year") return [previousPeriod];
+    return [previousPeriod, previousDay, previousWeek, previousMonth, previousYear];
+  }
+
+  _energyCompareLabel(value, fallbackKey) {
+    if (value === "yesterday") {
+      return this._localize(
+        "ui.components.date-range-picker.ranges.yesterday",
+        this._customLocalize(fallbackKey),
+      );
+    }
+    return this._customLocalize(fallbackKey);
+  }
+
+  _syncEnergyCompareControl(compareCard, collection, applyMode) {
+    if (!compareCard?.isConnected || !collection?.compare) return;
+    const options = this._energyCompareOptions(collection);
+    let choice = this._energyCompareChoice
+      || this._energyCompareChoiceFromNative(collection.compare, Boolean(this._panelDayPeriod()))
+      || "previous_period";
+    if (!options.some(([value]) => value === choice)) {
+      choice = "previous_period";
+      this._energyCompareChoice = choice;
+      applyMode(collection.compare, true);
+    }
+    this._energyCompareChoice = choice;
+    const customRange = this._energyCompareRange(collection.start, collection.end, choice);
+    if (customRange) {
+      compareCard._start = collection.start;
+      compareCard._end = collection.end;
+      compareCard._startCompare = customRange.start;
+      compareCard._endCompare = customRange.end;
+      compareCard.requestUpdate?.();
+    }
+
+    const install = async () => {
+      await compareCard.updateComplete;
+      if (!compareCard.isConnected) return;
+      const root = compareCard.shadowRoot;
+      let staticLabel = root?.querySelector(".advanced-history-compare-label");
+      if (options.length === 1) {
+        if (!staticLabel) {
+          const replaceTarget = root?.querySelector(
+            "button.link, .advanced-history-compare-control",
+          );
+          if (!replaceTarget) return;
+          staticLabel = document.createElement("span");
+          staticLabel.className = "advanced-history-compare-label";
+          replaceTarget.replaceWith(staticLabel);
+        }
+        staticLabel.textContent = "";
+        return;
+      }
+      let select = root?.querySelector(".advanced-history-compare-select");
+      if (!select) {
+        const replaceTarget = root?.querySelector("button.link") || staticLabel;
+        if (!replaceTarget) return;
+        const wrapper = document.createElement("span");
+        wrapper.className = "advanced-history-compare-control";
+        select = document.createElement("select");
+        select.className = "advanced-history-compare-select";
+        select.setAttribute("aria-label", this._customLocalize("comparison_period"));
+        select.style.cssText = "font:inherit;line-height:1.4;color:inherit;background:var(--card-background-color,transparent);border:1px solid var(--divider-color,currentColor);border-radius:14px;padding:2px 7px;cursor:pointer;outline:none;";
+        select.addEventListener("change", () => {
+          this._energyCompareChoice = select.value;
+          const nativeMode = this._nativeEnergyCompareMode(select.value);
+          this._beginGraphDataSourceCycle();
+          collection.setCompare?.(nativeMode);
+          applyMode(nativeMode, true);
+          collection.refresh?.();
+        });
+        wrapper.append(select);
+        replaceTarget.replaceWith(wrapper);
+      }
+      const optionValues = Array.from(select.options, (option) => option.value);
+      const nextOptionValues = options.map(([value]) => value);
+      if (optionValues.join("\u001f") !== nextOptionValues.join("\u001f")) {
+        select.replaceChildren();
+        for (const [value, label] of options) {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = this._energyCompareLabel(value, label);
+          select.append(option);
+        }
+      }
+      select.value = choice;
+    };
+    queueMicrotask(install);
+  }
+
   _panelDayPeriod() {
     const start = this._energyCollection?.start;
     const end = this._energyCollection?.end;
@@ -613,9 +776,13 @@ export class EnergyMethods {
         || Boolean(compareCard.hidden);
       const effectiveMode = this._periodRestoreLoading ? collection.compare : mode;
       const dayPeriod = this._panelDayPeriod();
-      const next = effectiveMode === "previous"
+      if (!effectiveMode) this._energyCompareChoice = null;
+      const nativeChoice = effectiveMode === "previous"
         ? (dayPeriod ? "yesterday" : "previous_period")
         : effectiveMode === "yoy" ? "last_year" : null;
+      const next = effectiveMode
+        ? (this._energyCompareChoice || nativeChoice)
+        : null;
       const nextDetailKey = this._largeRangeDetailRenderKey();
       if (this._periodRestoreLoading) {
         this._energyCompare = next;
@@ -645,6 +812,7 @@ export class EnergyMethods {
       // old graph cards were deliberately removed by _beginPeriodRestore().
       // Force their recreation once the requested Energy data is confirmed.
       applyMode(data?.compareMode, periodRestored || timeRangeReset);
+      this._syncEnergyCompareControl(compareCard, collection, applyMode);
       if (periodRestored) {
         compareHost.hidden = Boolean(compareCard.hidden);
         this._renderLargeRangeDetailBanner();
@@ -755,6 +923,7 @@ export class EnergyMethods {
     this._closePanelTimeRangeDialog?.();
     this._panelTimeRange = null;
     this._energyCompare = null;
+    this._energyCompareChoice = null;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
     this._largeRangeDetailDismissedKey = null;
