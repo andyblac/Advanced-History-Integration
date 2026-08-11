@@ -457,10 +457,33 @@ export class GraphMethods {
     const bucketSeries = card?._bucketSeries;
     if (typeof bucketSeries !== "function") return;
     card._bucketSeries = (...args) => {
-      const result = bucketSeries.apply(card, args);
+      let result = bucketSeries.apply(card, args);
       const entity = args[1];
+      const windowStart = Number(args[3]);
       const windowEnd = Number(args[4]);
       const offsetHours = Number(entity?.offset);
+
+      if (
+        card?._config?.chart_mode === "state_timeline"
+        && entity?._compareOf == null
+        && (!Number.isFinite(offsetHours) || offsetHours === 0)
+        && Number.isFinite(windowStart)
+        && Number.isFinite(windowEnd)
+      ) {
+        const now = Date.now();
+        if (windowStart <= now && now < windowEnd && Array.isArray(result?.points)) {
+          const points = result.points.filter((point) => point?.t <= now);
+          const lastPoint = points.at(-1);
+          if (lastPoint?.v != null) {
+            // State-timeline rendering carries its final value to the visible
+            // window end. A null transition at now closes that segment while
+            // leaving the requested future portion of the axis visible.
+            points.push({ ...lastPoint, t: now, v: null });
+          }
+          result = { ...result, points };
+        }
+      }
+
       if (
         entity?._compareOf == null
         || !Number.isFinite(offsetHours)
