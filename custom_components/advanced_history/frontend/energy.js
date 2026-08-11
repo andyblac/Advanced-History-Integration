@@ -904,7 +904,7 @@ export class EnergyMethods {
       // finish after the click fallback, including clearing Compare.
       this._syncPanelTimeRangeControl();
       if (data?.start && !this._periodRestoreLoading) {
-        this._recordChange(null, true);
+        this._recordChange(null, !periodRestored);
       }
     });
     if (normalizedEnergyDay && !restoringPeriod) {

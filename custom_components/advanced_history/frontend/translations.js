@@ -1,6 +1,9 @@
 const TRANSLATIONS = {
   "en-US": {
     "bookmarks": "Bookmarks",
+    "panels": "Panels",
+    "add_panel": "Add panel",
+    "panel_number": "Panel {number}",
     "chart_history": "Chart history",
     "graph_settings": "Graph settings",
     "numeric_history": "Numeric history",
@@ -82,6 +85,9 @@ const TRANSLATIONS = {
   },
   "en-GB": {
     "bookmarks": "Bookmarks",
+    "panels": "Panels",
+    "add_panel": "Add panel",
+    "panel_number": "Panel {number}",
     "chart_history": "Chart history",
     "graph_settings": "Graph settings",
     "numeric_history": "Numeric history",
@@ -156,6 +162,9 @@ const TRANSLATIONS = {
   },
   "de": {
     "bookmarks": "Lesezeichen",
+    "panels": "Ansichten",
+    "add_panel": "Ansicht hinzufügen",
+    "panel_number": "Ansicht {number}",
     "chart_history": "Diagrammverlauf",
     "graph_settings": "Diagrammeinstellungen",
     "numeric_history": "Numerischer Verlauf",
@@ -230,6 +239,9 @@ const TRANSLATIONS = {
   },
   "es": {
     "bookmarks": "Marcadores",
+    "panels": "Paneles",
+    "add_panel": "Añadir panel",
+    "panel_number": "Panel {number}",
     "chart_history": "Historial de gráficos",
     "graph_settings": "Ajustes del gráfico",
     "numeric_history": "Historial numérico",
@@ -304,6 +316,9 @@ const TRANSLATIONS = {
   },
   "fr": {
     "bookmarks": "Favoris",
+    "panels": "Panneaux",
+    "add_panel": "Ajouter un panneau",
+    "panel_number": "Panneau {number}",
     "chart_history": "Historique des graphiques",
     "graph_settings": "Paramètres du graphique",
     "numeric_history": "Historique numérique",
@@ -378,6 +393,9 @@ const TRANSLATIONS = {
   },
   "it": {
     "bookmarks": "Segnalibri",
+    "panels": "Pannelli",
+    "add_panel": "Aggiungi pannello",
+    "panel_number": "Pannello {number}",
     "chart_history": "Cronologia dei grafici",
     "graph_settings": "Impostazioni del grafico",
     "numeric_history": "Cronologia numerica",
@@ -452,6 +470,9 @@ const TRANSLATIONS = {
   },
   "nl": {
     "bookmarks": "Bladwijzers",
+    "panels": "Panelen",
+    "add_panel": "Paneel toevoegen",
+    "panel_number": "Paneel {number}",
     "chart_history": "Grafiekgeschiedenis",
     "graph_settings": "Grafiekinstellingen",
     "numeric_history": "Numerieke geschiedenis",
@@ -526,6 +547,9 @@ const TRANSLATIONS = {
   },
   "pt-BR": {
     "bookmarks": "Favoritos",
+    "panels": "Painéis",
+    "add_panel": "Adicionar painel",
+    "panel_number": "Painel {number}",
     "chart_history": "Histórico de gráficos",
     "graph_settings": "Configurações do gráfico",
     "numeric_history": "Histórico numérico",

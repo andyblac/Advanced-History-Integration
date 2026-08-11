@@ -366,6 +366,12 @@ export class StorageMethods {
         sourceFingerprint === freshSessionFingerprint
       )
     );
+    const completingFreshSession = Boolean(
+      freshSessionFingerprint
+      && !this._periodRestoreLoading
+      && !bookmarkEdit
+      && this._loadedBookmarkId
+    );
 
     if (changed && !this._incomingTargetOverride && !restoringFreshSession) {
       this._pushUndoSnapshot(previous);
@@ -378,7 +384,10 @@ export class StorageMethods {
     if (freshSessionFingerprint && !this._periodRestoreLoading) {
       this._freshSnapshotSessionFingerprint = null;
     }
-    if (this._loadedBookmarkId && bookmarkEdit && !restoringFreshSession) {
+    if (completingFreshSession) {
+      this._loadedBookmarkBaselineFingerprint = sourceFingerprint;
+      this._loadedBookmarkDirty = false;
+    } else if (this._loadedBookmarkId && bookmarkEdit && !restoringFreshSession) {
       this._loadedBookmarkDirty = Boolean(
         this._loadedBookmarkBaselineFingerprint &&
         sourceFingerprint !== this._loadedBookmarkBaselineFingerprint
@@ -387,6 +396,7 @@ export class StorageMethods {
       this._loadedBookmarkDirty = false;
     }
     this._updateUndoRedoButtons();
+    this._persistPanelTabs?.();
   }
 
   _pushUndoSnapshot(snapshot) {
@@ -441,14 +451,14 @@ export class StorageMethods {
   }
 
   async _requestClearCurrentChart() {
-    if (!this._targetCount()) return;
+    if (!this._targetCount()) return true;
     const loadedBookmarkChanged = Boolean(
       this._loadedBookmarkId && this._loadedBookmarkDirty
     );
     const newChart = !this._loadedBookmarkId;
     if (!newChart && !loadedBookmarkChanged) {
       this._clearCurrentChart();
-      return;
+      return true;
     }
 
     const action = await this._showUnsavedChangesDialog({
@@ -467,11 +477,12 @@ export class StorageMethods {
       const saved = loadedBookmarkChanged
         ? this._updateBookmark(this._loadedBookmarkId)
         : this._saveCurrentBookmark(this._snapshotLabel());
-      if (!saved) return;
+      if (!saved) return false;
     } else if (action !== "discard") {
-      return;
+      return false;
     }
     this._clearCurrentChart();
+    return true;
   }
 
   _showUnsavedChangesDialog({ title, message, saveLabel, discardLabel }) {

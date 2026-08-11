@@ -9,6 +9,7 @@ import { GraphMethods } from "./graphs.js";
 import { ShareMethods } from "./share.js";
 import { StorageMethods } from "./storage.js";
 import { panelStyles as css } from "./styles.js";
+import { PanelTabsMethods } from "./panel-tabs.js";
 import { TargetPickerMethods } from "./target-picker.js";
 import { customLocalize } from "./translations.js";
 
@@ -62,6 +63,11 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._largeRangeDetailStateKey = null;
     this._largeRangeDetailDismissedKey = null;
     this._versionLogged = false;
+    const initialPanelTabId = globalThis.crypto?.randomUUID?.()
+      || `panel-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    this._panelTabs = [{ id: initialPanelTabId, state: null }];
+    this._activePanelTabId = initialPanelTabId;
+    this._persistPanelsOnPageHide = () => this._persistPanelTabs();
   }
 
   set hass(value) {
@@ -83,7 +89,11 @@ class AdvancedHistoryPanel extends HTMLElement {
     if (!this._loaded && this._hass) this._initialize();
   }
   get panel() { return this._panel; }
-  set narrow(value) { this._narrow = value; }
+  set narrow(value) {
+    const changed = this._narrow !== value;
+    this._narrow = value;
+    if (changed && this._initialized && this.isConnected) this._render();
+  }
   get narrow() { return this._narrow; }
   get config() { return this._panel?.config || {}; }
   get maxEntities() { return Number(this.config.max_entities) || 30; }
@@ -98,6 +108,7 @@ class AdvancedHistoryPanel extends HTMLElement {
   }
 
   connectedCallback() {
+    window.addEventListener("pagehide", this._persistPanelsOnPageHide);
     if (!this._initialized || !this._hass) return;
     queueMicrotask(() => {
       if (this.isConnected && !this._energyUnsubscribe) this._render();
@@ -105,6 +116,8 @@ class AdvancedHistoryPanel extends HTMLElement {
   }
 
   disconnectedCallback() {
+    this._persistPanelTabs();
+    window.removeEventListener("pagehide", this._persistPanelsOnPageHide);
     this._energyRenderToken = null;
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;
@@ -136,7 +149,8 @@ class AdvancedHistoryPanel extends HTMLElement {
       }),
     ]);
     this._initialized = true;
-    if (this.isConnected) this._render();
+    const restoredPanels = this._restorePersistedPanelTabs();
+    if (this.isConnected && !restoredPanels) this._render();
   }
 
   async _loadEnergyTranslations() {
@@ -211,12 +225,16 @@ class AdvancedHistoryPanel extends HTMLElement {
     const chartHistory = this._customLocalize("chart_history");
     const undo = this._localize("ui.common.undo", "Undo");
     const redo = this._localize("ui.common.redo", "Redo");
+    const addPanel = this._customLocalize("add_panel");
     const dependencyMissing = Boolean(this._cardLoadError);
     this._nativeTargetPicker = null;
     this.shadowRoot.innerHTML = `
       <style>${css}</style>
       <header class="appbar">
-        <ha-menu-button id="menu"></ha-menu-button><h1>${this._escape(title)}</h1><span class="spacer"></span>
+        <ha-menu-button id="menu"></ha-menu-button><h1>${this._escape(title)}</h1>
+        ${this._renderPanelTabs()}
+        <span class="spacer"></span>
+        ${this._desktopPanelTabsEnabled() ? `<button id="add-panel" class="icon-button desktop-panel-only" title="${this._escape(addPanel)}" aria-label="${this._escape(addPanel)}"><ha-icon icon="mdi:plus"></ha-icon></button>` : ""}
         <button id="bookmarks" class="icon-button" title="${this._escape(bookmarks)}"><ha-icon icon="mdi:bookmark-multiple-outline"></ha-icon></button>
         <button id="chart-history" class="icon-button" title="${this._escape(chartHistory)}"><ha-icon icon="mdi:history"></ha-icon></button>
         <button id="undo" class="icon-button" title="${this._escape(undo)}"><ha-icon icon="mdi:undo"></ha-icon></button>
@@ -249,6 +267,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this.shadowRoot.getElementById("chart-history")?.addEventListener("click", () => this._openLibrary("history"));
     this.shadowRoot.getElementById("undo")?.addEventListener("click", () => this._undo());
     this.shadowRoot.getElementById("redo")?.addEventListener("click", () => this._redo());
+    this._bindPanelTabs();
     this._updateUndoRedoButtons();
     if (!dependencyMissing) this._renderNativeTargetPicker();
     this._renderContent();
@@ -281,6 +300,7 @@ for (const methods of [
   GraphMethods,
   EnergyMethods,
   DiagnosticsMethods,
+  PanelTabsMethods,
 ]) {
   for (const name of Object.getOwnPropertyNames(methods.prototype)) {
     if (name === "constructor") continue;

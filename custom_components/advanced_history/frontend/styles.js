@@ -8,12 +8,33 @@ export const panelStyles = `
     box-shadow:0 2px 4px rgba(0,0,0,.18); position:sticky; top:0; z-index:5;
   }
   .appbar h1 { margin:0 10px 0 0; font-size:20px; font-weight:500; }
-  .appbar .spacer { flex:1; }
+  .appbar .spacer { flex:1; min-width:0; }
   .icon-button { width:40px; height:40px; padding:8px; border:0; border-radius:50%; display:grid; place-items:center; cursor:pointer; color:inherit; background:transparent; }
   .icon-button:hover { background:rgba(255,255,255,.12); }
   .icon-button:disabled { opacity:.38; cursor:default; }
   .icon-button:disabled:hover { background:transparent; }
   .icon-button[hidden] { display:none; }
+  .panel-tabs {
+    align-self:stretch; min-width:0; max-width:50%; display:flex; align-items:stretch; overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .panel-tabs::-webkit-scrollbar { display:none; }
+  .panel-tab {
+    position:relative; max-width:240px; display:inline-flex; align-items:stretch; flex:0 0 auto;
+    color:var(--app-header-text-color,white); opacity:.72;
+  }
+  .panel-tab.active { opacity:1; }
+  .panel-tab.active::after {
+    content:""; position:absolute; right:4px; bottom:0; left:4px; height:2px;
+    background:var(--primary-color); border-radius:2px 2px 0 0;
+  }
+  .panel-tab-select, .panel-tab-close {
+    box-sizing:border-box; height:100%; border:0; color:inherit; background:transparent; cursor:pointer;
+  }
+  .panel-tab-select { min-width:76px; padding:0 8px 0 14px; white-space:nowrap; font-weight:500; }
+  .panel-tab-close { width:34px; padding:0; display:flex; align-items:center; justify-content:center; }
+  .panel-tab-close:hover, .panel-tab-select:hover { background:rgba(255,255,255,.1); }
+  .panel-tab-close ha-icon { display:block; width:18px; height:18px; line-height:0; --mdc-icon-size:18px; }
   .content { max-width:1400px; margin:auto; padding:0 16px 104px; }
   .filters { display:flex; align-items:flex-start; gap:16px; margin-bottom:16px; }
   .energy-nav-floating {
@@ -202,6 +223,9 @@ export const panelStyles = `
   @media (max-width:900px) {
     .filters { flex-direction:column; gap:8px; }
     .target-picker { width:100%; min-width:0; }
+  }
+  @media (max-width:768px) {
+    .desktop-panel-only, .panel-tabs { display:none !important; }
   }
   @media (max-width:600px) {
     .content { padding:0 12px 96px; }
