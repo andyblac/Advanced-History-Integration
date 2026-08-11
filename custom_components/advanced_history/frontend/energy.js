@@ -752,6 +752,8 @@ export class EnergyMethods {
     this._pendingPeriodRestore = null;
     this._finishPeriodRestore();
     this._finishEnergyInteractionLoading();
+    this._closePanelTimeRangeDialog?.();
+    this._panelTimeRange = null;
     this._energyCompare = null;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
