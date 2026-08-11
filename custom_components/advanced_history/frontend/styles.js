@@ -3,11 +3,11 @@ export const panelStyles = `
   * { box-sizing:border-box; }
   button, input { font:inherit; }
   .appbar {
-    height:var(--header-height,64px); padding:0 20px; display:flex; align-items:center; gap:14px;
+    height:var(--header-height,64px); padding:0 20px; display:flex; align-items:center; gap:4px;
     color:var(--app-header-text-color,white); background:var(--app-header-background-color,var(--primary-color));
     box-shadow:0 2px 4px rgba(0,0,0,.18); position:sticky; top:0; z-index:5;
   }
-  .appbar h1 { margin:0; font-size:20px; font-weight:500; }
+  .appbar h1 { margin:0 10px 0 0; font-size:20px; font-weight:500; }
   .appbar .spacer { flex:1; }
   .icon-button { width:40px; height:40px; padding:8px; border:0; border-radius:50%; display:grid; place-items:center; cursor:pointer; color:inherit; background:transparent; }
   .icon-button:hover { background:rgba(255,255,255,.12); }
