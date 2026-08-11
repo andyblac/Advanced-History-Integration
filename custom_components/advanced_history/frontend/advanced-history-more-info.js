@@ -9,7 +9,7 @@ import {
   nativeHistoryAttributes,
 } from "./history-series.js";
 import { mergeStateMaps, nativeStateMap } from "./state-colors.js";
-import { customLocalize } from "./translations.js";
+import { customLocalize, loadTranslations } from "./translations.js";
 
 // Keep the legacy global value so an update cannot install duplicate listeners
 // in a browser session that still has the previous module loaded.
@@ -725,6 +725,7 @@ function ensureMoreInfoEditorButton(historyView, serviceConfig) {
 }
 
 async function replaceMoreInfoChart(historyView) {
+  await loadTranslations(language(historyView.hass));
   const token = (historyView.__advancedHistoryMoreInfoToken || 0) + 1;
   historyView.__advancedHistoryMoreInfoToken = token;
   const entityId = historyView.entityId;

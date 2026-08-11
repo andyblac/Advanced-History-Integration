@@ -1,6 +1,6 @@
 import { CARD_DEFAULT_MODULE_URLS, CARD_TAG } from "./constants.js";
 import { openCardEditorDialog } from "./card-editor-dialog.js";
-import { customLocalize } from "./translations.js";
+import { customLocalize, loadTranslations } from "./translations.js";
 
 const INSTALLED_KEY = "__advancedHistoryConfigFlowDefaultsInstalled";
 const INJECTED_KEY = "advancedHistoryDefaultsButton";
@@ -43,6 +43,7 @@ function findObjectSelector(name, root = document) {
 }
 
 export async function ensureCardLoaded(hass, configuredModuleUrl = "") {
+  await loadTranslations(language(hass));
   if (customElements.get(CARD_TAG)) return;
   const configured = configuredModuleUrl
     || hass?.panels?.["advanced-history"]?.config?.card_module_url;

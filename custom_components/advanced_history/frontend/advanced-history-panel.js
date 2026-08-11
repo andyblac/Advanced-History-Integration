@@ -11,7 +11,7 @@ import { StorageMethods } from "./storage.js";
 import { panelStyles as css } from "./styles.js";
 import { PanelTabsMethods } from "./panel-tabs.js";
 import { TargetPickerMethods } from "./target-picker.js";
-import { customLocalize } from "./translations.js";
+import { customLocalize, loadTranslations } from "./translations.js";
 
 class AdvancedHistoryPanel extends HTMLElement {
   constructor() {
@@ -133,6 +133,7 @@ class AdvancedHistoryPanel extends HTMLElement {
 
   async _initialize() {
     this._loaded = true;
+    await loadTranslations(this._hass?.locale?.language || this._hass?.language);
     await this._loadTargets();
     this._loadingView();
     try {
