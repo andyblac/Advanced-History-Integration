@@ -102,6 +102,10 @@ export class EnergyMethods {
     }));
   }
 
+  _energyCompareMode(dataMode, collectionMode) {
+    return collectionMode ? (dataMode || collectionMode) : "";
+  }
+
   _syncEnergyCompareControl(compareCard, collection, applyMode) {
     if (!compareCard?.isConnected || !collection?.compare) return;
     const options = this._energyCompareOptions(collection);
@@ -305,7 +309,30 @@ export class EnergyMethods {
     const charts = this.shadowRoot?.getElementById("charts");
     if (charts && !this._periodRestoreLoading) charts.hidden = false;
     if (compareHost && compareCard && !this._periodRestoreLoading) {
-      compareHost.hidden = Boolean(compareCard.hidden);
+      compareHost.hidden = !this._targetCount()
+        || !this._energyCollection?.compare
+        || Boolean(compareCard.hidden);
+    }
+  }
+
+  _resetNativeEnergyCompareUI() {
+    const controller = this.shadowRoot
+      ?.getElementById("date-controller")
+      ?.querySelector(".energy-date-controller");
+    const selector = controller?.shadowRoot?.querySelector("hui-energy-period-selector");
+    if (selector) {
+      selector._compare = false;
+      selector.requestUpdate?.();
+    }
+    const compareCard = this.shadowRoot
+      ?.getElementById("compare-banner")
+      ?.querySelector("hui-energy-compare-card");
+    if (compareCard) {
+      compareCard._startCompare = undefined;
+      compareCard._endCompare = undefined;
+      compareCard._compareMode = "";
+      compareCard.hidden = true;
+      compareCard.requestUpdate?.();
     }
   }
 
@@ -631,6 +658,8 @@ export class EnergyMethods {
       const syncCompareVisibility = () => {
         compareHost.hidden = this._periodRestoreLoading
           || this._energyInteractionLoading
+          || !this._targetCount()
+          || !this._energyCollection?.compare
           || Boolean(compareCard.hidden);
       };
       // The native card can synchronously replay cached Energy data as soon as
@@ -798,6 +827,8 @@ export class EnergyMethods {
       if (this._energyRenderToken !== token) return;
       compareHost.hidden = this._periodRestoreLoading
         || this._energyInteractionLoading
+        || !this._targetCount()
+        || !collection.compare
         || Boolean(compareCard.hidden);
       const effectiveMode = this._periodRestoreLoading ? collection.compare : mode;
       const dayPeriod = this._panelDayPeriod();
@@ -850,7 +881,7 @@ export class EnergyMethods {
         && !this._periodRestoreLoading
         && (data?.compareMode || collection.compare),
       );
-      let compareMode = data?.compareMode;
+      let compareMode = this._energyCompareMode(data?.compareMode, collection.compare);
       if (resetComparePeriod) {
         this._energyCompareChoice = "previous_period";
         compareMode = "previous";
@@ -981,6 +1012,7 @@ export class EnergyMethods {
     this._largeRangeDetailDismissedKey = null;
     const compareHost = this.shadowRoot?.getElementById("compare-banner");
     if (compareHost) compareHost.hidden = true;
+    this._resetNativeEnergyCompareUI();
 
     if (!collection) {
       this._energyResetPending = true;
