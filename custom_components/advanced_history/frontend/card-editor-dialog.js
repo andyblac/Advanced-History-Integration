@@ -31,6 +31,7 @@ export async function openCardEditorDialog({
   const strings = {
     loading: "Loading",
     cancel: "Cancel",
+    close: "Close",
     save: "Save",
     reset: "Reset",
     confirmResetTitle: "Reset graph settings?",
@@ -61,10 +62,13 @@ export async function openCardEditorDialog({
       dialog.confirm section { height:auto; min-height:0; flex:none; }
       dialog.confirm .confirm-content { padding:24px; color:var(--primary-text-color); line-height:1.5; }
       section { width:100%; height:100%; display:flex; flex-direction:column; overflow:hidden; }
-      header { min-height:64px; padding:0 24px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--divider-color); }
+      header { min-height:64px; padding:0 24px 0 12px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--divider-color); }
       h2 { margin:0; font-size:20px; font-weight:500; }
       .mode-toggle { margin-left:auto; min-width:40px; border-radius:20px; display:flex; align-items:center; gap:8px; }
       .mode-toggle ha-icon { width:20px; height:20px; }
+      .dialog-close { min-width:40px; width:40px; height:40px; padding:8px; display:grid; place-items:center; border-radius:50%; color:var(--primary-text-color); }
+      .dialog-close:hover { color:var(--primary-text-color); background:var(--secondary-background-color); }
+      .dialog-close ha-icon { width:22px; height:22px; }
       .note { margin:14px 18px 8px; padding:10px 12px; border-radius:8px; color:var(--secondary-text-color); background:var(--secondary-background-color); line-height:1.4; }
       .note:empty { display:none; }
       .host { flex:1; min-height:0; overflow:auto; padding:8px 18px 18px; }
@@ -80,14 +84,14 @@ export async function openCardEditorDialog({
       @media (max-width:600px) {
         dialog { width:100vw; height:100vh; border-radius:0; }
         dialog.confirm { width:min(440px,calc(100vw - 32px)); height:fit-content !important; min-height:0; max-height:calc(100vh - 32px); border-radius:12px; }
-        header { padding:0 14px; }
+        header { padding:0 14px 0 12px; }
         .mode-toggle { padding:0 10px; }
         .mode-toggle span { display:none; }
       }
     </style>
     <dialog aria-label="${escapeHtml(title)}">
       <section>
-        <header><h2>${escapeHtml(title)}</h2>${toggleMarkup}</header>
+        <header><button class="dialog-close" data-action="close-editor" title="${escapeHtml(strings.close)}" aria-label="${escapeHtml(strings.close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${escapeHtml(title)}</h2>${toggleMarkup}</header>
         <div class="note">${escapeHtml(note)}</div>
         <div class="host"><div class="loading">${escapeHtml(strings.loading)}…</div></div>
         <footer>${resetMarkup}${leadingMarkup}<span class="status"></span><button data-action="cancel">${escapeHtml(strings.cancel)}</button><button class="primary" data-action="save">${escapeHtml(strings.save)}</button></footer>
@@ -95,7 +99,7 @@ export async function openCardEditorDialog({
     </dialog>
     <dialog class="confirm" aria-label="${escapeHtml(strings.confirmResetTitle)}">
       <section>
-        <header><h2>${escapeHtml(strings.confirmResetTitle)}</h2></header>
+        <header><button class="dialog-close" data-action="close-reset" title="${escapeHtml(strings.close)}" aria-label="${escapeHtml(strings.close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${escapeHtml(strings.confirmResetTitle)}</h2></header>
         <div class="confirm-content">${escapeHtml(strings.confirmReset)}</div>
         <footer><ha-button appearance="plain" data-action="cancel-reset">${escapeHtml(strings.cancel)}</ha-button><ha-button variant="danger" data-action="confirm-reset">${escapeHtml(strings.reset)}</ha-button></footer>
       </section>
@@ -207,6 +211,7 @@ export async function openCardEditorDialog({
   modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
   modal.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
   root.querySelector('[data-action="cancel"]').addEventListener("click", close);
+  root.querySelector('[data-action="close-editor"]').addEventListener("click", close);
   toggle?.addEventListener("click", () => {
     if (mode === "visual") renderCode();
     else renderVisual();
@@ -223,6 +228,7 @@ export async function openCardEditorDialog({
       if (event.target === confirmModal) cancelReset();
     });
     root.querySelector('[data-action="cancel-reset"]').addEventListener("click", cancelReset);
+    root.querySelector('[data-action="close-reset"]').addEventListener("click", cancelReset);
     root.querySelector('[data-action="confirm-reset"]').addEventListener("click", async () => {
       confirmModal.close();
       reset.disabled = true;

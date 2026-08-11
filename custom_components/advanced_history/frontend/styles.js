@@ -152,9 +152,12 @@ export const panelStyles = `
   .library-row .delete { width:40px; padding:8px; color:var(--secondary-text-color); }
   .library-row .update { width:40px; padding:8px; color:var(--primary-color); }
   .library-empty { padding:40px 20px; color:var(--secondary-text-color); text-align:center; }
-  .dialog-title { min-height:64px; padding:0 24px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--divider-color); }
+  .dialog-title { min-height:64px; padding:0 24px 0 12px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--divider-color); }
   .dialog-title h2 { margin:0; font-size:20px; font-weight:500; }
   .dialog-title .count { margin-left:auto; color:var(--secondary-text-color); font-size:13px; }
+  .dialog-close { width:40px; height:40px; padding:8px; display:grid; place-items:center; flex:0 0 auto; border:0; border-radius:50%; cursor:pointer; color:var(--primary-text-color); background:transparent; }
+  .dialog-close:hover { color:var(--primary-text-color); background:var(--secondary-background-color); }
+  .dialog-close ha-icon { width:22px; height:22px; }
   .tabs { height:48px; padding:0 16px; display:flex; gap:2px; border-bottom:1px solid var(--divider-color); }
   .tab { padding:0 18px; border:0; border-bottom:2px solid transparent; cursor:pointer; color:var(--secondary-text-color); background:transparent; }
   .tab.active { color:var(--primary-color); border-bottom-color:var(--primary-color); }
@@ -211,7 +214,7 @@ export const panelStyles = `
     .appbar .icon-button { flex:0 0 40px; }
     .dialog { height:100%; border-radius:0; }
     .backdrop { padding:0; }
-    .dialog-title { padding:0 14px; }
+    .dialog-title { padding:0 14px 0 12px; }
     .tab { flex:1; padding:0 4px; }
     .chip { max-width:230px; }
   }

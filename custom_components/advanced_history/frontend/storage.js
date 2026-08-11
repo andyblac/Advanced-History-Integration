@@ -481,19 +481,61 @@ export class StorageMethods {
         if (typeof window.loadCardHelpers !== "function") return null;
         const helpers = await window.loadCardHelpers();
         if (typeof helpers.showConfirmationDialog !== "function") return null;
-        const discard = await helpers.showConfirmationDialog(this, {
+        let closed = false;
+        const dialogPromise = helpers.showConfirmationDialog(this, {
           title,
           text: message,
           dismissText: saveLabel,
           confirmText: discardLabel,
           destructive: true,
         });
-        return discard ? "discard" : "save";
+        const stopCloseButtonSearch = this._addNativeConfirmationCloseButton(
+          title,
+          () => { closed = true; },
+        );
+        const discard = await dialogPromise;
+        stopCloseButtonSearch();
+        return closed ? null : discard ? "discard" : "save";
       } finally {
         this._unsavedDialogPromise = null;
       }
     })();
     return this._unsavedDialogPromise;
+  }
+
+  _addNativeConfirmationCloseButton(title, onClose) {
+    let stopped = false;
+    let attempts = 0;
+    const findDialogs = (root, found = []) => {
+      if (!root?.querySelectorAll) return found;
+      for (const element of root.querySelectorAll("*")) {
+        if (element.localName === "dialog-box") found.push(element);
+        if (element.shadowRoot) findDialogs(element.shadowRoot, found);
+      }
+      return found;
+    };
+    const attach = () => {
+      if (stopped) return;
+      const dialog = findDialogs(document).find((item) => item._params?.title === title);
+      const header = dialog?.shadowRoot?.querySelector("ha-dialog-header");
+      if (dialog && header && !header.querySelector("[data-advanced-history-close]")) {
+        const button = document.createElement("ha-icon-button");
+        button.slot = "navigationIcon";
+        button.dataset.advancedHistoryClose = "";
+        button.label = this._localize("ui.common.close", "Close");
+        button.path = "M19,6.41 17.59,5 12,10.59 6.41,5 5,6.41 10.59,12 5,17.59 6.41,19 12,13.41 17.59,19 19,17.59 13.41,12Z";
+        button.addEventListener("click", () => {
+          onClose();
+          dialog.shadowRoot.querySelector('ha-button[slot="secondaryAction"]')?.click();
+        });
+        header.prepend(button);
+        return;
+      }
+      attempts += 1;
+      if (attempts < 30) requestAnimationFrame(attach);
+    };
+    requestAnimationFrame(attach);
+    return () => { stopped = true; };
   }
 
   _updateUndoRedoButtons() {
@@ -970,13 +1012,14 @@ export class StorageMethods {
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop";
     backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${title}">
-      <header class="dialog-title"><h2>${title}</h2><span class="count">${items.length}${isBookmarks ? "" : ` / ${HISTORY_LIMIT}`}</span></header>
+      <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${title}</h2><span class="count">${items.length}${isBookmarks ? "" : ` / ${HISTORY_LIMIT}`}</span></header>
       ${isBookmarks ? `<div class="library-save"><input id="bookmark-name" maxlength="80" placeholder="${this._escape(this._customLocalize("bookmark_name"))}" value="${this._escape(this._snapshotLabel())}"><button data-action="save-current">${this._escape(this._customLocalize("save_current"))}</button></div>` : ""}
       <div class="library-list">${this._libraryRows(items, isBookmarks)}</div>
       <footer class="dialog-actions"><button data-action="clear" style="margin-right:auto" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</button>${isBookmarks ? `<button data-action="share" ${this._targetCount() ? "" : "disabled"}>${this._escape(copyShareLink)}</button>` : ""}<button data-action="close">${this._escape(close)}</button></footer>
     </section>`;
     backdrop.addEventListener("click", (event) => { if (event.target === backdrop) backdrop.remove(); });
     backdrop.querySelector('[data-action="close"]').addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector('[data-action="close-dialog"]').addEventListener("click", () => backdrop.remove());
     backdrop.querySelector('[data-action="save-current"]')?.addEventListener("click", () => {
       const input = backdrop.querySelector("#bookmark-name");
       if (this._saveCurrentBookmark(input.value)) this._renderLibrary(kind);

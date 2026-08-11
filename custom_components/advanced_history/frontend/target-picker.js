@@ -397,10 +397,11 @@ export class TargetPickerMethods {
     const choices = this._seriesChoices(entity);
     const cancel = this._localize("ui.common.cancel", "Cancel");
     const apply = this._localize("ui.common.apply", "Apply");
+    const close = this._localize("ui.common.close", "Close");
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop series-backdrop";
     backdrop.innerHTML = `<section class="dialog series-dialog" role="dialog" aria-modal="true" aria-label="${this._escape(this._customLocalize("attributes_settings", { target: name }))}">
-      <header class="dialog-title"><h2>${this._escape(this._customLocalize("attributes_settings", { target: name }))}</h2></header>
+      <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${this._escape(this._customLocalize("attributes_settings", { target: name }))}</h2></header>
       <p class="series-note">${this._escape(this._customLocalize("attributes_settings_note"))}</p>
       <div class="target-list series-list">
         ${choices.map((choice) => `<div class="series-choice">
@@ -444,6 +445,7 @@ export class TargetPickerMethods {
       if (event.target === backdrop) backdrop.remove();
     });
     backdrop.querySelector('[data-action="cancel"]').addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector('[data-action="close-dialog"]').addEventListener("click", () => backdrop.remove());
     applyButton.addEventListener("click", () => {
       const selection = [...backdrop.querySelectorAll("[data-series]:checked")]
         .map((checkbox) => checkbox.dataset.series);
@@ -571,6 +573,7 @@ export class TargetPickerMethods {
     const addTarget = this._localize("ui.components.target-picker.add_target", "Add target");
     const cancel = this._localize("ui.common.cancel", "Cancel");
     const apply = this._localize("ui.common.apply", "Apply");
+    const close = this._localize("ui.common.close", "Close");
     const targetTypes = {
       area_id: this._localize("ui.components.target-picker.type.areas", "Areas"),
       device_id: this._localize("ui.components.target-picker.type.devices", "Devices"),
@@ -579,7 +582,7 @@ export class TargetPickerMethods {
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop";
     backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${this._escape(addTarget)}">
-      <header class="dialog-title"><h2>${this._escape(addTarget)}</h2><span class="count">${this._escape(this._localize("ui.panel.config.entities.picker.selected", `${this._targetCount(this._draftTargets)} selected`, { number: this._targetCount(this._draftTargets) }))}</span></header>
+      <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${this._escape(addTarget)}</h2><span class="count">${this._escape(this._localize("ui.panel.config.entities.picker.selected", `${this._targetCount(this._draftTargets)} selected`, { number: this._targetCount(this._draftTargets) }))}</span></header>
       <nav class="tabs">${Object.entries(targetTypes).map(([key,label]) => `<button class="tab ${key === this._activeTab ? "active" : ""}" data-tab="${key}">${this._escape(label)}</button>`).join("")}</nav>
       <div class="search-wrap"><input class="search" type="search" placeholder="${this._escape(this._localize("ui.common.search", "Search"))}" value="${this._escape(this._dialogSearch)}"></div>
       <div class="target-list">${this._dialogRows()}</div>
@@ -590,6 +593,7 @@ export class TargetPickerMethods {
     const search = backdrop.querySelector(".search");
     search.addEventListener("input", () => { this._dialogSearch = search.value; backdrop.querySelector(".target-list").innerHTML = this._dialogRows(); this._bindDialogRows(backdrop); });
     backdrop.querySelector('[data-action="cancel"]').addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector('[data-action="close-dialog"]').addEventListener("click", () => backdrop.remove());
     backdrop.querySelector('[data-action="apply"]').addEventListener("click", () => {
       const nextTargets = this._normalizeTargets(this._draftTargets);
       const clearedAll = Boolean(
