@@ -189,6 +189,9 @@ export class GraphMethods {
       ) {
         configured.color = palette[index % palette.length];
       }
+      if (series.length === 1) {
+        this._colorAutomaticComparisons(configured, palette, index);
+      }
       return configured;
     });
     const height = this._effectiveGraphHeight();
@@ -845,6 +848,24 @@ export class GraphMethods {
       return { ...defaults, period: active };
     };
     return Array.isArray(activeCompare) ? activeCompare.map(mergeOne) : mergeOne(activeCompare);
+  }
+
+  _colorAutomaticComparisons(configured, palette, entityIndex = 0) {
+    if (
+      !Array.isArray(this._energyCompare)
+      || this._effectiveCompare() !== this._energyCompare
+      || !Array.isArray(configured?.compare)
+      || !Array.isArray(palette)
+      || palette.length < 2
+    ) return configured;
+    const configuredIndex = palette.indexOf(configured.color);
+    const baseIndex = configuredIndex >= 0 ? configuredIndex : entityIndex % palette.length;
+    configured.compare = configured.compare.map((comparison, index) => (
+      comparison && typeof comparison === "object" && comparison.color == null
+        ? { ...comparison, color: palette[(baseIndex + index + 1) % palette.length] }
+        : comparison
+    ));
+    return configured;
   }
 
   _cardOptions(configured = this._effectiveCardOptionsConfig()) {

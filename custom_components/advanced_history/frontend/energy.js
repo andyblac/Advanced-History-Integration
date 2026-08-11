@@ -93,6 +93,15 @@ export class EnergyMethods {
     return this._customLocalize(fallbackKey);
   }
 
+  _energyCompareValue(choice, count = 1) {
+    const comparisons = Math.max(1, Math.min(10, Math.trunc(Number(count)) || 1));
+    if (comparisons === 1) return choice;
+    return Array.from({ length: comparisons }, (_, index) => ({
+      period: choice,
+      periods_back: index + 1,
+    }));
+  }
+
   _syncEnergyCompareControl(compareCard, collection, applyMode) {
     if (!compareCard?.isConnected || !collection?.compare) return;
     const options = this._energyCompareOptions(collection);
@@ -118,26 +127,15 @@ export class EnergyMethods {
       await compareCard.updateComplete;
       if (!compareCard.isConnected) return;
       const root = compareCard.shadowRoot;
-      let staticLabel = root?.querySelector(".advanced-history-compare-label");
-      if (options.length === 1) {
-        if (!staticLabel) {
-          const replaceTarget = root?.querySelector(
-            "button.link, .advanced-history-compare-control",
-          );
-          if (!replaceTarget) return;
-          staticLabel = document.createElement("span");
-          staticLabel.className = "advanced-history-compare-label";
-          replaceTarget.replaceWith(staticLabel);
-        }
-        staticLabel.textContent = "";
-        return;
-      }
-      let select = root?.querySelector(".advanced-history-compare-select");
-      if (!select) {
-        const replaceTarget = root?.querySelector("button.link") || staticLabel;
+      let wrapper = root?.querySelector(".advanced-history-compare-control");
+      let select = wrapper?.querySelector(".advanced-history-compare-select");
+      let countSelect = wrapper?.querySelector(".advanced-history-compare-count");
+      if (!wrapper) {
+        const replaceTarget = root?.querySelector("button.link, .advanced-history-compare-label");
         if (!replaceTarget) return;
-        const wrapper = document.createElement("span");
+        wrapper = document.createElement("span");
         wrapper.className = "advanced-history-compare-control";
+        wrapper.style.cssText = "display:inline-flex;align-items:center;gap:5px;";
         select = document.createElement("select");
         select.className = "advanced-history-compare-select";
         select.setAttribute("aria-label", this._customLocalize("comparison_period"));
@@ -150,9 +148,28 @@ export class EnergyMethods {
           applyMode(nativeMode, true);
           collection.refresh?.();
         });
+        countSelect = document.createElement("select");
+        countSelect.className = "advanced-history-compare-count";
+        countSelect.setAttribute("aria-label", this._customLocalize("comparison_count"));
+        countSelect.title = this._customLocalize("comparison_count");
+        countSelect.style.cssText = "font:inherit;line-height:1.4;color:inherit;background:var(--card-background-color,transparent);border:1px solid var(--divider-color,currentColor);border-radius:14px;padding:2px 5px;cursor:pointer;outline:none;";
+        for (let value = 1; value <= 10; value += 1) {
+          const option = document.createElement("option");
+          option.value = String(value);
+          option.textContent = String(value);
+          countSelect.append(option);
+        }
+        countSelect.addEventListener("change", () => {
+          this._energyCompareCount = Number(countSelect.value) || 1;
+          this._beginGraphDataSourceCycle();
+          applyMode(collection.compare, true);
+          this._recordChange(null, true);
+        });
         wrapper.append(select);
+        wrapper.append(countSelect);
         replaceTarget.replaceWith(wrapper);
       }
+      select.hidden = options.length === 1;
       const optionValues = Array.from(select.options, (option) => option.value);
       const nextOptionValues = options.map(([value]) => value);
       if (optionValues.join("\u001f") !== nextOptionValues.join("\u001f")) {
@@ -165,6 +182,7 @@ export class EnergyMethods {
         }
       }
       select.value = choice;
+      countSelect.value = String(this._energyCompareCount || 1);
     };
     queueMicrotask(install);
   }
@@ -788,7 +806,10 @@ export class EnergyMethods {
         ? (dayPeriod ? "yesterday" : "previous_period")
         : effectiveMode === "yoy" ? "last_year" : null;
       const next = effectiveMode
-        ? (this._energyCompareChoice || nativeChoice)
+        ? this._energyCompareValue(
+          this._energyCompareChoice || nativeChoice,
+          this._energyCompareCount,
+        )
         : null;
       const nextDetailKey = this._largeRangeDetailRenderKey();
       if (this._periodRestoreLoading) {
@@ -796,7 +817,11 @@ export class EnergyMethods {
         this._largeRangeDetailStateKey = nextDetailKey;
         return;
       }
-      if (!force && next === this._energyCompare && nextDetailKey === this._largeRangeDetailStateKey) return;
+      if (
+        !force
+        && JSON.stringify(next) === JSON.stringify(this._energyCompare)
+        && nextDetailKey === this._largeRangeDetailStateKey
+      ) return;
       this._energyCompare = next;
       this._largeRangeDetailStateKey = nextDetailKey;
       this._renderGraphs();
@@ -950,6 +975,7 @@ export class EnergyMethods {
     this._panelTimeRange = null;
     this._energyCompare = null;
     this._energyCompareChoice = null;
+    this._energyCompareCount = 1;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
     this._largeRangeDetailDismissedKey = null;
