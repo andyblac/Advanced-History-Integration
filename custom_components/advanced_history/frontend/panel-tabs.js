@@ -74,7 +74,7 @@ export class PanelTabsMethods {
         typeof tab?.id === "string"
         && tab.state?.snapshot?.targets
         && tab.state?.snapshot?.chart
-      ));
+      )).slice(0, this.maxTabs);
       if (!tabs.length) return false;
       this._panelTabs = this._clone(tabs);
       this._activePanelTabId = this._panelTabs.some((tab) => tab.id === stored.active_id)
@@ -161,7 +161,7 @@ export class PanelTabsMethods {
   }
 
   _addPanelTab() {
-    if (!this._desktopPanelTabsEnabled()) return;
+    if (!this._desktopPanelTabsEnabled() || this._panelTabs.length >= this.maxTabs) return;
     this._saveActivePanelTab();
     const tab = { id: this._panelTabId(), state: this._blankPanelTabState() };
     this._panelTabs.push(tab);
@@ -204,12 +204,52 @@ export class PanelTabsMethods {
   _renderPanelTabs() {
     if (!this._desktopPanelTabsEnabled() || this._panelTabs.length < 2) return "";
     const close = this._localize("ui.common.close", "Close");
-    return `<nav class="panel-tabs" aria-label="${this._escape(this._customLocalize("panels"))}">
-      ${this._panelTabs.map((tab, index) => `<span class="panel-tab${tab.id === this._activePanelTabId ? " active" : ""}">
-        <button class="panel-tab-select" data-panel-tab="${this._escape(tab.id)}" ${tab.id === this._activePanelTabId ? 'aria-current="page"' : ""}>${this._escape(this._panelTabLabel(index))}</button>
-        <button class="panel-tab-close" data-close-panel="${this._escape(tab.id)}" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button>
-      </span>`).join("")}
-    </nav>`;
+    const previous = this._localize("ui.common.previous", "Previous");
+    const next = this._localize("ui.common.next", "Next");
+    return `<div class="panel-tabs-shell">
+      <button class="panel-tabs-scroll" data-scroll-panels="-1" title="${this._escape(previous)}" aria-label="${this._escape(previous)}" hidden><ha-icon icon="mdi:chevron-left"></ha-icon></button>
+      <nav class="panel-tabs" aria-label="${this._escape(this._customLocalize("panels"))}">
+        ${this._panelTabs.map((tab, index) => `<span class="panel-tab${tab.id === this._activePanelTabId ? " active" : ""}">
+          <button class="panel-tab-select" data-panel-tab="${this._escape(tab.id)}" ${tab.id === this._activePanelTabId ? 'aria-current="page"' : ""}>${this._escape(this._panelTabLabel(index))}</button>
+          <button class="panel-tab-close" data-close-panel="${this._escape(tab.id)}" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button>
+        </span>`).join("")}
+      </nav>
+      <button class="panel-tabs-scroll" data-scroll-panels="1" title="${this._escape(next)}" aria-label="${this._escape(next)}" hidden><ha-icon icon="mdi:chevron-right"></ha-icon></button>
+    </div>`;
+  }
+
+  _syncPanelTabScrollButtons() {
+    const tabs = this.shadowRoot?.querySelector(".panel-tabs");
+    if (!tabs) return;
+    const buttons = this.shadowRoot.querySelectorAll("[data-scroll-panels]");
+    const overflow = tabs.scrollWidth > tabs.clientWidth + 1;
+    for (const button of buttons) button.hidden = !overflow;
+    if (!overflow) return;
+    const start = tabs.scrollLeft <= 1;
+    const end = tabs.scrollLeft + tabs.clientWidth >= tabs.scrollWidth - 1;
+    this.shadowRoot.querySelector('[data-scroll-panels="-1"]').disabled = start;
+    this.shadowRoot.querySelector('[data-scroll-panels="1"]').disabled = end;
+  }
+
+  _scrollPanelTabs(tabs, direction) {
+    const tabItems = Array.from(tabs.querySelectorAll(".panel-tab"));
+    if (!tabItems.length) return;
+    const viewport = tabs.getBoundingClientRect();
+    const bounds = tabItems.map((tab) => {
+      const rect = tab.getBoundingClientRect();
+      const left = tabs.scrollLeft + rect.left - viewport.left;
+      return { left, right: left + rect.width };
+    });
+    let destination;
+    if (direction > 0) {
+      const visibleRight = tabs.scrollLeft + tabs.clientWidth;
+      const target = bounds.find((item) => item.right > visibleRight + 1);
+      destination = target ? target.right - tabs.clientWidth : tabs.scrollWidth;
+    } else {
+      const target = [...bounds].reverse().find((item) => item.left < tabs.scrollLeft - 1);
+      destination = target ? target.left : 0;
+    }
+    tabs.scrollTo({ left: Math.max(0, destination), behavior: "smooth" });
   }
 
   _bindPanelTabs() {
@@ -220,5 +260,34 @@ export class PanelTabsMethods {
     for (const button of this.shadowRoot.querySelectorAll("[data-close-panel]")) {
       button.addEventListener("click", () => this._closePanelTab(button.dataset.closePanel));
     }
+    this._panelTabsResizeObserver?.disconnect();
+    this._panelTabsResizeObserver = null;
+    const tabs = this.shadowRoot.querySelector(".panel-tabs");
+    if (!tabs) return;
+    tabs.addEventListener("scroll", () => this._syncPanelTabScrollButtons(), { passive: true });
+    for (const button of this.shadowRoot.querySelectorAll("[data-scroll-panels]")) {
+      button.addEventListener("click", () => {
+        this._scrollPanelTabs(tabs, Number(button.dataset.scrollPanels));
+      });
+    }
+    this._panelTabsResizeObserver = typeof ResizeObserver === "undefined"
+      ? null
+      : new ResizeObserver(() => this._syncPanelTabScrollButtons());
+    this._panelTabsResizeObserver?.observe(tabs);
+    requestAnimationFrame(() => {
+      this._syncPanelTabScrollButtons();
+      const active = tabs.querySelector(".panel-tab.active");
+      if (active) {
+        const viewport = tabs.getBoundingClientRect();
+        const rect = active.getBoundingClientRect();
+        const left = tabs.scrollLeft + rect.left - viewport.left;
+        const right = left + rect.width;
+        if (left < tabs.scrollLeft) tabs.scrollLeft = left;
+        else if (right > tabs.scrollLeft + tabs.clientWidth) {
+          tabs.scrollLeft = right - tabs.clientWidth;
+        }
+      }
+      this._syncPanelTabScrollButtons();
+    });
   }
 }

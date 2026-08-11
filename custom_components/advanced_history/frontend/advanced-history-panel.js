@@ -97,6 +97,9 @@ class AdvancedHistoryPanel extends HTMLElement {
   get narrow() { return this._narrow; }
   get config() { return this._panel?.config || {}; }
   get maxEntities() { return Number(this.config.max_entities) || 30; }
+  get maxTabs() {
+    return Math.max(1, Math.min(50, Math.trunc(Number(this.config.max_tabs)) || 10));
+  }
 
   _localize(key, fallback, replacements) {
     return this._hass?.localize?.(key, replacements) || fallback;
@@ -118,6 +121,8 @@ class AdvancedHistoryPanel extends HTMLElement {
   disconnectedCallback() {
     this._persistPanelTabs();
     window.removeEventListener("pagehide", this._persistPanelsOnPageHide);
+    this._panelTabsResizeObserver?.disconnect();
+    this._panelTabsResizeObserver = null;
     this._energyRenderToken = null;
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;
@@ -234,7 +239,7 @@ class AdvancedHistoryPanel extends HTMLElement {
         <ha-menu-button id="menu"></ha-menu-button><h1>${this._escape(title)}</h1>
         ${this._renderPanelTabs()}
         <span class="spacer"></span>
-        ${this._desktopPanelTabsEnabled() ? `<button id="add-panel" class="icon-button desktop-panel-only" title="${this._escape(addPanel)}" aria-label="${this._escape(addPanel)}"><ha-icon icon="mdi:plus"></ha-icon></button>` : ""}
+        ${this._desktopPanelTabsEnabled() ? `<button id="add-panel" class="icon-button desktop-panel-only" title="${this._escape(addPanel)}" aria-label="${this._escape(addPanel)}" ${this._panelTabs.length >= this.maxTabs ? "disabled" : ""}><ha-icon icon="mdi:plus"></ha-icon></button>` : ""}
         <button id="bookmarks" class="icon-button" title="${this._escape(bookmarks)}"><ha-icon icon="mdi:bookmark-multiple-outline"></ha-icon></button>
         <button id="chart-history" class="icon-button" title="${this._escape(chartHistory)}"><ha-icon icon="mdi:history"></ha-icon></button>
         <button id="undo" class="icon-button" title="${this._escape(undo)}"><ha-icon icon="mdi:undo"></ha-icon></button>

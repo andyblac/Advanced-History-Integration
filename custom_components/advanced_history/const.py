@@ -34,6 +34,7 @@ CONF_TITLE = "title"
 CONF_ENTRY_TYPE = "entry_type"
 CONF_SIDEBAR_ICON = "sidebar_icon"
 CONF_MAX_ENTITIES = "max_entities"
+CONF_MAX_TABS = "max_tabs"
 CONF_LARGE_RANGE_AUTOMATIC_DETAIL = "large_range_automatic_detail"
 CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS = "large_range_detail_threshold_days"
 CONF_DEFAULT_HOURS = "default_hours"
@@ -112,6 +113,7 @@ DEFAULT_OPTIONS = {
     CONF_TITLE: "Advanced History",
     CONF_SIDEBAR_ICON: "mdi:chart-timeline-variant-shimmer",
     CONF_MAX_ENTITIES: 30,
+    CONF_MAX_TABS: 10,
     CONF_LARGE_RANGE_AUTOMATIC_DETAIL: True,
     CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS: 31,
     CONF_DEFAULT_HOURS: 24,
