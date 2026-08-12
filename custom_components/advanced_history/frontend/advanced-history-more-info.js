@@ -697,15 +697,19 @@ function ensureMoreInfoEditorButton(historyView, serviceConfig) {
       return false;
     }
   });
-  if (!showMore) return;
-  showMore.classList.add(MORE_INFO_EDITOR_LINK_CLASS);
   let actions = root.querySelector(`.${MORE_INFO_EDITOR_ACTIONS_CLASS}`);
   if (!actions) {
+    const header = root.querySelector(".header");
+    if (!showMore && !header) return;
     actions = document.createElement("span");
     actions.className = MORE_INFO_EDITOR_ACTIONS_CLASS;
-    showMore.before(actions);
+    if (showMore) showMore.before(actions);
+    else header.append(actions);
   }
-  if (showMore.parentElement !== actions) actions.append(showMore);
+  if (showMore) {
+    showMore.classList.add(MORE_INFO_EDITOR_LINK_CLASS);
+    if (showMore.parentElement !== actions) actions.append(showMore);
+  }
   if (!button) {
     button = document.createElement("button");
     button.type = "button";
