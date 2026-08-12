@@ -842,16 +842,45 @@ export class GraphMethods {
 
   _mergeCompareOptions(activeCompare, defaults) {
     if (activeCompare == null || activeCompare === false) return activeCompare;
-    if (!defaults || typeof defaults !== "object" || Array.isArray(defaults)) return activeCompare;
 
-    const mergeOne = (active) => {
-      if (active === true) return { ...defaults };
+    const mergeOne = (active, configuredDefaults) => {
+      const resolvedDefaults = configuredDefaults
+        && typeof configuredDefaults === "object"
+        && !Array.isArray(configuredDefaults)
+        ? configuredDefaults
+        : null;
+      if (!resolvedDefaults) return active;
+      if (active === true) return { ...resolvedDefaults };
       if (active && typeof active === "object" && !Array.isArray(active)) {
-        return { ...defaults, ...active };
+        return { ...resolvedDefaults, ...active };
       }
-      return { ...defaults, period: active };
+      return { ...resolvedDefaults, period: active };
     };
-    return Array.isArray(activeCompare) ? activeCompare.map(mergeOne) : mergeOne(activeCompare);
+    if (Array.isArray(activeCompare)) {
+      return activeCompare.map((active, index) => mergeOne(
+        active,
+        Array.isArray(defaults) ? defaults[index] : defaults,
+      ));
+    }
+    return mergeOne(activeCompare, Array.isArray(defaults) ? defaults[0] : defaults);
+  }
+
+  _comparisonEditorDefaults(compare) {
+    const clean = (configured) => {
+      if (!configured || typeof configured !== "object" || Array.isArray(configured)) return {};
+      const options = structuredClone(configured);
+      // These describe the comparison selected in the Energy picker and must
+      // continue to follow that picker rather than becoming entity overrides.
+      delete options.period;
+      delete options.periods_back;
+      if (this._panelTimeRange && options.layout === "sequential") delete options.layout;
+      return options;
+    };
+    const rows = (Array.isArray(compare) ? compare : [compare]).map(clean);
+    if (!rows.some((row) => Object.keys(row).length)) return undefined;
+    const first = rows[0];
+    if (rows.every((row) => this._sameGraphOption(row, first))) return first;
+    return rows;
   }
 
   _withTimeRangeComparisonLayout(compare) {
@@ -1026,7 +1055,9 @@ export class GraphMethods {
       const options = structuredClone(raw);
       delete options.entity;
       delete options.statistic_id;
+      const compareOptions = this._comparisonEditorDefaults(options.compare);
       delete options.compare;
+      if (compareOptions !== undefined) options.compare = compareOptions;
       // Target-chip visibility is stored separately with the chart and is
       // applied to generated card entities through the card's native enabled
       // option. Do not turn that transient state into an editor override.
