@@ -45,7 +45,7 @@ export const panelStyles = `
   .panel-tab.active:hover, .panel-tab.active:focus-within { background:var(--secondary-background-color); }
   .panel-tab.active::after {
     content:""; position:absolute; right:4px; bottom:0; left:4px; height:2px;
-    background:var(--primary-color); border-radius:2px 2px 0 0;
+    background:var(--mdc-tab-indicator-active-indicator-color,var(--app-header-text-color,white)); border-radius:2px 2px 0 0;
   }
   .panel-tab-select, .panel-tab-close {
     box-sizing:border-box; height:100%; border:0; color:inherit; background:transparent; cursor:pointer;

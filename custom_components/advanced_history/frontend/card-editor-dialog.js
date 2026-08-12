@@ -49,8 +49,8 @@ export async function openCardEditorDialog({
   const resetMarkup = onReset
     ? `<button data-action="reset">${escapeHtml(strings.reset)}</button>`
     : "";
-  const leadingMarkup = leadingAction
-    ? `<button data-action="leading">${escapeHtml(leadingAction.label)}</button>`
+  const headerActionMarkup = leadingAction
+    ? `<button class="header-action" data-action="leading">${escapeHtml(leadingAction.label)}</button>`
     : "";
   root.innerHTML = `
     <style>
@@ -64,7 +64,8 @@ export async function openCardEditorDialog({
       section { width:100%; height:100%; display:flex; flex-direction:column; overflow:hidden; }
       header { min-height:64px; padding:0 24px 0 12px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--divider-color); }
       h2 { margin:0; font-size:20px; font-weight:500; }
-      .mode-toggle { margin-left:auto; min-width:40px; border-radius:20px; display:flex; align-items:center; gap:8px; }
+      .header-action { margin-left:auto; }
+      .mode-toggle { min-width:40px; border-radius:20px; display:flex; align-items:center; gap:8px; }
       .mode-toggle ha-icon { width:20px; height:20px; }
       .dialog-close { min-width:40px; width:40px; height:40px; padding:8px; display:grid; place-items:center; border-radius:50%; color:var(--primary-text-color); }
       .dialog-close:hover { color:var(--primary-text-color); background:var(--secondary-background-color); }
@@ -91,10 +92,10 @@ export async function openCardEditorDialog({
     </style>
     <dialog aria-label="${escapeHtml(title)}">
       <section>
-        <header><button class="dialog-close" data-action="close-editor" title="${escapeHtml(strings.close)}" aria-label="${escapeHtml(strings.close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${escapeHtml(title)}</h2>${toggleMarkup}</header>
+        <header><button class="dialog-close" data-action="close-editor" title="${escapeHtml(strings.close)}" aria-label="${escapeHtml(strings.close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${escapeHtml(title)}</h2>${headerActionMarkup}</header>
         <div class="note">${escapeHtml(note)}</div>
         <div class="host"><div class="loading">${escapeHtml(strings.loading)}…</div></div>
-        <footer>${resetMarkup}${leadingMarkup}<span class="status"></span><button data-action="cancel">${escapeHtml(strings.cancel)}</button><button class="primary" data-action="save">${escapeHtml(strings.save)}</button></footer>
+        <footer>${toggleMarkup}${resetMarkup}<span class="status"></span><button data-action="cancel">${escapeHtml(strings.cancel)}</button><button class="primary" data-action="save">${escapeHtml(strings.save)}</button></footer>
       </section>
     </dialog>
     <dialog class="confirm" aria-label="${escapeHtml(strings.confirmResetTitle)}">
