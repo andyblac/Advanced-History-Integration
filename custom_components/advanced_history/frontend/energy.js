@@ -1,7 +1,7 @@
 export class EnergyMethods {
-  _energyCompareChoiceFromNative(mode, dayPeriod = false) {
+  _energyCompareChoiceFromNative(mode) {
     return mode === "previous"
-      ? (dayPeriod ? "yesterday" : "previous_period")
+      ? "previous_period"
       : mode === "yoy" ? "last_year" : null;
   }
 
@@ -9,8 +9,17 @@ export class EnergyMethods {
     return choice === "last_year" ? "yoy" : choice ? "previous" : "";
   }
 
-  _energyCompareRange(start, end, choice) {
+  _energyCompareRange(start, end, choice, count = 1) {
     if (!(start instanceof Date) || !(end instanceof Date)) return null;
+    if (choice === "previous_period") {
+      const duration = end.getTime() - start.getTime();
+      if (duration <= 0) return null;
+      const periods = Math.max(1, Math.min(10, Math.trunc(Number(count)) || 1));
+      return {
+        start: new Date(start.getTime() - duration * periods),
+        end: new Date(start),
+      };
+    }
     if (choice === "last_month") {
       const compareStart = new Date(start);
       const dayOfMonth = compareStart.getDate();
@@ -69,7 +78,11 @@ export class EnergyMethods {
     const previousWeek = ["last_week", "compare_previous_week"];
     const previousMonth = ["last_month", "compare_previous_month"];
     const previousYear = ["last_year", "compare_previous_year"];
-    if (periodKind === "day") return [previousPeriod, previousWeek, previousYear];
+    if (periodKind === "day") {
+      return this._panelTimeRange
+        ? [previousPeriod, previousDay, previousWeek, previousYear]
+        : [previousPeriod, previousWeek, previousYear];
+    }
     if (periodKind === "week") return [previousPeriod, previousMonth, previousYear];
     if (periodKind === "month") return [previousPeriod, previousYear];
     if (periodKind === "year") return [previousPeriod];
@@ -106,11 +119,59 @@ export class EnergyMethods {
     return collectionMode ? (dataMode || collectionMode) : "";
   }
 
+  _energyCompareRangeLabel(start, end) {
+    const language = this._hass?.locale?.language || this._hass?.language;
+    const timeZone = this._resolvedTimeZone?.() || this._hass?.config?.time_zone;
+    const dateOptions = { dateStyle: "long", ...(timeZone ? { timeZone } : {}) };
+    const timeOptions = { timeStyle: "short", ...(timeZone ? { timeZone } : {}) };
+    const dateFormatter = new Intl.DateTimeFormat(language, dateOptions);
+    const timeFormatter = new Intl.DateTimeFormat(language, timeOptions);
+    const startDate = dateFormatter.format(start);
+    const endDate = dateFormatter.format(end);
+    const startTime = timeFormatter.format(start);
+    const endTime = timeFormatter.format(end);
+    return startDate === endDate
+      ? `${startDate}, ${startTime} – ${endTime}`
+      : `${startDate}, ${startTime} – ${endDate}, ${endTime}`;
+  }
+
+  _renderEnergyCompareRangeBanner(compareCard, wrapper) {
+    const range = compareCard?.__advancedHistoryCompareRange;
+    const alert = compareCard?.shadowRoot?.querySelector("ha-alert");
+    if (!this._panelTimeRange || !range || !alert || !wrapper) return;
+    const startMarker = "__ADVANCED_HISTORY_START__";
+    const endMarker = "__ADVANCED_HISTORY_END__";
+    const message = this._localize(
+      "ui.panel.lovelace.cards.energy.energy_compare.info",
+      `You are comparing the period ${startMarker} with the period ${endMarker}`,
+      { start: startMarker, end: endMarker },
+    );
+    const labels = {
+      [startMarker]: this._energyCompareRangeLabel(range.start, range.end),
+      [endMarker]: this._energyCompareRangeLabel(range.compareStart, range.compareEnd),
+    };
+    const markerPattern = new RegExp(`(${startMarker}|${endMarker})`, "g");
+    const content = document.createDocumentFragment();
+    for (const part of message.split(markerPattern)) {
+      if (!part) continue;
+      if (labels[part]) {
+        const strong = document.createElement("b");
+        strong.textContent = labels[part];
+        content.append(strong);
+      } else {
+        content.append(document.createTextNode(part));
+      }
+    }
+    content.append(document.createTextNode(" "));
+    content.append(wrapper);
+    alert.replaceChildren(content);
+  }
+
   _syncEnergyCompareControl(compareCard, collection, applyMode) {
     if (!compareCard?.isConnected || !collection?.compare) return;
     const options = this._energyCompareOptions(collection);
     let choice = this._energyCompareChoice
-      || this._energyCompareChoiceFromNative(collection.compare, Boolean(this._panelDayPeriod()))
+      || this._energyCompareChoiceFromNative(collection.compare)
       || "previous_period";
     if (!options.some(([value]) => value === choice)) {
       choice = "previous_period";
@@ -118,14 +179,34 @@ export class EnergyMethods {
       applyMode(collection.compare, true);
     }
     this._energyCompareChoice = choice;
-    const customRange = this._energyCompareRange(collection.start, collection.end, choice);
-    if (customRange) {
-      compareCard._start = collection.start;
-      compareCard._end = collection.end;
+    const syncRange = (rangeChoice = this._energyCompareChoice || choice) => {
+      const visiblePeriod = this._panelDayPeriod();
+      const rangeStart = this._panelTimeRange && visiblePeriod
+        ? visiblePeriod.start
+        : collection.start;
+      const rangeEnd = this._panelTimeRange && visiblePeriod
+        ? visiblePeriod.end
+        : collection.end;
+      const customRange = this._energyCompareRange(
+        rangeStart,
+        rangeEnd,
+        rangeChoice,
+        this._energyCompareCount,
+      );
+      if (!customRange) return;
+      compareCard._start = rangeStart;
+      compareCard._end = rangeEnd;
       compareCard._startCompare = customRange.start;
       compareCard._endCompare = customRange.end;
+      compareCard.__advancedHistoryCompareRange = {
+        start: rangeStart,
+        end: rangeEnd,
+        compareStart: customRange.start,
+        compareEnd: customRange.end,
+      };
       compareCard.requestUpdate?.();
-    }
+    };
+    syncRange(choice);
 
     const install = async () => {
       await compareCard.updateComplete;
@@ -150,6 +231,7 @@ export class EnergyMethods {
           this._beginGraphDataSourceCycle();
           collection.setCompare?.(nativeMode);
           applyMode(nativeMode, true);
+          syncRange(select.value);
           collection.refresh?.();
         });
         countSelect = document.createElement("select");
@@ -167,6 +249,7 @@ export class EnergyMethods {
           this._energyCompareCount = Number(countSelect.value) || 1;
           this._beginGraphDataSourceCycle();
           applyMode(collection.compare, true);
+          syncRange();
           this._recordChange(null, true);
         });
         wrapper.append(select);
@@ -187,6 +270,7 @@ export class EnergyMethods {
       }
       select.value = choice;
       countSelect.value = String(this._energyCompareCount || 1);
+      this._renderEnergyCompareRangeBanner(compareCard, wrapper);
     };
     queueMicrotask(install);
   }
@@ -227,6 +311,10 @@ export class EnergyMethods {
     const period = this._panelDayPeriod();
     const range = this._panelTimeRange;
     if (!period || !range) return {};
+    // Sequential comparison needs the selected slot to be the card's actual
+    // Energy window. Applying daily hour filters would leave the hidden hours
+    // between yesterday's slot and today's slot on the extended axis.
+    if (this._sequentialPanelTimeComparisonActive()) return {};
     // A wrapping window is stored as the Energy collection period itself.
     // Applying the daily hour filters as well would require a point to be
     // both after the start hour and before the end hour, hiding everything.
@@ -235,6 +323,57 @@ export class EnergyMethods {
       graph_start_hour: range.start / 60,
       graph_end_hour: range.end / 60,
     };
+  }
+
+  _sequentialPanelTimeComparisonActive(compare = this._effectiveCompare?.()) {
+    if (!this._panelTimeRange || compare == null || compare === false) return false;
+    const isSequential = (value) => {
+      if (value === true || value === "previous_period") return true;
+      if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+      return (value.period ?? "previous_period") === "previous_period"
+        && (value.layout == null || value.layout === "sequential");
+    };
+    return (Array.isArray(compare) ? compare : [compare]).some(isSequential);
+  }
+
+  _syncPanelComparisonRange(compare, collection = this._energyCollection) {
+    if (!collection || !this._panelTimeRange || this._periodRestoreLoading) return false;
+    const period = this._panelDayPeriod();
+    if (!period) return false;
+    const { start: startMinutes, end: endMinutes } = this._panelTimeRange;
+    if (endMinutes <= startMinutes) return false;
+    const start = new Date(period.dayStart);
+    const end = new Date(period.dayStart);
+    if (this._sequentialPanelTimeComparisonActive(compare)) {
+      start.setMinutes(startMinutes, 0, 0);
+      end.setMinutes(endMinutes, 0, 0);
+    } else {
+      start.setHours(0, 0, 0, 0);
+      end.setHours(23, 59, 59, 999);
+    }
+    const changed = collection.start?.getTime?.() !== start.getTime()
+      || collection.end?.getTime?.() !== end.getTime();
+    if (!changed) return false;
+    this._beginEnergyInteractionLoading();
+    collection.setPeriod(start, end);
+    collection.refresh?.();
+    return true;
+  }
+
+  _panelComparisonPayloadCurrent(data, compare, collection = this._energyCollection) {
+    if (!this._sequentialPanelTimeComparisonActive(compare)) return true;
+    const actualStart = data?.start instanceof Date ? data.start : new Date(data?.start);
+    const actualEnd = data?.end instanceof Date ? data.end : new Date(data?.end);
+    const expectedStart = collection?.start instanceof Date
+      ? collection.start
+      : new Date(collection?.start);
+    const expectedEnd = collection?.end instanceof Date
+      ? collection.end
+      : new Date(collection?.end);
+    return [actualStart, actualEnd, expectedStart, expectedEnd]
+      .every((value) => Number.isFinite(value.getTime()))
+      && Math.abs(actualStart.getTime() - expectedStart.getTime()) < 60_000
+      && Math.abs(actualEnd.getTime() - expectedEnd.getTime()) < 60_000;
   }
 
   _normalizeEnergyDayPeriod(collection = this._energyCollection, refresh = true) {
@@ -252,6 +391,20 @@ export class EnergyMethods {
     const dayEnd = new Date(start);
     dayEnd.setHours(23, 59, 59, 999);
     const range = this._panelTimeRange;
+    if (
+      range
+      && range.end > range.start
+      && this._sequentialPanelTimeComparisonActive()
+    ) {
+      const rangeStart = new Date(dayStart);
+      rangeStart.setMinutes(range.start, 0, 0);
+      const rangeEnd = new Date(dayStart);
+      rangeEnd.setMinutes(range.end, 0, 0);
+      if (
+        Math.abs(start.getTime() - rangeStart.getTime()) < 60_000
+        && Math.abs(end.getTime() - rangeEnd.getTime()) < 60_000
+      ) return false;
+    }
     if (range && range.end <= range.start) {
       const rangeStart = new Date(dayStart);
       rangeStart.setMinutes(range.start, 0, 0);
@@ -502,6 +655,9 @@ export class EnergyMethods {
       start.setMinutes(range.start, 0, 0);
       end.setMinutes(range.end, 0, 0);
       end.setDate(end.getDate() + 1);
+    } else if (range && this._sequentialPanelTimeComparisonActive()) {
+      start.setMinutes(range.start, 0, 0);
+      end.setMinutes(range.end, 0, 0);
     } else {
       end.setHours(23, 59, 59, 999);
     }
@@ -831,10 +987,9 @@ export class EnergyMethods {
         || !collection.compare
         || Boolean(compareCard.hidden);
       const effectiveMode = this._periodRestoreLoading ? collection.compare : mode;
-      const dayPeriod = this._panelDayPeriod();
       if (!effectiveMode) this._energyCompareChoice = null;
       const nativeChoice = effectiveMode === "previous"
-        ? (dayPeriod ? "yesterday" : "previous_period")
+        ? "previous_period"
         : effectiveMode === "yoy" ? "last_year" : null;
       const next = effectiveMode
         ? this._energyCompareValue(
@@ -848,8 +1003,10 @@ export class EnergyMethods {
         this._largeRangeDetailStateKey = nextDetailKey;
         return;
       }
+      const comparisonRangeChanged = this._syncPanelComparisonRange(next, collection);
       if (
         !force
+        && !comparisonRangeChanged
         && JSON.stringify(next) === JSON.stringify(this._energyCompare)
         && nextDetailKey === this._largeRangeDetailStateKey
       ) return;
@@ -870,6 +1027,16 @@ export class EnergyMethods {
       const periodRestored = restoreRefreshStarted
         ? this._completePeriodRestoreFromData(data, collection)
         : false;
+      if (
+        !this._periodRestoreLoading
+        && !this._panelComparisonPayloadCurrent(data, this._energyCompare, collection)
+      ) {
+        this._beginEnergyInteractionLoading();
+        if (!this._syncPanelComparisonRange(this._energyCompare, collection)) {
+          collection.refresh?.();
+        }
+        return;
+      }
       const timeRangeReset = this._resetPanelTimeRangeOutsideDayView();
       const periodKindChanged = this._energyComparePeriodKindChanged(
         collection.start,

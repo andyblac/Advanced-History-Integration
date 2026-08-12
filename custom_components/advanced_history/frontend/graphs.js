@@ -816,11 +816,13 @@ export class GraphMethods {
       if (entityOptions.unit == null && unit != null) entityOptions.unit = unit;
     }
     const enabled = this._enabledResolvedEntityIds?.has(entity) !== false;
+    const { compare: compareDefaults, ...options } = entityOptions;
+    const activeCompare = this._effectiveCompare();
+    const compare = this._withTimeRangeComparisonLayout(
+      this._mergeCompareOptions(activeCompare, compareDefaults),
+    );
     if (mode !== "state_timeline") {
-      const { compare: compareDefaults, ...options } = entityOptions;
       delete options.state_map;
-      const activeCompare = this._effectiveCompare();
-      const compare = this._mergeCompareOptions(activeCompare, compareDefaults);
       return compare == null
         ? { ...options, entity, enabled }
         : { ...options, entity, enabled, compare };
@@ -833,7 +835,9 @@ export class GraphMethods {
       entity,
       ...(stateMap ? { state_map: stateMap } : {}),
     };
-    return { ...entityOptions, ...generated, entity, enabled };
+    return compare == null
+      ? { ...options, ...generated, entity, enabled }
+      : { ...options, ...generated, entity, enabled, compare };
   }
 
   _mergeCompareOptions(activeCompare, defaults) {
@@ -848,6 +852,26 @@ export class GraphMethods {
       return { ...defaults, period: active };
     };
     return Array.isArray(activeCompare) ? activeCompare.map(mergeOne) : mergeOne(activeCompare);
+  }
+
+  _withTimeRangeComparisonLayout(compare) {
+    // The card's sequential layout places the preceding time slot directly
+    // before the selected one. It is meaningful only for a selected day slot.
+    if (!this._panelTimeRange || !this._panelDayPeriod?.() || compare == null || compare === false) {
+      return compare;
+    }
+    const withLayout = (value) => {
+      if (value === true) return { layout: "sequential" };
+      if (typeof value === "string") {
+        return value === "previous_period" ? { period: value, layout: "sequential" } : value;
+      }
+      if (!value || typeof value !== "object" || Array.isArray(value) || value.layout != null) {
+        return value;
+      }
+      if ((value.period ?? "previous_period") !== "previous_period") return value;
+      return { ...value, layout: "sequential" };
+    };
+    return Array.isArray(compare) ? compare.map(withLayout) : withLayout(compare);
   }
 
   _colorAutomaticComparisons(configured, palette, entityIndex = 0) {
