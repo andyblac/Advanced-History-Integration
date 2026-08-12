@@ -287,6 +287,7 @@ export class StorageMethods {
       graph_height: this._effectiveGraphHeight(),
     };
     if (this._panelTimeRange) chart.time_range = this._clone(this._panelTimeRange);
+    if (this._panelRollingHours) chart.rolling_hours = this._panelRollingHours;
     if (this._activeSnapshot?.single_graph) chart.single_graph = true;
     if (
       this._activeSnapshot?.attribute_selection &&
@@ -309,11 +310,14 @@ export class StorageMethods {
   }
 
   _snapshotFingerprint(snapshot) {
+    const period = snapshot.chart?.rolling_hours
+      ? { ...snapshot.period, start: null, end: null }
+      : snapshot.period;
     return JSON.stringify({
       targets: snapshot.targets,
       hidden_targets: snapshot.hidden_targets,
       chart: snapshot.chart,
-      period: snapshot.period,
+      period,
     });
   }
 
@@ -646,9 +650,25 @@ export class StorageMethods {
       this._archiveCurrentChart();
     }
     this._activeSnapshot = this._clone(snapshot.chart);
+    const rollingHours = [1, 2, 4, 8, 12, 24].includes(Number(snapshot.chart.rolling_hours))
+      ? Number(snapshot.chart.rolling_hours)
+      : null;
+    this._setPanelRollingHours?.(rollingHours);
     this._panelTimeRange = this._clone(snapshot.chart.time_range) || null;
     if (this._activeSnapshot?.compare === undefined) delete this._activeSnapshot.compare;
-    this._pendingPeriodRestore = this._clone(snapshot.period);
+    // A saved rolling range must resume from the current time rather than
+    // restoring the timestamp captured when the panel or bookmark was saved.
+    // Keep its comparison state separately so a remounted Energy collection
+    // receives it without restoring those stale timestamps.
+    this._pendingRollingCompareRestore = rollingHours ? {
+      compare: snapshot.period?.compare || "",
+      choice: snapshot.period?.compare_choice || null,
+      count: Math.max(
+        1,
+        Math.min(10, Math.trunc(Number(snapshot.period?.compare_count)) || 1),
+      ),
+    } : null;
+    this._pendingPeriodRestore = rollingHours ? null : this._clone(snapshot.period);
     if (this._pendingPeriodRestore?.start) {
       this._beginPeriodRestore(this._pendingPeriodRestore, loadingSavedRange);
     } else {
@@ -676,6 +696,7 @@ export class StorageMethods {
     if (recordChange) this._recordChange(snapshot);
     else this._updateUndoRedoButtons();
     this._render();
+    if (rollingHours) queueMicrotask(() => this._refreshPanelRollingRange?.());
   }
 
   _startFreshSnapshotSession(snapshot) {

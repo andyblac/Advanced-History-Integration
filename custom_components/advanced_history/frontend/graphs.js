@@ -857,9 +857,14 @@ export class GraphMethods {
       return { ...resolvedDefaults, period: active };
     };
     if (Array.isArray(activeCompare)) {
+      const defaultRows = Array.isArray(defaults) ? defaults : null;
       return activeCompare.map((active, index) => mergeOne(
         active,
-        Array.isArray(defaults) ? defaults[index] : defaults,
+        defaultRows
+          ? defaultRows.length === 1
+            ? defaultRows[0]
+            : defaultRows[index]
+          : defaults,
       ));
     }
     return mergeOne(activeCompare, Array.isArray(defaults) ? defaults[0] : defaults);

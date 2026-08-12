@@ -44,6 +44,10 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._activeSnapshot = null;
     this._energyCollection = null;
     this._panelTimeRange = null;
+    this._panelRollingHours = null;
+    this._panelRollingTimer = null;
+    this._pendingRollingCompareRestore = null;
+    this._panelTimeRangePreview = false;
     this._pendingPeriodRestore = null;
     this._currentSnapshot = null;
     this._freshSnapshotSessionFingerprint = null;
@@ -114,7 +118,9 @@ class AdvancedHistoryPanel extends HTMLElement {
     window.addEventListener("pagehide", this._persistPanelsOnPageHide);
     if (!this._initialized || !this._hass) return;
     queueMicrotask(() => {
-      if (this.isConnected && !this._energyUnsubscribe) this._render();
+      if (!this.isConnected) return;
+      if (!this._energyUnsubscribe) this._render();
+      if (this._panelRollingHours) this._refreshPanelRollingRange();
     });
   }
 
@@ -127,6 +133,8 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;
     this._energyCollection = null;
+    if (this._panelRollingTimer) window.clearTimeout(this._panelRollingTimer);
+    this._panelRollingTimer = null;
     if (this._periodRestoreTimer) window.clearTimeout(this._periodRestoreTimer);
     this._periodRestoreTimer = null;
   }

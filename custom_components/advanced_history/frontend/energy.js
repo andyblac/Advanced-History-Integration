@@ -534,7 +534,11 @@ export class EnergyMethods {
       || window.matchMedia("(max-height: 500px)").matches;
     const picker = document.createElement(narrow ? "ha-bottom-sheet" : "wa-popover");
     picker.className = narrow ? "time-range-sheet" : "time-range-popover";
-    picker.innerHTML = `<div class="time-range-fields">
+    const presets = [1, 2, 4, 8, 12, 24];
+    picker.innerHTML = `<div class="time-range-presets" role="group" aria-label="${this._escape(title)}">
+        ${presets.map((hours) => `<button type="button" data-hours="${hours}" aria-pressed="false">${hours}H</button>`).join("")}
+      </div>
+      <div class="time-range-fields">
         <label><span>${this._escape(startLabel)}</span><ha-time-input data-time="start"></ha-time-input></label>
         <span class="time-range-separator" aria-hidden="true">–</span>
         <label><span>${this._escape(endLabel)}</span><ha-time-input data-time="end"></ha-time-input></label>
@@ -565,9 +569,94 @@ export class EnergyMethods {
     }
     startInput.value = this._panelTimeValue(period.start);
     endInput.value = this._panelTimeValue(period.end);
+    const original = {
+      range: this._panelTimeRange ? { ...this._panelTimeRange } : null,
+      rollingHours: this._panelRollingHours,
+      dayStart: new Date(period.dayStart),
+    };
+    let presetRange = null;
+    let accepted = false;
+    let previewFrame = 0;
+    const parseMinutes = (value) => {
+      const match = /^(\d{2}):(\d{2})(?::\d{2})?$/.exec(value || "");
+      return match ? Number(match[1]) * 60 + Number(match[2]) : null;
+    };
+    const formatMinutes = (value) => {
+      const minutes = ((value % 1440) + 1440) % 1440;
+      return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}:00`;
+    };
+    const syncPresetSelection = () => {
+      const start = parseMinutes(startInput.value);
+      const end = parseMinutes(endInput.value);
+      const duration = start == null || end == null
+        ? null
+        : start === 0 && end === 1439
+          ? 1440
+          : start === end
+            ? 1440
+            : ((end - start) + 1440) % 1440;
+      for (const button of picker.querySelectorAll(".time-range-presets button")) {
+        const selected = duration === Number(button.dataset.hours) * 60;
+        button.classList.toggle("selected", selected);
+        button.setAttribute("aria-pressed", String(selected));
+      }
+    };
+    const preview = () => {
+      const presetDayStart = presetRange
+        && startInput.value === presetRange.startValue
+        && endInput.value === presetRange.endValue
+        ? presetRange.dayStart
+        : null;
+      this._panelTimeRangePreview = true;
+      this._setPanelTimeRange(
+        startInput.value,
+        endInput.value,
+        presetDayStart,
+        null,
+      );
+    };
+    const schedulePreview = () => {
+      syncPresetSelection();
+      if (previewFrame) cancelAnimationFrame(previewFrame);
+      previewFrame = requestAnimationFrame(() => {
+        previewFrame = 0;
+        preview();
+      });
+    };
+    for (const button of picker.querySelectorAll(".time-range-presets button")) {
+      button.addEventListener("click", () => {
+        const hours = Number(button.dataset.hours);
+        const end = new Date();
+        end.setSeconds(0, 0);
+        const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
+        const startValue = formatMinutes(start.getHours() * 60 + start.getMinutes());
+        const endValue = formatMinutes(end.getHours() * 60 + end.getMinutes());
+        startInput.value = startValue;
+        endInput.value = endValue;
+        presetRange = { startValue, endValue, dayStart: start };
+        schedulePreview();
+      });
+    }
+    startInput.addEventListener("value-changed", schedulePreview);
+    endInput.addEventListener("value-changed", schedulePreview);
+    startInput.addEventListener("change", schedulePreview);
+    endInput.addEventListener("change", schedulePreview);
+    syncPresetSelection();
     let removed = false;
+    let restored = false;
+    const restore = () => {
+      if (accepted || restored) return;
+      restored = true;
+      if (previewFrame) cancelAnimationFrame(previewFrame);
+      this._panelTimeRangePreview = true;
+      this._setPanelRollingHours(original.rollingHours);
+      this._panelTimeRange = original.range ? { ...original.range } : null;
+      this._applyPanelTimeRangePeriod(original.dayStart, true);
+      this._panelTimeRangePreview = false;
+    };
     const remove = () => {
       if (removed) return;
+      restore();
       removed = true;
       picker.remove();
       if (this._closePanelTimeRangeDialog === close) {
@@ -575,17 +664,39 @@ export class EnergyMethods {
       }
     };
     const close = () => {
+      restore();
       picker.open = false;
       setTimeout(remove, 350);
     };
     this._closePanelTimeRangeDialog = close;
     picker.addEventListener(narrow ? "closed" : "wa-after-hide", remove);
     picker.querySelector('ha-button[data-action="reset"]').addEventListener("click", () => {
-      if (this._setPanelTimeRange("00:00:00", "23:59:00")) close();
+      presetRange = null;
+      startInput.value = "00:00:00";
+      endInput.value = "23:59:00";
+      schedulePreview();
     });
     picker.querySelector('ha-button[data-action="cancel"]').addEventListener("click", close);
     picker.querySelector('ha-button[data-action="apply"]').addEventListener("click", () => {
-      if (this._setPanelTimeRange(startInput.value, endInput.value)) close();
+      const presetDayStart = presetRange
+        && startInput.value === presetRange.startValue
+        && endInput.value === presetRange.endValue
+        ? presetRange.dayStart
+        : null;
+      const rollingHours = presetDayStart ? Number(
+        picker.querySelector(".time-range-presets button.selected")?.dataset.hours
+      ) : null;
+      accepted = this._setPanelTimeRange(
+        startInput.value,
+        endInput.value,
+        presetDayStart,
+        rollingHours,
+      );
+      this._panelTimeRangePreview = false;
+      if (accepted) {
+        this._recordChange(null, true);
+        close();
+      }
     });
     this.shadowRoot.append(picker);
     requestAnimationFrame(() => {
@@ -593,7 +704,7 @@ export class EnergyMethods {
     });
   }
 
-  _setPanelTimeRange(startValue, endValue) {
+  _setPanelTimeRange(startValue, endValue, dayStart = null, rollingHours = null) {
     const period = this._panelDayPeriod();
     if (!this._energyCollection || !period) return false;
     const parse = (value) => {
@@ -610,13 +721,58 @@ export class EnergyMethods {
     const end = endParts[0] * 60 + endParts[1];
     const next = start === 0 && end === 1439 ? null : { start, end };
     const changed = JSON.stringify(this._panelTimeRange) !== JSON.stringify(next);
-    if (!changed) return true;
-    this._panelTimeRange = next;
-    return this._applyPanelTimeRangePeriod(period.dayStart);
+    const rolling = [1, 2, 4, 8, 12, 24].includes(Number(rollingHours))
+      ? Number(rollingHours)
+      : null;
+    const rollingChanged = this._panelRollingHours !== rolling;
+    this._setPanelRollingHours(rolling);
+    if (!changed && !rollingChanged && !(dayStart instanceof Date)) return true;
+    if (changed) this._panelTimeRange = next;
+    return this._applyPanelTimeRangePeriod(
+      dayStart instanceof Date ? dayStart : period.dayStart,
+      Boolean(rolling),
+    );
+  }
+
+  _setPanelRollingHours(hours) {
+    if (this._panelRollingTimer) window.clearTimeout(this._panelRollingTimer);
+    this._panelRollingTimer = null;
+    this._panelRollingHours = [1, 2, 4, 8, 12, 24].includes(Number(hours))
+      ? Number(hours)
+      : null;
+    if (!this._panelRollingHours || !this.isConnected) return;
+    const delay = 60_000 - (Date.now() % 60_000) + 250;
+    this._panelRollingTimer = window.setTimeout(() => {
+      this._panelRollingTimer = null;
+      this._refreshPanelRollingRange();
+    }, delay);
+  }
+
+  _refreshPanelRollingRange() {
+    const hours = this._panelRollingHours;
+    if (!hours || !this.isConnected) return;
+    if (!this._energyCollection) {
+      if (this._panelRollingTimer) window.clearTimeout(this._panelRollingTimer);
+      this._panelRollingTimer = window.setTimeout(() => {
+        this._panelRollingTimer = null;
+        this._refreshPanelRollingRange();
+      }, 250);
+      return;
+    }
+    const end = new Date();
+    end.setSeconds(0, 0);
+    const start = new Date(end.getTime() - hours * 60 * 60 * 1000);
+    this._panelTimeRange = {
+      start: start.getHours() * 60 + start.getMinutes(),
+      end: end.getHours() * 60 + end.getMinutes(),
+    };
+    this._applyPanelTimeRangePeriod(start, true);
+    this._setPanelRollingHours(hours);
   }
 
   _resetPanelTimeRangeOutsideDayView() {
     if (!this._panelTimeRange || this._panelDayPeriod()) return false;
+    this._setPanelRollingHours(null);
     this._closePanelTimeRangeDialog?.();
     this._panelTimeRange = null;
     this._syncPanelTimeRangeControl();
@@ -627,6 +783,7 @@ export class EnergyMethods {
     const period = this._panelDayPeriod();
     if (!this._energyCollection || !period || ![-1, 1].includes(direction)) return false;
     if (!this._panelTimeRange) return this._shiftPanelDay(direction);
+    this._setPanelRollingHours(null);
     const { start, end } = this._panelTimeRange;
     const duration = (end - start + 1440) % 1440;
     if (!duration) return false;
@@ -644,7 +801,7 @@ export class EnergyMethods {
     return this._applyPanelTimeRangePeriod(dayStart);
   }
 
-  _applyPanelTimeRangePeriod(dayStart) {
+  _applyPanelTimeRangePeriod(dayStart, forceRefresh = false) {
     const collection = this._energyCollection;
     if (!collection || !(dayStart instanceof Date)) return false;
     const start = new Date(dayStart);
@@ -672,7 +829,7 @@ export class EnergyMethods {
     // publishes its fresh payload.
     this._renderGraphs();
     this._syncPanelTimeRangeControl();
-    if (changed) collection.refresh?.();
+    if (changed || forceRefresh) collection.refresh?.();
     else this._recordChange(null, true);
     return true;
   }
@@ -681,6 +838,7 @@ export class EnergyMethods {
     const period = this._panelDayPeriod();
     if (!this._energyCollection || !period || ![-1, 1].includes(direction)) return false;
     const start = new Date(period.dayStart);
+    this._setPanelRollingHours(null);
     start.setDate(start.getDate() + direction);
     this._closePanelTimeRangeDialog?.();
     return this._applyPanelTimeRangePeriod(start);
@@ -949,6 +1107,15 @@ export class EnergyMethods {
       return;
     }
     this._energyCollection = collection;
+    if (this._panelRollingHours && this._pendingRollingCompareRestore) {
+      const restore = this._pendingRollingCompareRestore;
+      this._pendingRollingCompareRestore = null;
+      this._energyCompareChoice = restore.choice;
+      this._energyCompareCount = restore.count;
+      if (collection.compare !== restore.compare) {
+        collection.setCompare?.(restore.compare);
+      }
+    }
     // Older partial-day builds stored the selected hours directly in HA's
     // shared Energy collection. Convert that cached selection back to a
     // native full-day period before mounting the replacement graph cards.
@@ -1070,7 +1237,7 @@ export class EnergyMethods {
       // The collection update is authoritative for picker changes that can
       // finish after the click fallback, including clearing Compare.
       this._syncPanelTimeRangeControl();
-      if (data?.start && !this._periodRestoreLoading) {
+      if (data?.start && !this._periodRestoreLoading && !this._panelTimeRangePreview) {
         this._recordChange(null, !periodRestored);
       }
     });
@@ -1170,6 +1337,8 @@ export class EnergyMethods {
     this._finishPeriodRestore();
     this._finishEnergyInteractionLoading();
     this._closePanelTimeRangeDialog?.();
+    this._setPanelRollingHours(null);
+    this._pendingRollingCompareRestore = null;
     this._panelTimeRange = null;
     this._energyCompare = null;
     this._energyCompareChoice = null;

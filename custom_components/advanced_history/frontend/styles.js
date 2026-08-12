@@ -219,6 +219,10 @@ export const panelStyles = `
   .time-range-popover { --wa-space-l:0; z-index:19; }
   .time-range-popover::part(body) { width:310px; max-width:calc(100vw - 20px); padding:0; overflow:hidden; }
   .time-range-sheet { z-index:19; }
+  .time-range-presets { padding:var(--ha-space-3,12px) var(--ha-space-3,12px) 0; display:flex; align-items:center; justify-content:center; gap:6px; }
+  .time-range-presets button { min-width:38px; height:32px; padding:0 8px; border:0; border-radius:9px; color:var(--secondary-text-color); background:var(--secondary-background-color); font:inherit; font-size:13px; font-weight:500; cursor:pointer; }
+  .time-range-presets button:hover { color:var(--primary-text-color); }
+  .time-range-presets button.selected { color:var(--text-primary-color,white); background:var(--primary-color); }
   .time-range-fields { width:100%; box-sizing:border-box; padding:var(--ha-space-3,12px); display:grid; grid-template-columns:minmax(0,1fr) 30px minmax(0,1fr); align-items:end; gap:0; }
   .time-range-fields label { min-width:0; display:grid; gap:4px; color:var(--secondary-text-color); font-size:13px; }
   .time-range-fields ha-time-input { width:100%; color:var(--primary-text-color); font-size:16px; }
