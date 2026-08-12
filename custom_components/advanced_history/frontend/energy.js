@@ -998,7 +998,7 @@ export class EnergyMethods {
     compareHost.addEventListener("click", syncAfterInteraction);
   }
 
-  _resetEnergySelection(collection = this._energyCollection) {
+  _resetEnergySelection(collection = this._energyCollection, forceRefresh = false) {
     this._pendingPeriodRestore = null;
     this._finishPeriodRestore();
     this._finishEnergyInteractionLoading();
@@ -1033,7 +1033,7 @@ export class EnergyMethods {
     const compareChanged = Boolean(collection.compare);
     if (periodChanged) collection.setPeriod(start, end);
     if (compareChanged) collection.setCompare?.("");
-    if (periodChanged || compareChanged) collection.refresh?.();
+    if (periodChanged || compareChanged || forceRefresh) collection.refresh?.();
     return periodChanged || compareChanged;
   }
 

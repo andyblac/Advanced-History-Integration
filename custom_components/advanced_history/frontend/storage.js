@@ -670,7 +670,7 @@ export class StorageMethods {
     this._targets = this._normalizeTargets(snapshot.targets);
     this._hiddenTargets = this._normalizeTargets(snapshot.hidden_targets || {});
     this._pruneHiddenTargets();
-    if (!this._targetCount()) this._resetEnergySelection();
+    if (!this._targetCount()) this._resetEnergySelection(this._energyCollection, true);
     this._saveTargets();
     this._notice = "";
     if (recordChange) this._recordChange(snapshot);
