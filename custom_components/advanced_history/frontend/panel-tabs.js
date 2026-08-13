@@ -384,7 +384,17 @@ export class PanelTabsMethods {
   }
 
   _bindPanelTabs() {
-    this.shadowRoot.getElementById("add-panel")?.addEventListener("click", () => this._addPanelTab());
+    this.shadowRoot.getElementById("add-panel")?.addEventListener("click", () => {
+      if (!this._panelTabsDependencySupported()) {
+        this.dispatchEvent(new CustomEvent("hass-notification", {
+          detail: { message: this._customLocalize("add_panel_requires_version") },
+          bubbles: true,
+          composed: true,
+        }));
+        return;
+      }
+      this._addPanelTab();
+    });
     for (const button of this.shadowRoot.querySelectorAll("[data-panel-tab]")) {
       let switchTimer = null;
       button.addEventListener("click", () => {
