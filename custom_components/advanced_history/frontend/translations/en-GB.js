@@ -19,6 +19,8 @@ export default {
   "clear_bookmarks": "Clear bookmarks",
   "clear_history": "Clear history",
   "confirm_clear_bookmarks": "Clear all bookmarks?",
+  "confirm_delete_bookmark": "Delete bookmark ‘{name}’?",
+  "delete_bookmark_title": "Delete bookmark?",
   "confirm_clear_history": "Clear all chart history?",
   "unsaved_chart_title": "Unsaved chart changes",
   "clear_new_chart_message": "Create a bookmark before clearing this chart?",

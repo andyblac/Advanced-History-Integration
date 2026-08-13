@@ -19,6 +19,8 @@ export default {
   "clear_bookmarks": "Effacer les favoris",
   "clear_history": "Effacer l’historique",
   "confirm_clear_bookmarks": "Effacer tous les favoris ?",
+  "confirm_delete_bookmark": "Supprimer le favori « {name} » ?",
+  "delete_bookmark_title": "Supprimer le favori ?",
   "confirm_clear_history": "Effacer tout l’historique des graphiques ?",
   "unsaved_chart_title": "Modifications non enregistrées du graphique",
   "clear_new_chart_message": "Créer un favori avant d’effacer ce graphique ?",

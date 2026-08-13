@@ -19,6 +19,8 @@ export default {
   "clear_bookmarks": "Bladwijzers wissen",
   "clear_history": "Geschiedenis wissen",
   "confirm_clear_bookmarks": "Alle bladwijzers wissen?",
+  "confirm_delete_bookmark": "Bladwijzer ‘{name}’ verwijderen?",
+  "delete_bookmark_title": "Bladwijzer verwijderen?",
   "confirm_clear_history": "Alle grafiekgeschiedenis wissen?",
   "unsaved_chart_title": "Niet-opgeslagen grafiekwijzigingen",
   "clear_new_chart_message": "Een bladwijzer maken voordat deze grafiek wordt gewist?",

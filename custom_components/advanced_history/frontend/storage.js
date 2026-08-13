@@ -572,6 +572,30 @@ export class StorageMethods {
     return this._unsavedDialogPromise;
   }
 
+  async _showDeleteBookmarkDialog(bookmark) {
+    if (typeof window.loadCardHelpers !== "function") return false;
+    const helpers = await window.loadCardHelpers();
+    if (typeof helpers.showConfirmationDialog !== "function") return false;
+    const title = this._customLocalize("delete_bookmark_title");
+    let closed = false;
+    const dialogPromise = helpers.showConfirmationDialog(this, {
+      title,
+      text: this._customLocalize("confirm_delete_bookmark", {
+        name: bookmark.name || this._snapshotLabel(bookmark),
+      }),
+      dismissText: this._localize("ui.common.cancel", "Cancel"),
+      confirmText: this._localize("ui.common.delete", "Delete"),
+      destructive: true,
+    });
+    const stopCloseButtonSearch = this._addNativeConfirmationCloseButton(
+      title,
+      () => { closed = true; },
+    );
+    const confirmed = await dialogPromise;
+    stopCloseButtonSearch();
+    return !closed && Boolean(confirmed);
+  }
+
   _addNativeConfirmationCloseButton(title, onClose) {
     let stopped = false;
     let attempts = 0;
@@ -1172,7 +1196,7 @@ export class StorageMethods {
     backdrop.querySelector('[data-action="close-dialog"]').addEventListener("click", () => backdrop.remove());
     backdrop.querySelector('[data-action="save-current"]')?.addEventListener("click", () => {
       const input = backdrop.querySelector("#bookmark-name");
-      if (this._saveCurrentBookmark(input.value)) this._renderLibrary(kind);
+      if (this._saveCurrentBookmark(input.value)) backdrop.remove();
     });
     backdrop.querySelector('[data-action="share"]')?.addEventListener("click", (event) => this._copyShareLink(event.currentTarget));
     backdrop.querySelector('[data-action="clear"]')?.addEventListener("click", () => {
@@ -1262,7 +1286,12 @@ export class StorageMethods {
     backdrop.querySelectorAll("[data-update-snapshot]").forEach((button) => button.addEventListener("click", () => {
       if (this._updateBookmark(button.dataset.updateSnapshot)) this._renderLibrary(kind);
     }));
-    backdrop.querySelectorAll("[data-delete-snapshot]").forEach((button) => button.addEventListener("click", () => {
+    backdrop.querySelectorAll("[data-delete-snapshot]").forEach((button) => button.addEventListener("click", async () => {
+      if (isBookmarks) {
+        const bookmark = items.find((item) => item.id === button.dataset.deleteSnapshot);
+        if (!bookmark) return;
+        if (!await this._showDeleteBookmarkDialog(bookmark)) return;
+      }
       if (isBookmarks) this._clearLoadedBookmark(button.dataset.deleteSnapshot);
       this._saveLibrary(key, items.filter((item) => item.id !== button.dataset.deleteSnapshot));
       this._renderLibrary(kind);

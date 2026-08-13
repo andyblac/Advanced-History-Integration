@@ -19,6 +19,8 @@ export default {
   "clear_bookmarks": "Lesezeichen löschen",
   "clear_history": "Verlauf löschen",
   "confirm_clear_bookmarks": "Alle Lesezeichen löschen?",
+  "confirm_delete_bookmark": "Lesezeichen „{name}“ löschen?",
+  "delete_bookmark_title": "Lesezeichen löschen?",
   "confirm_clear_history": "Den gesamten Diagrammverlauf löschen?",
   "unsaved_chart_title": "Nicht gespeicherte Diagrammänderungen",
   "clear_new_chart_message": "Vor dem Leeren dieses Diagramms ein Lesezeichen erstellen?",

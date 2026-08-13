@@ -19,6 +19,8 @@ export default {
   "clear_bookmarks": "Borrar marcadores",
   "clear_history": "Borrar historial",
   "confirm_clear_bookmarks": "¿Borrar todos los marcadores?",
+  "confirm_delete_bookmark": "¿Borrar el marcador «{name}»?",
+  "delete_bookmark_title": "¿Borrar marcador?",
   "confirm_clear_history": "¿Borrar todo el historial de gráficos?",
   "unsaved_chart_title": "Cambios sin guardar en el gráfico",
   "clear_new_chart_message": "¿Crear un marcador antes de borrar este gráfico?",

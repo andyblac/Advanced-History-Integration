@@ -19,6 +19,8 @@ export default {
   "clear_bookmarks": "Cancella segnalibri",
   "clear_history": "Cancella cronologia",
   "confirm_clear_bookmarks": "Cancellare tutti i segnalibri?",
+  "confirm_delete_bookmark": "Eliminare il segnalibro “{name}”?",
+  "delete_bookmark_title": "Eliminare il segnalibro?",
   "confirm_clear_history": "Cancellare tutta la cronologia dei grafici?",
   "unsaved_chart_title": "Modifiche al grafico non salvate",
   "clear_new_chart_message": "Creare un segnalibro prima di cancellare questo grafico?",
