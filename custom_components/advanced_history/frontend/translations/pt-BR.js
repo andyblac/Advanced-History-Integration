@@ -7,6 +7,8 @@ export default {
   "graph_settings": "Configurações do gráfico",
   "numeric_history": "Histórico numérico",
   "state_history": "Histórico de estados",
+  "primary_axis": "Eixo primário",
+  "secondary_axis": "Eixo secundário",
   "bookmark_name": "Nome do favorito",
   "save_current": "Salvar atual",
   "update_bookmark": "Atualizar favorito",

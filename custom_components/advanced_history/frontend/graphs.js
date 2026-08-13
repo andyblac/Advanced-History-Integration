@@ -194,6 +194,8 @@ export class GraphMethods {
       }
       return configured;
     });
+    const hasSecondaryAxis = mode !== "state_timeline"
+      && entities.some((entity) => entity.y_axis === "secondary");
     const height = this._effectiveGraphHeight();
     const config = {
       type: `custom:${CARD_TAG}`, card_header: title, chart_mode: mode,
@@ -201,6 +203,7 @@ export class GraphMethods {
       hours_to_show: this._effectiveDefaultHours(),
       height,
       ...cardOptions,
+      show_y2_axis: hasSecondaryAxis,
       ...detailOptions,
       ...(mode === "state_timeline"
         ? { height: "auto", auto_scale_points: false, group_by: "raw" }
@@ -823,6 +826,7 @@ export class GraphMethods {
     );
     if (mode !== "state_timeline") {
       delete options.state_map;
+      options.y_axis = this._y2ResolvedEntityIds?.has(entity) ? "secondary" : "primary";
       return compare == null
         ? { ...options, entity, enabled }
         : { ...options, entity, enabled, compare };
@@ -835,6 +839,7 @@ export class GraphMethods {
       entity,
       ...(stateMap ? { state_map: stateMap } : {}),
     };
+    delete options.y_axis;
     return compare == null
       ? { ...options, ...generated, entity, enabled }
       : { ...options, ...generated, entity, enabled, compare };

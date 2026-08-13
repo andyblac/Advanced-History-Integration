@@ -132,10 +132,21 @@ export class DiagnosticsMethods {
           explicit_entities: this._targets.entity_id.length,
           resolved_entities: resolvedEntities.size,
         },
+        y2_targets: {
+          areas: this._y2Targets.area_id.length,
+          devices: this._y2Targets.device_id.length,
+          explicit_entities: this._y2Targets.entity_id.length,
+          resolved_entities: this._y2ResolvedEntityIds?.size || 0,
+        },
         hidden_targets: {
           areas: this._hiddenTargets.area_id.length,
           devices: this._hiddenTargets.device_id.length,
           entities: this._hiddenTargets.entity_id.length,
+        },
+        hidden_y2_targets: {
+          areas: this._hiddenY2Targets.area_id.length,
+          devices: this._hiddenY2Targets.device_id.length,
+          entities: this._hiddenY2Targets.entity_id.length,
         },
         period: snapshot.period ? {
           start: snapshot.period.start || null,

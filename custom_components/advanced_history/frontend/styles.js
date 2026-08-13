@@ -55,7 +55,21 @@ export const panelStyles = `
   .panel-tab-close:hover, .panel-tab-select:hover { background:transparent; }
   .panel-tab-close ha-icon { display:block; width:18px; height:18px; line-height:0; --mdc-icon-size:18px; }
   .content { max-width:1400px; margin:auto; padding:0 16px 104px; }
-  .filters { display:flex; align-items:flex-start; gap:16px; margin-bottom:16px; }
+  .filters { display:flex; align-items:stretch; gap:12px; margin-bottom:16px; }
+  .axis-target-group { flex:1 1 0; min-width:0; }
+  .axis-target-group.axis-target-compact { flex:0 1 190px; }
+  .axis-target-label {
+    min-height:24px; margin:0 4px 4px; display:flex; align-items:center; gap:7px;
+    color:var(--secondary-text-color); font-size:12px; font-weight:500;
+  }
+  .axis-badge {
+    min-width:24px; padding:2px 6px; box-sizing:border-box; border-radius:10px;
+    color:var(--text-primary-color,var(--primary-text-color)); background:var(--primary-color); text-align:center;
+  }
+  .axis-target-primary .axis-badge { background:var(--ha-color-green-80,var(--success-color)); }
+  .axis-target-secondary .axis-badge { background:var(--primary-color); }
+  .axis-target-secondary .axis-target-label { justify-content:flex-end; }
+  .axis-target-divider { flex:0 0 1px; align-self:stretch; margin-top:28px; background:var(--divider-color); }
   .energy-nav-floating {
     position:fixed; z-index:20; left:16px; right:16px; bottom:max(12px,env(safe-area-inset-bottom));
     width:min(600px,calc(100vw - 32px)); margin-inline:auto;
@@ -245,6 +259,8 @@ export const panelStyles = `
   .diagnostics-preview { flex:1; min-height:0; margin:0; padding:18px 24px; overflow:auto; color:var(--primary-text-color); background:var(--primary-background-color); font:13px/1.5 var(--code-font-family,monospace); white-space:pre; tab-size:2; }
   @media (max-width:900px) {
     .filters { flex-direction:column; gap:8px; }
+    .axis-target-group.axis-target-compact { flex:1 1 auto; width:100%; }
+    .axis-target-divider { width:100%; height:1px; margin:0; }
     .target-picker { width:100%; min-width:0; }
   }
   @media (max-width:768px) {

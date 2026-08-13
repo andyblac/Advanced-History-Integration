@@ -7,6 +7,8 @@ export default {
   "graph_settings": "Grafiekinstellingen",
   "numeric_history": "Numerieke geschiedenis",
   "state_history": "Statusgeschiedenis",
+  "primary_axis": "Primaire as",
+  "secondary_axis": "Secundaire as",
   "bookmark_name": "Naam van bladwijzer",
   "save_current": "Huidige opslaan",
   "update_bookmark": "Bladwijzer bijwerken",

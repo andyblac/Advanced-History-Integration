@@ -109,6 +109,8 @@ export class PanelTabsMethods {
       saved_at: new Date().toISOString(),
       targets: { area_id: [], device_id: [], entity_id: [] },
       hidden_targets: { area_id: [], device_id: [], entity_id: [] },
+      y2_targets: { area_id: [], device_id: [], entity_id: [] },
+      hidden_y2_targets: { area_id: [], device_id: [], entity_id: [] },
       chart,
       period: {
         start: start.toISOString(),

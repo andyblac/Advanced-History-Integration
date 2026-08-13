@@ -7,6 +7,8 @@ export default {
   "graph_settings": "Impostazioni del grafico",
   "numeric_history": "Cronologia numerica",
   "state_history": "Cronologia degli stati",
+  "primary_axis": "Asse principale",
+  "secondary_axis": "Asse secondario",
   "bookmark_name": "Nome del segnalibro",
   "save_current": "Salva corrente",
   "update_bookmark": "Aggiorna segnalibro",

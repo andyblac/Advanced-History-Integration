@@ -7,6 +7,8 @@ export default {
   "graph_settings": "Diagrammeinstellungen",
   "numeric_history": "Numerischer Verlauf",
   "state_history": "Zustandsverlauf",
+  "primary_axis": "Primärachse",
+  "secondary_axis": "Sekundärachse",
   "bookmark_name": "Name des Lesezeichens",
   "save_current": "Aktuelles Diagramm speichern",
   "update_bookmark": "Lesezeichen aktualisieren",

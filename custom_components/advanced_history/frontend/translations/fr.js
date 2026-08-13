@@ -7,6 +7,8 @@ export default {
   "graph_settings": "Paramètres du graphique",
   "numeric_history": "Historique numérique",
   "state_history": "Historique des états",
+  "primary_axis": "Axe principal",
+  "secondary_axis": "Axe secondaire",
   "bookmark_name": "Nom du favori",
   "save_current": "Enregistrer l’affichage actuel",
   "update_bookmark": "Mettre à jour le favori",

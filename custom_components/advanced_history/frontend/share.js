@@ -63,11 +63,18 @@ export class ShareMethods {
     for (const values of Object.values(hiddenTargets)) {
       if (!values.every((item) => typeof item === "string" && item.length <= 255)) return null;
     }
+    const y2Targets = this._normalizeTargets(value.y2_targets || {});
+    const hiddenY2Targets = this._normalizeTargets(value.hidden_y2_targets || {});
+    for (const values of [...Object.values(y2Targets), ...Object.values(hiddenY2Targets)]) {
+      if (!values.every((item) => typeof item === "string" && item.length <= 255)) return null;
+    }
 
     const snapshot = this._clone(value);
     snapshot.schema = 1;
     snapshot.targets = targets;
     snapshot.hidden_targets = hiddenTargets;
+    snapshot.y2_targets = y2Targets;
+    snapshot.hidden_y2_targets = hiddenY2Targets;
     snapshot.source_bookmark_id = null;
     snapshot.id = this._newSnapshotId();
     snapshot.name = this._snapshotLabel(snapshot);
@@ -107,6 +114,9 @@ export class ShareMethods {
     ["area_id", "device_id", "entity_id"].forEach((key) => {
       url.searchParams.delete(key);
       this._targets[key].forEach((value) => url.searchParams.append(key, value));
+      const y2Key = `y2_${key}`;
+      url.searchParams.delete(y2Key);
+      this._y2Targets[key].forEach((value) => url.searchParams.append(y2Key, value));
     });
     history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }
@@ -143,7 +153,10 @@ export class ShareMethods {
       // when the clipboard API is called, particularly Safari and HA's iOS WebView.
       const encoded = this._encodeSharedSnapshot(this._shareableSnapshot());
       const url = new URL(location.href);
-      ["area_id", "device_id", "entity_id"].forEach((key) => url.searchParams.delete(key));
+      ["area_id", "device_id", "entity_id"].forEach((key) => {
+        url.searchParams.delete(key);
+        url.searchParams.delete(`y2_${key}`);
+      });
       url.searchParams.set(SHARE_QUERY_PARAM, encoded);
       const copied = await this._writeShareLink(url.href);
       if (!copied) throw new Error("Clipboard write failed");

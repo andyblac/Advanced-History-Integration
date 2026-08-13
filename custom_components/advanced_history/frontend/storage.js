@@ -31,13 +31,14 @@ export class StorageMethods {
       this._notice = this._customLocalize("shared_link_invalid");
     }
     const fromUrl = { area_id: params.getAll("area_id"), device_id: params.getAll("device_id"), entity_id: params.getAll("entity_id") };
+    const y2FromUrl = { area_id: params.getAll("y2_area_id"), device_id: params.getAll("y2_device_id"), entity_id: params.getAll("y2_entity_id") };
     const previous = this._loadCurrentSnapshot();
     const incomingSnapshot = handedOffSnapshot || sharedSnapshot;
     if (incomingSnapshot) {
       this._loadedBookmarkId = null;
       if (
         previous?.targets &&
-        this._targetCount(this._normalizeTargets(previous.targets)) &&
+        this._snapshotTargetCount(previous) &&
         this._snapshotFingerprint(previous) !== this._snapshotFingerprint(incomingSnapshot)
       ) {
         this._archiveSnapshot(previous);
@@ -46,6 +47,8 @@ export class StorageMethods {
       }
       this._targets = this._normalizeTargets(incomingSnapshot.targets);
       this._hiddenTargets = this._normalizeTargets(incomingSnapshot.hidden_targets || {});
+      this._y2Targets = this._normalizeTargets(incomingSnapshot.y2_targets || {});
+      this._hiddenY2Targets = this._normalizeTargets(incomingSnapshot.hidden_y2_targets || {});
       this._activeSnapshot = this._clone(incomingSnapshot.chart);
       this._panelTimeRange = this._clone(incomingSnapshot.chart?.time_range) || null;
       this._pendingPeriodRestore = this._clone(incomingSnapshot.period);
@@ -59,15 +62,17 @@ export class StorageMethods {
       this._replaceIncomingUrlWithTargets();
       return;
     }
-    const hasUrlTargets = Object.values(fromUrl).some((items) => items.length);
+    const hasUrlTargets = [...Object.values(fromUrl), ...Object.values(y2FromUrl)]
+      .some((items) => items.length);
     if (hasUrlTargets) {
       this._loadedBookmarkId = null;
       if (
         previous?.targets &&
-        this._targetCount(this._normalizeTargets(previous.targets)) &&
+        this._snapshotTargetCount(previous) &&
         this._snapshotFingerprint(previous) !== this._snapshotFingerprint({
           ...previous,
           targets: fromUrl,
+          y2_targets: y2FromUrl,
         })
       ) {
         this._archiveSnapshot(previous);
@@ -77,6 +82,8 @@ export class StorageMethods {
       }
       this._targets = fromUrl;
       this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
+      this._y2Targets = y2FromUrl;
+      this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
     }
     else {
       try {
@@ -86,7 +93,8 @@ export class StorageMethods {
     }
     if (
       previous?.targets &&
-      JSON.stringify(this._normalizeTargets(previous.targets)) === JSON.stringify(this._targets)
+      JSON.stringify(this._normalizeTargets(previous.targets)) === JSON.stringify(this._targets) &&
+      JSON.stringify(this._normalizeTargets(previous.y2_targets || {})) === JSON.stringify(this._y2Targets)
     ) {
       this._currentSnapshot = this._clone(previous);
       this._loadedBookmarkId = previous.source_bookmark_id || null;
@@ -107,6 +115,8 @@ export class StorageMethods {
         this._beginPeriodRestore(this._pendingPeriodRestore);
       }
       this._hiddenTargets = this._normalizeTargets(previous.hidden_targets || {});
+      this._y2Targets = this._normalizeTargets(previous.y2_targets || {});
+      this._hiddenY2Targets = this._normalizeTargets(previous.hidden_y2_targets || {});
       this._pruneHiddenTargets();
     }
   }
@@ -128,6 +138,9 @@ export class StorageMethods {
     ["area_id", "device_id", "entity_id"].forEach((key) => {
       url.searchParams.delete(key);
       this._targets[key].forEach((value) => url.searchParams.append(key, value));
+      const y2Key = `y2_${key}`;
+      url.searchParams.delete(y2Key);
+      this._y2Targets[key].forEach((value) => url.searchParams.append(y2Key, value));
     });
     history.replaceState(null, "", `${url.pathname}${url.search}${url.hash}`);
   }
@@ -303,6 +316,8 @@ export class StorageMethods {
       saved_at: new Date().toISOString(),
       targets: this._clone(this._targets),
       hidden_targets: this._clone(this._hiddenTargets),
+      y2_targets: this._clone(this._y2Targets),
+      hidden_y2_targets: this._clone(this._hiddenY2Targets),
       chart,
       period,
       source_bookmark_id: this._loadedBookmarkId || null,
@@ -316,6 +331,8 @@ export class StorageMethods {
     return JSON.stringify({
       targets: snapshot.targets,
       hidden_targets: snapshot.hidden_targets,
+      y2_targets: snapshot.y2_targets,
+      hidden_y2_targets: snapshot.hidden_y2_targets,
       chart: snapshot.chart,
       period,
     });
@@ -339,11 +356,15 @@ export class StorageMethods {
   }
 
   _snapshotLabel(snapshot = null) {
-    const targets = this._normalizeTargets(snapshot?.targets || this._targets);
+    const targets = this._normalizeTargets(snapshot ? snapshot.targets : this._targets);
+    const y2Targets = this._normalizeTargets(snapshot ? snapshot.y2_targets : this._y2Targets);
     const names = [
       ...targets.area_id.map((id) => this._areaName(id)),
       ...targets.device_id.map((id) => this._deviceName(id)),
       ...targets.entity_id.map((id) => this._entityName(id)),
+      ...y2Targets.area_id.map((id) => this._areaName(id)),
+      ...y2Targets.device_id.map((id) => this._deviceName(id)),
+      ...y2Targets.entity_id.map((id) => this._entityName(id)),
     ];
     if (!names.length) return this._customLocalize("empty_chart");
     return names.length > 3 ? `${names.slice(0, 3).join(", ")} +${names.length - 3}` : names.join(", ");
@@ -351,7 +372,7 @@ export class StorageMethods {
 
   _recordChange(snapshot = null, bookmarkEdit = false) {
     const source = snapshot ? this._clone(snapshot) : this._captureSnapshot();
-    if (!this._targetCount(this._normalizeTargets(source.targets || {}))) {
+    if (!this._snapshotTargetCount(source)) {
       this._loadedBookmarkId = null;
     }
     source.source_bookmark_id = this._loadedBookmarkId || null;
@@ -413,7 +434,7 @@ export class StorageMethods {
 
   _archiveSnapshot(snapshot) {
     if (!snapshot?.targets || !snapshot?.chart) return false;
-    if (!this._targetCount(this._normalizeTargets(snapshot.targets))) return false;
+    if (!this._snapshotTargetCount(snapshot)) return false;
     const archived = this._clone(snapshot);
     archived.id = this._newSnapshotId();
     archived.name = archived.name || this._snapshotLabel(archived);
@@ -446,6 +467,8 @@ export class StorageMethods {
     this._activeSnapshot = null;
     this._targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
+    this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
+    this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._resetEnergySelection();
     this._saveTargets();
     this._recordChange();
@@ -610,7 +633,7 @@ export class StorageMethods {
   _bookmarkHasChanges(bookmark) {
     if (!bookmark || bookmark.id !== this._loadedBookmarkId) return false;
     const current = this._currentSnapshot || this._captureSnapshot();
-    if (!this._targetCount(this._normalizeTargets(current.targets || {}))) return false;
+    if (!this._snapshotTargetCount(current)) return false;
     return this._loadedBookmarkDirty;
   }
 
@@ -644,8 +667,8 @@ export class StorageMethods {
     if (!snapshot?.targets || !snapshot?.chart) return;
     if (
       recordChange &&
-      this._targetCount(this._targets) &&
-      !this._targetCount(this._normalizeTargets(snapshot.targets))
+      this._targetCount() &&
+      !this._snapshotTargetCount(snapshot)
     ) {
       this._archiveCurrentChart();
     }
@@ -689,6 +712,8 @@ export class StorageMethods {
     }
     this._targets = this._normalizeTargets(snapshot.targets);
     this._hiddenTargets = this._normalizeTargets(snapshot.hidden_targets || {});
+    this._y2Targets = this._normalizeTargets(snapshot.y2_targets || {});
+    this._hiddenY2Targets = this._normalizeTargets(snapshot.hidden_y2_targets || {});
     this._pruneHiddenTargets();
     if (!this._targetCount()) this._resetEnergySelection(this._energyCollection, true);
     this._saveTargets();
@@ -984,8 +1009,7 @@ export class StorageMethods {
   }
 
   _snapshotSummary(snapshot) {
-    const targets = this._normalizeTargets(snapshot.targets || {});
-    const count = this._targetCount(targets);
+    const count = this._snapshotTargetCount(snapshot);
     const hours = Number(snapshot.chart?.default_hours) || 24;
     const height = Number(snapshot.chart?.graph_height) || 300;
     const periodStart = snapshot.period?.start ? new Date(snapshot.period.start) : null;

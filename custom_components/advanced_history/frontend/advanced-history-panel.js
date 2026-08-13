@@ -24,6 +24,8 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._entities = [];
     this._targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
+    this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
+    this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._draftTargets = null;
     this._activeTab = "area_id";
     this._dialogSearch = "";
@@ -40,6 +42,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._energyComparePeriodKind = null;
     this._energyUnsubscribe = null;
     this._nativeTargetPicker = null;
+    this._nativeY2TargetPicker = null;
     this._editorAutoColors = new Map();
     this._activeSnapshot = null;
     this._energyCollection = null;
@@ -78,7 +81,11 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._hass = value;
     if (this._nativeTargetPicker) {
       this._nativeTargetPicker.hass = this._targetPickerHass();
-      this._syncNativeTargetVisibility();
+      this._syncNativeTargetVisibility("primary");
+    }
+    if (this._nativeY2TargetPicker) {
+      this._nativeY2TargetPicker.hass = this._targetPickerHass();
+      this._syncNativeTargetVisibility("secondary");
     }
     for (const card of this._cards) this._setGraphCardHass(card, value);
     if (!this._loaded && value) this._initialize();
@@ -241,7 +248,12 @@ class AdvancedHistoryPanel extends HTMLElement {
     const redo = this._localize("ui.common.redo", "Redo");
     const addPanel = this._customLocalize("add_panel");
     const dependencyMissing = Boolean(this._cardLoadError);
+    const hasY1Targets = Boolean(this._targetCount(this._targets));
+    const hasY2Targets = Boolean(this._targetCount(this._y2Targets));
+    const y1TargetClass = !hasY1Targets && hasY2Targets ? " axis-target-compact" : "";
+    const y2TargetClass = !hasY2Targets && hasY1Targets ? " axis-target-compact" : "";
     this._nativeTargetPicker = null;
+    this._nativeY2TargetPicker = null;
     this.shadowRoot.innerHTML = `
       <style>${css}</style>
       <header class="appbar">
@@ -256,9 +268,19 @@ class AdvancedHistoryPanel extends HTMLElement {
         <button id="remove-all" class="icon-button" title="${this._escape(removeAll)}" ${this._targetCount() ? "" : "hidden"}><ha-icon icon="mdi:filter-remove-outline"></ha-icon></button>
       </header>
       <main class="content">
-        ${dependencyMissing ? "" : `<section class="filters">
-          <div id="target-picker-host" class="native-target-picker">
-            <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+        ${dependencyMissing ? "" : `<section class="filters axis-targets">
+          <div class="axis-target-group axis-target-primary${y1TargetClass}">
+            <div class="axis-target-label"><span class="axis-badge">Y1</span><span>${this._escape(this._customLocalize("primary_axis"))}</span></div>
+            <div id="target-picker-host" class="native-target-picker">
+              <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+            </div>
+          </div>
+          <div class="axis-target-divider" aria-hidden="true"></div>
+          <div class="axis-target-group axis-target-secondary${y2TargetClass}">
+            <div class="axis-target-label"><span class="axis-badge">Y2</span><span>${this._escape(this._customLocalize("secondary_axis"))}</span></div>
+            <div id="y2-target-picker-host" class="native-target-picker">
+              <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+            </div>
           </div>
         </section>`}
         <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
@@ -283,7 +305,10 @@ class AdvancedHistoryPanel extends HTMLElement {
     this.shadowRoot.getElementById("redo")?.addEventListener("click", () => this._redo());
     this._bindPanelTabs();
     this._updateUndoRedoButtons();
-    if (!dependencyMissing) this._renderNativeTargetPicker();
+    if (!dependencyMissing) {
+      void this._renderNativeTargetPicker("primary")
+        .then(() => this._renderNativeTargetPicker("secondary"));
+    }
     this._renderContent();
   }
 

@@ -7,6 +7,8 @@ export default {
   "graph_settings": "Ajustes del gráfico",
   "numeric_history": "Historial numérico",
   "state_history": "Historial de estados",
+  "primary_axis": "Eje principal",
+  "secondary_axis": "Eje secundario",
   "bookmark_name": "Nombre del marcador",
   "save_current": "Guardar actual",
   "update_bookmark": "Actualizar marcador",
