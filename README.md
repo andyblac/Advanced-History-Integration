@@ -23,7 +23,7 @@ Advanced History provides a dedicated Home Assistant sidebar panel that keeps th
 
 It includes native target selection, Energy-style date navigation and comparisons, visual graph editing, reusable bookmarks, chart history, Undo/Redo, and independent defaults for the sidebar and More Info graphs.
 
-![Advanced History graphing multiple climate attributes](https://raw.githubusercontent.com/andyblac/Advanced-History-Integration/master/docs/images/advanced-history-attributes.jpeg)
+![Advanced History with multiple panels, dual Y axes and rolling comparisons](https://raw.githubusercontent.com/andyblac/Advanced-History-Integration/master/docs/images/advanced-history-overview.png)
 
 ## Why was it created?
 
