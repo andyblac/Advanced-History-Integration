@@ -50,6 +50,7 @@ export class StorageMethods {
       this._hiddenTargets = this._normalizeTargets(incomingSnapshot.hidden_targets || {});
       this._y2Targets = this._normalizeTargets(incomingSnapshot.y2_targets || {});
       this._hiddenY2Targets = this._normalizeTargets(incomingSnapshot.hidden_y2_targets || {});
+      incomingSnapshot.chart = this._normalizeSnapshotChart(incomingSnapshot.chart);
       this._activeSnapshot = this._clone(incomingSnapshot.chart);
       this._panelTimeRange = this._clone(incomingSnapshot.chart?.time_range) || null;
       this._pendingPeriodRestore = this._clone(incomingSnapshot.period);
@@ -111,7 +112,10 @@ export class StorageMethods {
         loadedBookmark &&
         this._snapshotFingerprint(previous) !== this._loadedBookmarkBaselineFingerprint
       );
+      previous.chart = this._normalizeSnapshotChart(previous.chart);
       this._activeSnapshot = this._clone(previous.chart);
+      this._currentSnapshot.chart = this._clone(previous.chart);
+      this._saveCurrentSnapshot(this._currentSnapshot);
       this._panelTimeRange = this._clone(previous.chart?.time_range) || null;
       this._pendingPeriodRestore = this._clone(previous.period);
       if (this._pendingPeriodRestore?.start) {
@@ -315,23 +319,25 @@ export class StorageMethods {
       compare_choice: this._energyCompareChoice || null,
       compare_count: this._energyCompareCount || 1,
     } : this._clone(this._pendingPeriodRestore);
-    const compare = this._snapshotCompareSetting();
+    const activeChart = this._normalizeSnapshotChart(this._activeSnapshot || {});
     const chart = {
-      card_options: this._clone(this._effectiveCardOptionsConfig()),
-      entity_options: this._clone(this._effectiveEntityOptionsConfig()),
-      default_hours: this._effectiveDefaultHours(),
-      graph_height: this._effectiveGraphHeight(),
+      defaults_mode: "overrides",
+      card_options: this._clone(activeChart.card_options || {}),
+      entity_options: this._clone(activeChart.entity_options || {}),
     };
+    const copyChartValue = (key) => {
+      if (activeChart[key] !== undefined) chart[key] = this._clone(activeChart[key]);
+    };
+    [
+      "default_hours",
+      "graph_height",
+      "source_graph_height",
+      "single_graph",
+      "attribute_selection",
+      "compare",
+    ].forEach(copyChartValue);
     if (this._panelTimeRange) chart.time_range = this._clone(this._panelTimeRange);
     if (this._panelRollingHours) chart.rolling_hours = this._panelRollingHours;
-    if (this._activeSnapshot?.single_graph) chart.single_graph = true;
-    if (
-      this._activeSnapshot?.attribute_selection &&
-      Object.keys(this._activeSnapshot.attribute_selection).length
-    ) {
-      chart.attribute_selection = this._clone(this._activeSnapshot.attribute_selection);
-    }
-    if (compare !== undefined) chart.compare = this._clone(compare);
     return {
       schema: 1,
       id: this._newSnapshotId(),
@@ -735,6 +741,8 @@ export class StorageMethods {
     ) {
       this._archiveCurrentChart();
     }
+    snapshot = this._clone(snapshot);
+    snapshot.chart = this._normalizeSnapshotChart(snapshot.chart);
     this._activeSnapshot = this._clone(snapshot.chart);
     const rollingHours = [1, 2, 4, 8, 12, 24].includes(Number(snapshot.chart.rolling_hours))
       ? Number(snapshot.chart.rolling_hours)
@@ -789,25 +797,79 @@ export class StorageMethods {
 
   _startFreshSnapshotSession(snapshot) {
     const current = this._clone(snapshot);
+    current.chart = this._normalizeSnapshotChart(current.chart);
     current.source_bookmark_id = this._loadedBookmarkId || null;
     current.source_external_bookmark = Boolean(this._loadedExternalBookmark);
     this._applySnapshot(current, false, true);
-    // A saved bookmark can predate newly introduced card defaults. Loading it
-    // applies those defaults immediately, so use the resulting effective
-    // configuration as the session baseline. Otherwise the first Energy or
-    // target-picker update after the restore looks like a user edit and adds
-    // both an Undo entry and an Update Bookmark action.
-    const effective = this._captureSnapshot(current.name);
-    effective.id = current.id;
-    effective.saved_at = current.saved_at;
-    effective.source_bookmark_id = current.source_bookmark_id;
-    effective.source_external_bookmark = current.source_external_bookmark;
-    this._freshSnapshotSessionFingerprint = this._snapshotFingerprint(effective);
+    // Keep the saved snapshot itself as the baseline. Recapturing here can
+    // read the previous Energy collection before the restored period has
+    // finished mounting, replacing the bookmark's date, time and comparison
+    // state with stale picker values.
+    this._freshSnapshotSessionFingerprint = this._snapshotFingerprint(current);
     this._loadedBookmarkBaselineFingerprint = this._freshSnapshotSessionFingerprint;
     this._loadedBookmarkDirty = false;
-    this._currentSnapshot = this._clone(effective);
-    this._saveCurrentSnapshot(effective);
+    this._currentSnapshot = this._clone(current);
+    this._saveCurrentSnapshot(current);
     this._clearUndoRedoHistory();
+  }
+
+  _sameSnapshotOption(left, right) {
+    if (Object.is(left, right)) return true;
+    if (left == null || right == null || typeof left !== "object" || typeof right !== "object") {
+      return false;
+    }
+    try {
+      return JSON.stringify(left) === JSON.stringify(right);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  _snapshotOptionOverrides(options, defaults) {
+    if (!options || typeof options !== "object" || Array.isArray(options)) return {};
+    const result = {};
+    const baseline = defaults && typeof defaults === "object" && !Array.isArray(defaults)
+      ? defaults
+      : {};
+    for (const [key, value] of Object.entries(options)) {
+      if (!this._sameSnapshotOption(value, baseline[key])) result[key] = this._clone(value);
+    }
+    return result;
+  }
+
+  _normalizeSnapshotChart(chart) {
+    const source = this._clone(
+      chart && typeof chart === "object" && !Array.isArray(chart) ? chart : {}
+    );
+    if (source.defaults_mode === "overrides") return source;
+
+    // Legacy snapshots contain the fully merged configuration. Values that
+    // still match the integration defaults can safely become inherited again;
+    // unmatched values are retained as possible intentional overrides.
+    source.card_options = this._snapshotOptionOverrides(
+      source.card_options,
+      this.config.card_options,
+    );
+    const entityOverrides = {};
+    const entityDefaults = this.config.entity_options || {};
+    for (const [key, value] of Object.entries(source.entity_options || {})) {
+      if (!value || typeof value !== "object" || Array.isArray(value)) {
+        if (!this._sameSnapshotOption(value, entityDefaults[key])) {
+          entityOverrides[key] = this._clone(value);
+        }
+        continue;
+      }
+      const overrides = this._snapshotOptionOverrides(value, entityDefaults[key]);
+      if (Object.keys(overrides).length) entityOverrides[key] = overrides;
+    }
+    source.entity_options = entityOverrides;
+    const configuredHours = Number(this.config.default_hours) || 24;
+    const configuredHeight = Number(this.config.graph_height) || 300;
+    if (Number(source.default_hours) === configuredHours) delete source.default_hours;
+    if (Number(source.graph_height) === configuredHeight) delete source.graph_height;
+    if (this._sameSnapshotOption(source.compare, this.config.compare)) delete source.compare;
+    source.defaults_mode = "overrides";
+    return source;
   }
 
   _effectiveCardOptionsConfig() {
@@ -1075,8 +1137,8 @@ export class StorageMethods {
 
   _snapshotSummary(snapshot) {
     const count = this._snapshotTargetCount(snapshot);
-    const hours = Number(snapshot.chart?.default_hours) || 24;
-    const height = Number(snapshot.chart?.graph_height) || 300;
+    const hours = Number(snapshot.chart?.default_hours ?? this.config.default_hours) || 24;
+    const height = Number(snapshot.chart?.graph_height ?? this.config.graph_height) || 300;
     const periodStart = snapshot.period?.start ? new Date(snapshot.period.start) : null;
     const periodEnd = snapshot.period?.end ? new Date(snapshot.period.end) : null;
     const dateFormatter = new Intl.DateTimeFormat(this._hass.locale?.language, { dateStyle: "medium" });

@@ -113,6 +113,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
   }
 
   const chart = {
+    defaults_mode: "overrides",
     card_options: cardOptions,
     entity_options: entityOptions,
     attribute_selection: attributeSelection,

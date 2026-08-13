@@ -1137,15 +1137,20 @@ export class GraphMethods {
     }
     const defaultHours = Number(config?.hours_to_show) || this._effectiveDefaultHours();
     const graphHeight = Number(config?.height) || this._effectiveGraphHeight();
-    const compare = this._snapshotCompareSetting();
+    const compare = this._activeSnapshot?.compare;
     const singleGraph = Boolean(this._activeSnapshot?.single_graph);
     const attributeSelection = this._clone(this._activeSnapshot?.attribute_selection);
     this._activeSnapshot = {
+      defaults_mode: "overrides",
       card_options: cardOptions,
       entity_options: entityOptions,
-      default_hours: defaultHours,
-      graph_height: graphHeight,
     };
+    if (defaultHours !== (Number(this.config.default_hours) || 24)) {
+      this._activeSnapshot.default_hours = defaultHours;
+    }
+    if (graphHeight !== (Number(this.config.graph_height) || 300)) {
+      this._activeSnapshot.graph_height = graphHeight;
+    }
     if (singleGraph) this._activeSnapshot.single_graph = true;
     if (attributeSelection && Object.keys(attributeSelection).length) {
       this._activeSnapshot.attribute_selection = attributeSelection;

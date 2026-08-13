@@ -96,12 +96,10 @@ export class PanelTabsMethods {
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
     const chart = {
-      card_options: this._clone(this.config.card_options || {}),
-      entity_options: this._clone(this.config.entity_options || {}),
-      default_hours: Number(this.config.default_hours) || 24,
-      graph_height: Number(this.config.graph_height) || 300,
+      defaults_mode: "overrides",
+      card_options: {},
+      entity_options: {},
     };
-    if (this.config.compare !== undefined) chart.compare = this._clone(this.config.compare);
     const snapshot = {
       schema: 1,
       id: this._newSnapshotId(),
