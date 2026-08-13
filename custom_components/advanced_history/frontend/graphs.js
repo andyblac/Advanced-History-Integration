@@ -227,6 +227,7 @@ export class GraphMethods {
         });
       }
       card.setConfig(config);
+      card.__advancedHistoryConfig = config;
       this._setGraphCardHass(card, this._hass);
       shell.append(card, sourceIndicator);
       if (
@@ -250,6 +251,25 @@ export class GraphMethods {
       this._graphCards.push(card);
     }
     catch (error) { host.insertAdjacentHTML("beforeend", `<div class="error">${this._escape(error.message || error)}</div>`); }
+  }
+
+  _updateGraphHourOptionsInPlace() {
+    const hourOptions = this._panelGraphHourOptions();
+    for (const card of this._graphCards || []) {
+      const current = card.__advancedHistoryConfig;
+      if (!current) continue;
+      const next = { ...current };
+      delete next.graph_start_hour;
+      delete next.graph_end_hour;
+      Object.assign(next, hourOptions);
+      if (
+        current.graph_start_hour === next.graph_start_hour
+        && current.graph_end_hour === next.graph_end_hour
+      ) continue;
+      card.__advancedHistoryConfig = next;
+      card.setConfig(next);
+      this._setGraphCardHass(card, this._hass);
+    }
   }
 
   _largeRangePeriod() {

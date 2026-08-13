@@ -767,7 +767,7 @@ export class EnergyMethods {
       start: start.getHours() * 60 + start.getMinutes(),
       end: end.getHours() * 60 + end.getMinutes(),
     };
-    const applied = this._applyPanelTimeRangePeriod(start, true);
+    const applied = this._applyPanelTimeRangePeriod(start, true, true);
     this._setPanelRollingHours(hours);
     return applied;
   }
@@ -812,7 +812,7 @@ export class EnergyMethods {
     return this._applyPanelTimeRangePeriod(dayStart);
   }
 
-  _applyPanelTimeRangePeriod(dayStart, forceRefresh = false) {
+  _applyPanelTimeRangePeriod(dayStart, forceRefresh = false, quiet = false) {
     const collection = this._energyCollection;
     if (!collection || !(dayStart instanceof Date)) return false;
     const start = new Date(dayStart);
@@ -831,6 +831,13 @@ export class EnergyMethods {
     }
     const changed = collection.start?.getTime?.() !== start.getTime()
       || collection.end?.getTime?.() !== end.getTime();
+    if (quiet) {
+      if (changed) collection.setPeriod(start, end);
+      this._updateGraphHourOptionsInPlace?.();
+      this._syncPanelTimeRangeControl();
+      if (changed || forceRefresh) collection.refresh?.();
+      return true;
+    }
     this._beginGraphDataSourceCycle();
     if (changed) {
       this._beginEnergyInteractionLoading();
