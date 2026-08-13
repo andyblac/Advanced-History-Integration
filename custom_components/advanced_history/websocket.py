@@ -29,8 +29,10 @@ from .const import (
 _WEBSOCKET_REGISTERED = f"{DOMAIN}_websocket_registered"
 _BOOKMARK_STORE_DATA = f"{DOMAIN}_bookmark_store"
 _MORE_INFO_ENTITY_STORE_DATA = f"{DOMAIN}_more_info_entity_store"
+_MORE_INFO_PREFERENCE_STORE_DATA = f"{DOMAIN}_more_info_preference_store"
 _STORAGE_KEY = f"{DOMAIN}.bookmarks"
 _MORE_INFO_ENTITY_STORAGE_KEY = f"{DOMAIN}.more_info_entities"
+_MORE_INFO_PREFERENCE_STORAGE_KEY = f"{DOMAIN}.more_info_preferences"
 _STORAGE_VERSION = 1
 _MAX_BOOKMARKS = 100
 _MAX_BOOKMARK_BYTES = 2_000_000
@@ -201,6 +203,57 @@ def _more_info_entity_store(hass: HomeAssistant) -> MoreInfoEntityStore:
     return hass.data[_MORE_INFO_ENTITY_STORE_DATA]
 
 
+class MoreInfoPreferenceStore:
+    """Persist the shared and per-user More Info picker preference."""
+
+    def __init__(self, hass: HomeAssistant) -> None:
+        """Initialize the preference store."""
+        self._store = Store[dict[str, Any]](
+            hass, _STORAGE_VERSION, _MORE_INFO_PREFERENCE_STORAGE_KEY
+        )
+        self._data: dict[str, Any] | None = None
+        self._lock = asyncio.Lock()
+
+    async def _async_ensure_loaded(self) -> dict[str, Any]:
+        """Load and normalize stored preferences once."""
+        if self._data is None:
+            loaded = await self._store.async_load()
+            self._data = loaded if isinstance(loaded, dict) else {}
+            if not isinstance(self._data.get("users"), dict):
+                self._data["users"] = {}
+            if self._data.get("default_picker_mode") not in {"date", "interval"}:
+                self._data.pop("default_picker_mode", None)
+        return self._data
+
+    async def async_get(self, user_id: str) -> str | None:
+        """Return a user's picker preference or the shared default."""
+        async with self._lock:
+            data = await self._async_ensure_loaded()
+            user_mode = data["users"].get(user_id)
+            if user_mode in {"date", "interval"}:
+                return user_mode
+            default_mode = data.get("default_picker_mode")
+            return default_mode if default_mode in {"date", "interval"} else None
+
+    async def async_set(self, user_id: str, mode: str, shared: bool) -> None:
+        """Set the shared default or one user's picker preference."""
+        async with self._lock:
+            data = await self._async_ensure_loaded()
+            if shared:
+                data["default_picker_mode"] = mode
+                data["users"] = {}
+            else:
+                data["users"][user_id] = mode
+            await self._store.async_save(data)
+
+
+def _more_info_preference_store(hass: HomeAssistant) -> MoreInfoPreferenceStore:
+    """Return the More Info picker preference store."""
+    if _MORE_INFO_PREFERENCE_STORE_DATA not in hass.data:
+        hass.data[_MORE_INFO_PREFERENCE_STORE_DATA] = MoreInfoPreferenceStore(hass)
+    return hass.data[_MORE_INFO_PREFERENCE_STORE_DATA]
+
+
 @websocket_api.websocket_command(
     {
         vol.Required("type"): f"{DOMAIN}/bookmarks/get",
@@ -339,6 +392,9 @@ async def websocket_get_more_info_config(
         if entity_id
         else None
     )
+    picker_mode = await _more_info_preference_store(hass).async_get(
+        connection.user.id
+    )
     connection.send_result(
         msg["id"],
         {
@@ -346,9 +402,29 @@ async def websocket_get_more_info_config(
             "card_module_url": options[CONF_CARD_MODULE_URL],
             "card_options": card_options,
             "entity_config": entity_config,
+            "picker_mode": picker_mode,
             "can_edit_entity_config": bool(connection.user.is_admin),
         },
     )
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/more_info/picker_mode/set",
+        vol.Required("mode"): vol.In(["date", "interval"]),
+    }
+)
+@websocket_api.async_response
+async def websocket_set_more_info_picker_mode(
+    hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Save the shared admin default or one user's picker preference."""
+    await _more_info_preference_store(hass).async_set(
+        connection.user.id,
+        msg["mode"],
+        bool(connection.user.is_admin),
+    )
+    connection.send_result(msg["id"])
 
 
 @websocket_api.websocket_command(
@@ -392,5 +468,6 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
         hass, websocket_set_bookmark_visible_everyone
     )
     websocket_api.async_register_command(hass, websocket_get_more_info_config)
+    websocket_api.async_register_command(hass, websocket_set_more_info_picker_mode)
     websocket_api.async_register_command(hass, websocket_set_more_info_entity_config)
     hass.data[_WEBSOCKET_REGISTERED] = True

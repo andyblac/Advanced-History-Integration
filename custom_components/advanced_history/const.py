@@ -90,6 +90,7 @@ DEFAULT_MORE_INFO_CARD_OPTIONS = {
     "date_picker_modes": ["day", "week", "month", "year", "last_24h"],
     "height": 240,
     "include_attribute_name": True,
+    "interval_picker_position": "right",
     "show_date_picker": True,
     "show_legend": False,
     "show_now_line": False,

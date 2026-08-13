@@ -58,6 +58,8 @@ export default {
   "more_info_card_defaults": "Padrões de Mais informações",
   "more_info_card_defaults_config_flow_note": "Estas configurações afetam apenas o Statistics Graph nos diálogos de entidade. Salvar atualiza o campo YAML de Mais informações; envie o fluxo de configuração para aplicá-lo.",
   "more_info_entity_graph_settings": "Configurações do gráfico da entidade",
+  "use_interval_picker": "Usar seletor de intervalo",
+  "use_date_picker": "Usar seletor de data",
   "more_info_entity_editor_note": "Estas configurações aplicam-se apenas ao gráfico Mais informações desta entidade. Redefinir remove a substituição e restaura os padrões globais.",
   "more_info_entity_save_error": "Não foi possível salvar as configurações do gráfico da entidade.",
   "more_info_entity_reset_title": "Redefinir as configurações do gráfico?",

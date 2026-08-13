@@ -24,12 +24,14 @@ const MORE_INFO_STATE_TIMELINE_HEIGHT = 90;
 const MORE_INFO_REPLACING_ATTRIBUTE = "advanced-history-replacing-chart";
 const MORE_INFO_STYLE_CLASS = "advanced-history-more-info-style";
 const MORE_INFO_EDITOR_BUTTON_CLASS = "advanced-history-more-info-editor-button";
+const MORE_INFO_PICKER_BUTTON_CLASS = "advanced-history-more-info-picker-button";
 const MORE_INFO_EDITOR_LINK_CLASS = "advanced-history-more-info-editor-link";
 const MORE_INFO_EDITOR_ACTIONS_CLASS = "advanced-history-more-info-editor-actions";
 const MORE_INFO_EDITOR_RESIZE_OBSERVER = "__advancedHistoryMoreInfoEditorResizeObserver";
 const MORE_INFO_DATE_SYNC_HANDLER = "__advancedHistoryMoreInfoDateSyncHandler";
 const MORE_INFO_CONFIG_TYPE = "advanced_history/more_info/config";
 const MORE_INFO_ENTITY_CONFIG_SET_TYPE = "advanced_history/more_info/entity_config/set";
+const MORE_INFO_PICKER_MODE_SET_TYPE = "advanced_history/more_info/picker_mode/set";
 const moreInfoConfigCache = new Map();
 const moreInfoConfigRequests = new Map();
 
@@ -252,6 +254,33 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   };
 }
 
+function pickerMode(historyView, config, preferredMode = null) {
+  const selection = historyView.__advancedHistoryMoreInfoPickerSelection;
+  if (selection?.entityId === historyView.entityId) {
+    return selection.mode;
+  }
+  if (preferredMode === "date" || preferredMode === "interval") {
+    return preferredMode;
+  }
+  return config.show_date_picker ? "date" : "interval";
+}
+
+function applyPickerMode(historyView, config, preferredMode = null) {
+  const mode = pickerMode(historyView, config, preferredMode);
+  const resolved = {
+    ...config,
+    show_date_picker: mode === "date",
+    show_interval_picker: mode === "interval",
+  };
+  if (mode === "date") {
+    resolved.date_picker_group = config.date_picker_group
+      || `advanced-history-more-info:${historyView.entityId}`;
+  } else {
+    delete resolved.date_picker_group;
+  }
+  return resolved;
+}
+
 function moreInfoLogbook(historyView) {
   const root = historyView?.getRootNode?.();
   if (!(root instanceof ShadowRoot)) return null;
@@ -377,6 +406,7 @@ function restoreNativeChart(historyView) {
   }
   actions?.remove();
   root?.querySelector(`.${MORE_INFO_EDITOR_BUTTON_CLASS}`)?.remove();
+  root?.querySelector(`.${MORE_INFO_PICKER_BUTTON_CLASS}`)?.remove();
   for (const chart of root?.querySelectorAll("statistics-chart, state-history-charts") || []) {
     chart.style.removeProperty("display");
   }
@@ -631,15 +661,28 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
   const entityId = historyView.entityId;
   const numeric = nativeMoreInfoAttributes(historyView).length > 0
     || isNumericMoreInfoHistory(historyView, nativeChart);
-  const baseConfig = moreInfoCardConfig(historyView, nativeChart, serviceConfig.card_options || {}, null);
-  await openCardEditorDialog({
-    hass,
-    container: historyView,
-    initialConfig: moreInfoCardConfig(
+  const baseConfig = applyPickerMode(
+    historyView,
+    moreInfoCardConfig(
       historyView,
       nativeChart,
       serviceConfig.card_options || {},
-      serviceConfig.entity_config,
+      null,
+    ),
+    serviceConfig.picker_mode,
+  );
+  await openCardEditorDialog({
+    hass,
+    container: historyView,
+    initialConfig: applyPickerMode(
+      historyView,
+      moreInfoCardConfig(
+        historyView,
+        nativeChart,
+        serviceConfig.card_options || {},
+        serviceConfig.entity_config,
+      ),
+      serviceConfig.picker_mode,
     ),
     title: custom(hass, "more_info_entity_graph_settings"),
     note: custom(hass, "more_info_entity_editor_note"),
@@ -675,21 +718,9 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
   });
 }
 
-function ensureMoreInfoEditorButton(historyView, serviceConfig) {
+function ensureMoreInfoActionButtons(historyView, serviceConfig, cardConfig) {
   const root = historyView.shadowRoot;
   if (!root) return;
-  let button = root.querySelector(`.${MORE_INFO_EDITOR_BUTTON_CLASS}`);
-  if (!serviceConfig?.enabled || !serviceConfig?.can_edit_entity_config) {
-    const actions = root.querySelector(`.${MORE_INFO_EDITOR_ACTIONS_CLASS}`);
-    const editorLink = actions?.querySelector(`.${MORE_INFO_EDITOR_LINK_CLASS}`);
-    if (actions && editorLink) {
-      editorLink.classList.remove(MORE_INFO_EDITOR_LINK_CLASS);
-      actions.before(editorLink);
-    }
-    actions?.remove();
-    button?.remove();
-    return;
-  }
   const showMore = [...root.querySelectorAll("a[href]")].find((link) => {
     try {
       return new URL(link.href, window.location.origin).pathname === "/history";
@@ -710,22 +741,70 @@ function ensureMoreInfoEditorButton(historyView, serviceConfig) {
     showMore.classList.add(MORE_INFO_EDITOR_LINK_CLASS);
     if (showMore.parentElement !== actions) actions.append(showMore);
   }
-  if (!button) {
-    button = document.createElement("button");
-    button.type = "button";
-    button.className = MORE_INFO_EDITOR_BUTTON_CLASS;
-    button.title = custom(historyView.hass, "more_info_entity_graph_settings");
-    button.setAttribute("aria-label", button.title);
-    button.style.cssText = "width:40px;height:40px;padding:8px;border:0;border-radius:50%;display:inline-grid;place-items:center;cursor:pointer;color:var(--primary-color);background:transparent";
-    button.innerHTML = '<ha-icon icon="mdi:cog-outline"></ha-icon>';
-    button.addEventListener("click", (event) => {
+  let pickerButton = root.querySelector(`.${MORE_INFO_PICKER_BUTTON_CLASS}`);
+  if (!pickerButton) {
+    pickerButton = document.createElement("button");
+    pickerButton.type = "button";
+    pickerButton.className = MORE_INFO_PICKER_BUTTON_CLASS;
+    pickerButton.style.cssText = "width:40px;height:40px;padding:8px;border:0;border-radius:50%;display:inline-grid;place-items:center;cursor:pointer;color:var(--primary-color);background:transparent";
+    pickerButton.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      openMoreInfoEntityEditor(historyView, button.__advancedHistoryServiceConfig);
+      const current = pickerMode(historyView, pickerButton.__advancedHistoryCardConfig || {});
+      const mode = current === "date" ? "interval" : "date";
+      pickerButton.disabled = true;
+      try {
+        await historyView.hass.callWS({
+          type: MORE_INFO_PICKER_MODE_SET_TYPE,
+          mode,
+        });
+        historyView.__advancedHistoryMoreInfoPickerSelection = {
+          entityId: historyView.entityId,
+          mode,
+        };
+        invalidateMoreInfoConfig(historyView.entityId);
+        scheduleMoreInfoReplacement(historyView);
+      } catch (error) {
+        console.warn("Advanced History: unable to save More Info picker preference", error);
+      } finally {
+        pickerButton.disabled = false;
+      }
     });
   }
-  button.__advancedHistoryServiceConfig = serviceConfig;
-  if (button.parentElement !== actions) actions.append(button);
+  pickerButton.__advancedHistoryCardConfig = cardConfig;
+  const currentMode = pickerMode(historyView, cardConfig || {});
+  const pickerLabel = custom(
+    historyView.hass,
+    currentMode === "date" ? "use_interval_picker" : "use_date_picker",
+  );
+  pickerButton.title = pickerLabel;
+  pickerButton.setAttribute("aria-label", pickerLabel);
+  pickerButton.innerHTML = currentMode === "date"
+    ? '<ha-icon icon="mdi:clock-outline"></ha-icon>'
+    : '<ha-icon icon="mdi:calendar-outline"></ha-icon>';
+  if (pickerButton.parentElement !== actions) actions.append(pickerButton);
+
+  let editorButton = root.querySelector(`.${MORE_INFO_EDITOR_BUTTON_CLASS}`);
+  if (!serviceConfig?.can_edit_entity_config) {
+    editorButton?.remove();
+    return;
+  }
+  if (!editorButton) {
+    editorButton = document.createElement("button");
+    editorButton.type = "button";
+    editorButton.className = MORE_INFO_EDITOR_BUTTON_CLASS;
+    editorButton.title = custom(historyView.hass, "more_info_entity_graph_settings");
+    editorButton.setAttribute("aria-label", editorButton.title);
+    editorButton.style.cssText = "width:40px;height:40px;padding:8px;border:0;border-radius:50%;display:inline-grid;place-items:center;cursor:pointer;color:var(--primary-color);background:transparent";
+    editorButton.innerHTML = '<ha-icon icon="mdi:cog-outline"></ha-icon>';
+    editorButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openMoreInfoEntityEditor(historyView, editorButton.__advancedHistoryServiceConfig);
+    });
+  }
+  editorButton.__advancedHistoryServiceConfig = serviceConfig;
+  if (editorButton.parentElement !== actions) actions.append(editorButton);
 }
 
 async function replaceMoreInfoChart(historyView) {
@@ -756,18 +835,28 @@ async function replaceMoreInfoChart(historyView) {
       restoreNativeChart(historyView);
       return;
     }
-    ensureMoreInfoEditorButton(historyView, serviceConfig);
+    if (
+      historyView.__advancedHistoryMoreInfoPickerSelection?.mode
+      === serviceConfig.picker_mode
+    ) {
+      historyView.__advancedHistoryMoreInfoPickerSelection = null;
+    }
     await ensureCardLoaded(historyView.hass, serviceConfig.card_module_url);
     if (historyView.__advancedHistoryMoreInfoToken !== token || !historyView.isConnected) return;
     nativeChart = root.querySelector("statistics-chart, state-history-charts");
     if (!nativeChart) return;
     const options = serviceConfig.card_options || {};
-    const config = moreInfoCardConfig(
+    const config = applyPickerMode(
       historyView,
-      nativeChart,
-      options,
-      serviceConfig.entity_config,
+      moreInfoCardConfig(
+        historyView,
+        nativeChart,
+        options,
+        serviceConfig.entity_config,
+      ),
+      serviceConfig.picker_mode,
     );
+    ensureMoreInfoActionButtons(historyView, serviceConfig, config);
     const configKey = JSON.stringify({ entityId: historyView.entityId, config });
     let host = root.querySelector(`.${MORE_INFO_HOST_CLASS}`);
     let card = host?.querySelector(CARD_TAG);

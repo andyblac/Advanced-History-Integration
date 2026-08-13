@@ -58,6 +58,8 @@ export default {
   "more_info_card_defaults": "Impostazioni predefinite di Ulteriori informazioni",
   "more_info_card_defaults_config_flow_note": "Queste impostazioni interessano solo Statistics Graph nelle finestre delle entità. Il salvataggio aggiorna il campo YAML di Ulteriori informazioni; invia il flusso di configurazione per applicarlo.",
   "more_info_entity_graph_settings": "Impostazioni del grafico dell’entità",
+  "use_interval_picker": "Usa selettore intervallo",
+  "use_date_picker": "Usa selettore data",
   "more_info_entity_editor_note": "Queste impostazioni si applicano solo al grafico Ulteriori informazioni di questa entità. Reimposta rimuove la personalizzazione e ripristina i valori globali.",
   "more_info_entity_save_error": "Impossibile salvare le impostazioni del grafico dell’entità.",
   "more_info_entity_reset_title": "Reimpostare le impostazioni del grafico?",

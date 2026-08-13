@@ -58,6 +58,8 @@ export default {
   "more_info_card_defaults": "More Info Card Defaults",
   "more_info_card_defaults_config_flow_note": "These settings only affect the Statistics Graph shown in entity dialogs. Saving updates the More Info Card Defaults YAML field; submit the config flow to apply it.",
   "more_info_entity_graph_settings": "Entity graph settings",
+  "use_interval_picker": "Use interval picker",
+  "use_date_picker": "Use date picker",
   "more_info_entity_editor_note": "These settings apply only to this entity's More Info graph. Reset removes the override and restores the global More Info Card Defaults.",
   "more_info_entity_save_error": "The entity graph settings could not be saved.",
   "more_info_entity_reset_title": "Reset graph settings?",

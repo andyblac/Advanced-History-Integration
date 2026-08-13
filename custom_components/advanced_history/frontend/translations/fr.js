@@ -58,6 +58,8 @@ export default {
   "more_info_card_defaults": "Valeurs par défaut de Plus d’informations",
   "more_info_card_defaults_config_flow_note": "Ces paramètres concernent uniquement Statistics Graph dans les boîtes de dialogue d’entité. L’enregistrement met à jour le champ YAML de Plus d’informations ; validez le flux de configuration pour l’appliquer.",
   "more_info_entity_graph_settings": "Paramètres du graphique de l’entité",
+  "use_interval_picker": "Utiliser le sélecteur d’intervalle",
+  "use_date_picker": "Utiliser le sélecteur de date",
   "more_info_entity_editor_note": "Ces paramètres s’appliquent uniquement au graphique Plus d’informations de cette entité. Réinitialiser supprime le remplacement et restaure les valeurs globales.",
   "more_info_entity_save_error": "Les paramètres du graphique de l’entité n’ont pas pu être enregistrés.",
   "more_info_entity_reset_title": "Réinitialiser les paramètres du graphique ?",

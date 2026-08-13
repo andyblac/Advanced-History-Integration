@@ -58,6 +58,8 @@ export default {
   "more_info_card_defaults": "Standards für Entitätsdetails",
   "more_info_card_defaults_config_flow_note": "Diese Einstellungen gelten nur für Statistics Graph in Entitätsdialogen. Beim Speichern wird das YAML-Feld Standards für Entitätsdetails aktualisiert; sende den Konfigurationsablauf ab, um es anzuwenden.",
   "more_info_entity_graph_settings": "Diagrammeinstellungen der Entität",
+  "use_interval_picker": "Intervallauswahl verwenden",
+  "use_date_picker": "Datumsauswahl verwenden",
   "more_info_entity_editor_note": "Diese Einstellungen gelten nur für das Entitätsdialog-Diagramm dieser Entität. Zurücksetzen entfernt die Überschreibung und stellt die globalen Standards wieder her.",
   "more_info_entity_save_error": "Die Diagrammeinstellungen der Entität konnten nicht gespeichert werden.",
   "more_info_entity_reset_title": "Diagrammeinstellungen zurücksetzen?",

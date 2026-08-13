@@ -58,6 +58,8 @@ export default {
   "more_info_card_defaults": "Valores predeterminados de Más información",
   "more_info_card_defaults_config_flow_note": "Estos ajustes solo afectan a Statistics Graph en los diálogos de entidad. Al guardar se actualiza el campo YAML de Más información; envía el flujo de configuración para aplicarlo.",
   "more_info_entity_graph_settings": "Ajustes del gráfico de la entidad",
+  "use_interval_picker": "Usar selector de intervalo",
+  "use_date_picker": "Usar selector de fecha",
   "more_info_entity_editor_note": "Estos ajustes solo se aplican al gráfico de Más información de esta entidad. Restablecer elimina la personalización y recupera los valores globales.",
   "more_info_entity_save_error": "No se pudieron guardar los ajustes del gráfico de la entidad.",
   "more_info_entity_reset_title": "¿Restablecer los ajustes del gráfico?",

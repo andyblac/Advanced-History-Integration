@@ -58,6 +58,8 @@ export default {
   "more_info_card_defaults": "Standaardwaarden voor Meer informatie",
   "more_info_card_defaults_config_flow_note": "Deze instellingen gelden alleen voor Statistics Graph in entiteitsvensters. Opslaan werkt het YAML-veld voor Meer informatie bij; dien de configuratiestroom in om dit toe te passen.",
   "more_info_entity_graph_settings": "Grafiekinstellingen van entiteit",
+  "use_interval_picker": "Intervalselectie gebruiken",
+  "use_date_picker": "Datumselectie gebruiken",
   "more_info_entity_editor_note": "Deze instellingen gelden alleen voor de Meer informatie-grafiek van deze entiteit. Resetten verwijdert de aanpassing en herstelt de algemene standaardwaarden.",
   "more_info_entity_save_error": "De grafiekinstellingen van de entiteit konden niet worden opgeslagen.",
   "more_info_entity_reset_title": "Grafiekinstellingen resetten?",
