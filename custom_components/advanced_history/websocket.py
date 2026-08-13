@@ -19,7 +19,6 @@ from homeassistant.helpers.storage import Store
 from .const import (
     CONF_CARD_MODULE_URL,
     CONF_MORE_INFO_CARD_OPTIONS,
-    CONF_MORE_INFO_SHOW_DATE_PICKER,
     CONF_REPLACE_MORE_INFO_HISTORY,
     DOMAIN,
     ENTRY_TYPE_MORE_INFO,
@@ -334,9 +333,6 @@ async def websocket_get_more_info_config(
 
     options = more_info_options_with_defaults(entry.options)
     card_options = deepcopy(options[CONF_MORE_INFO_CARD_OPTIONS])
-    card_options["show_date_picker"] = bool(
-        options[CONF_MORE_INFO_SHOW_DATE_PICKER]
-    )
     entity_id = msg.get("entity_id")
     entity_config = (
         await _more_info_entity_store(hass).async_get(entity_id)

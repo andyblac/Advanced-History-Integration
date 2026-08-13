@@ -90,6 +90,7 @@ DEFAULT_MORE_INFO_CARD_OPTIONS = {
     "date_picker_modes": ["day", "week", "month", "year", "last_24h"],
     "height": 240,
     "include_attribute_name": True,
+    "show_date_picker": True,
     "show_legend": False,
     "show_now_line": False,
     "show_tooltip": True,
@@ -195,6 +196,4 @@ def more_info_options_with_defaults(options: Mapping[str, Any]) -> dict[str, Any
             )
     else:
         merged[CONF_MORE_INFO_CARD_OPTIONS] = deepcopy(DEFAULT_MORE_INFO_CARD_OPTIONS)
-    # This has a dedicated config-flow toggle and must not appear twice.
-    merged[CONF_MORE_INFO_CARD_OPTIONS].pop("show_date_picker", None)
     return merged
