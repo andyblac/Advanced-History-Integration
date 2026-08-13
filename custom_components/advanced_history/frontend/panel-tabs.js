@@ -22,6 +22,10 @@ export class PanelTabsMethods {
     return this._customLocalize("panel_number", { number: index + 1 });
   }
 
+  _panelTabDisplayLabel(tab, index) {
+    return String(tab?.name || "").trim() || this._panelTabLabel(index);
+  }
+
   _capturePanelTabState() {
     const snapshot = this._captureSnapshot();
     return {
@@ -209,8 +213,8 @@ export class PanelTabsMethods {
     return `<div class="panel-tabs-shell">
       <button class="panel-tabs-scroll" data-scroll-panels="-1" title="${this._escape(previous)}" aria-label="${this._escape(previous)}" hidden><ha-icon icon="mdi:chevron-left"></ha-icon></button>
       <nav class="panel-tabs" aria-label="${this._escape(this._customLocalize("panels"))}">
-        ${this._panelTabs.map((tab, index) => `<span class="panel-tab${tab.id === this._activePanelTabId ? " active" : ""}">
-          <button class="panel-tab-select" data-panel-tab="${this._escape(tab.id)}" ${tab.id === this._activePanelTabId ? 'aria-current="page"' : ""}>${this._escape(this._panelTabLabel(index))}</button>
+        ${this._panelTabs.map((tab, index) => `<span class="panel-tab${tab.id === this._activePanelTabId ? " active" : ""}" draggable="true" data-panel-tab-item="${this._escape(tab.id)}">
+          <button class="panel-tab-select" data-panel-tab="${this._escape(tab.id)}" ${tab.id === this._activePanelTabId ? 'aria-current="page"' : ""}>${this._escape(this._panelTabDisplayLabel(tab, index))}</button>
           <button class="panel-tab-close" data-close-panel="${this._escape(tab.id)}" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button>
         </span>`).join("")}
       </nav>
@@ -252,10 +256,79 @@ export class PanelTabsMethods {
     tabs.scrollTo({ left: Math.max(0, destination), behavior: "smooth" });
   }
 
+  _renamePanelTab(id, button) {
+    const tab = this._panelTabs.find((item) => item.id === id);
+    if (!tab || !button || button.querySelector("input")) return;
+    const index = this._panelTabs.indexOf(tab);
+    const previousName = String(tab.name || "");
+    const input = document.createElement("input");
+    input.className = "panel-tab-name-input";
+    input.value = previousName || this._panelTabLabel(index);
+    input.maxLength = 40;
+    input.setAttribute("aria-label", this._localize("ui.common.rename", "Rename"));
+    button.replaceChildren(input);
+    button.draggable = false;
+    let finished = false;
+    const finish = (save) => {
+      if (finished) return;
+      finished = true;
+      if (save) tab.name = input.value.trim();
+      button.replaceChildren(document.createTextNode(this._panelTabDisplayLabel(tab, index)));
+      button.draggable = true;
+      if (save) this._persistPanelTabs();
+    };
+    input.addEventListener("click", (event) => event.stopPropagation());
+    input.addEventListener("dblclick", (event) => event.stopPropagation());
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        input.blur();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        finish(false);
+        button.focus();
+      }
+    });
+    input.addEventListener("blur", () => finish(true), { once: true });
+    input.focus();
+    input.select();
+  }
+
+  _finishPanelTabReorder(tabs) {
+    const ids = Array.from(tabs.querySelectorAll("[data-panel-tab-item]"), (item) => (
+      item.dataset.panelTabItem
+    ));
+    const byId = new Map(this._panelTabs.map((tab) => [tab.id, tab]));
+    const reordered = ids.map((id) => byId.get(id)).filter(Boolean);
+    if (reordered.length !== this._panelTabs.length) return;
+    this._panelTabs = reordered;
+    for (const [index, tab] of this._panelTabs.entries()) {
+      const button = tabs.querySelector(`[data-panel-tab="${CSS.escape(tab.id)}"]`);
+      if (button && !button.querySelector("input")) {
+        button.textContent = this._panelTabDisplayLabel(tab, index);
+      }
+    }
+    this._persistPanelTabs();
+  }
+
   _bindPanelTabs() {
     this.shadowRoot.getElementById("add-panel")?.addEventListener("click", () => this._addPanelTab());
     for (const button of this.shadowRoot.querySelectorAll("[data-panel-tab]")) {
-      button.addEventListener("click", () => this._switchPanelTab(button.dataset.panelTab));
+      let switchTimer = null;
+      button.addEventListener("click", () => {
+        if (switchTimer) window.clearTimeout(switchTimer);
+        switchTimer = window.setTimeout(() => {
+          switchTimer = null;
+          this._switchPanelTab(button.dataset.panelTab);
+        }, 220);
+      });
+      button.addEventListener("dblclick", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        if (switchTimer) window.clearTimeout(switchTimer);
+        switchTimer = null;
+        this._renamePanelTab(button.dataset.panelTab, button);
+      });
     }
     for (const button of this.shadowRoot.querySelectorAll("[data-close-panel]")) {
       button.addEventListener("click", () => this._closePanelTab(button.dataset.closePanel));
@@ -264,6 +337,46 @@ export class PanelTabsMethods {
     this._panelTabsResizeObserver = null;
     const tabs = this.shadowRoot.querySelector(".panel-tabs");
     if (!tabs) return;
+    let dragging = null;
+    let dragBlocked = false;
+    tabs.addEventListener("pointerdown", (event) => {
+      dragBlocked = Boolean(event.target.closest(".panel-tab-close, .panel-tab-name-input"));
+    });
+    tabs.addEventListener("dragstart", (event) => {
+      if (dragBlocked) {
+        event.preventDefault();
+        dragBlocked = false;
+        return;
+      }
+      dragging = event.target.closest("[data-panel-tab-item]");
+      if (!dragging) return;
+      dragging.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", dragging.dataset.panelTabItem);
+    });
+    tabs.addEventListener("dragover", (event) => {
+      if (!dragging) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      const target = event.target.closest("[data-panel-tab-item]");
+      if (!target || target === dragging) return;
+      const rect = target.getBoundingClientRect();
+      const after = event.clientX > rect.left + rect.width / 2;
+      tabs.insertBefore(dragging, after ? target.nextSibling : target);
+    });
+    const finishDrag = () => {
+      dragBlocked = false;
+      if (!dragging) return;
+      dragging.classList.remove("dragging");
+      dragging = null;
+      this._finishPanelTabReorder(tabs);
+      this._syncPanelTabScrollButtons();
+    };
+    tabs.addEventListener("drop", (event) => {
+      event.preventDefault();
+      finishDrag();
+    });
+    tabs.addEventListener("dragend", finishDrag);
     tabs.addEventListener("scroll", () => this._syncPanelTabScrollButtons(), { passive: true });
     for (const button of this.shadowRoot.querySelectorAll("[data-scroll-panels]")) {
       button.addEventListener("click", () => {
