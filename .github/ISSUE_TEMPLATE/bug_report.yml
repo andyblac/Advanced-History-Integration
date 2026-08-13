@@ -1,0 +1,96 @@
+name: Bug report
+description: Report a problem with Advanced History
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Where does the bug occur?
+      description: Select the part of Advanced History where you see the problem.
+      options:
+        - Advanced History panel
+        - More Info dialog
+        - Both
+        - Unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected to happen instead.
+      placeholder: Tell us what went wrong and what should have happened.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: List the shortest sequence that reliably causes the problem.
+      placeholder: |
+        1. Open ...
+        2. Select ...
+        3. See ...
+    validations:
+      required: true
+
+  - type: input
+    id: integration_version
+    attributes:
+      label: Advanced History version
+      placeholder: e.g. 2.0.0-beta.2
+    validations:
+      required: true
+
+  - type: input
+    id: card_version
+    attributes:
+      label: Statistics Graph Chart Card version
+      placeholder: e.g. 4.02
+    validations:
+      required: true
+
+  - type: input
+    id: home_assistant_version
+    attributes:
+      label: Home Assistant version
+      placeholder: e.g. 2026.8.1
+    validations:
+      required: true
+
+  - type: input
+    id: browser_device
+    attributes:
+      label: Browser and device
+      placeholder: e.g. Chrome 140 on Windows 11, or HA Companion App on iPhone
+    validations:
+      required: true
+
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics or relevant configuration
+      description: Paste relevant diagnostics, configuration, or browser-console errors. Remove any private information first.
+      render: yaml
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshots or video
+      description: Drag and drop any screenshots or recordings that help show the problem.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I am using the latest available version of Advanced History and Statistics Graph Chart Card.
+          required: true
+        - label: I searched existing issues for the same problem.
+          required: true
+        - label: I removed private information from the report and diagnostics.
+          required: true
