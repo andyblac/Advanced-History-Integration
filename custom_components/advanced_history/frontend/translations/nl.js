@@ -6,6 +6,7 @@ export default {
   "bookmark_visibility_error": "De zichtbaarheid van de bladwijzer kon niet worden gewijzigd.",
   "panels": "Panelen",
   "add_panel": "Paneel toevoegen",
+  "add_panel_requires_version": "Meerdere panelen vereisen Statistics Graph Chart Card v4.02 of nieuwer",
   "panel_number": "Paneel {number}",
   "chart_history": "Grafiekgeschiedenis",
   "graph_settings": "Grafiekinstellingen",

@@ -210,6 +210,9 @@ export class GraphMethods {
         : {}),
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
       energy_date_sync: true,
+      ...(this._panelEnergyCollectionKey()
+        ? { energy_collection_key: this._panelEnergyCollectionKey() }
+        : {}),
       ...this._panelGraphHourOptions(),
     };
     try {
@@ -956,6 +959,7 @@ export class GraphMethods {
     const options = { ...configured };
     delete options.entities;
     delete options.energy_date_sync;
+    delete options.energy_collection_key;
     delete options.height;
     delete options.hours_to_show;
     return options;
@@ -1025,6 +1029,9 @@ export class GraphMethods {
       chart_mode: cardOptions.chart_mode ?? editorMode,
       entities,
       energy_date_sync: true,
+      ...(this._panelEnergyCollectionKey()
+        ? { energy_collection_key: this._panelEnergyCollectionKey() }
+        : {}),
     };
   }
 
@@ -1034,7 +1041,7 @@ export class GraphMethods {
     const integrationCardDefaults = this._cardOptions(this.config.card_options);
     const integrationEntityDefaults = this.config.entity_options || {};
     const protectedKeys = new Set([
-      "type", "entities", "energy_date_sync", "height", "hours_to_show",
+      "type", "entities", "energy_date_sync", "energy_collection_key", "height", "hours_to_show",
     ]);
     const cardOptions = {};
     for (const [key, value] of Object.entries(config || {})) {

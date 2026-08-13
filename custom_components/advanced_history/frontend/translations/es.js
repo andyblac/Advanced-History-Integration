@@ -6,6 +6,7 @@ export default {
   "bookmark_visibility_error": "No se pudo cambiar la visibilidad del marcador.",
   "panels": "Paneles",
   "add_panel": "Añadir panel",
+  "add_panel_requires_version": "Los paneles múltiples requieren Statistics Graph Chart Card v4.02 o posterior",
   "panel_number": "Panel {number}",
   "chart_history": "Historial de gráficos",
   "graph_settings": "Ajustes del gráfico",

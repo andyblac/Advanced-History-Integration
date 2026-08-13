@@ -6,6 +6,7 @@ export default {
   "bookmark_visibility_error": "Não foi possível alterar a visibilidade do favorito.",
   "panels": "Painéis",
   "add_panel": "Adicionar painel",
+  "add_panel_requires_version": "Vários painéis requerem Statistics Graph Chart Card v4.02 ou mais recente",
   "panel_number": "Painel {number}",
   "chart_history": "Histórico de gráficos",
   "graph_settings": "Configurações do gráfico",

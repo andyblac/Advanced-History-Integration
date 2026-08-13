@@ -6,6 +6,7 @@ export default {
   "bookmark_visibility_error": "Impossibile modificare la visibilità del segnalibro.",
   "panels": "Pannelli",
   "add_panel": "Aggiungi pannello",
+  "add_panel_requires_version": "I pannelli multipli richiedono Statistics Graph Chart Card v4.02 o versioni successive",
   "panel_number": "Pannello {number}",
   "chart_history": "Cronologia dei grafici",
   "graph_settings": "Impostazioni del grafico",

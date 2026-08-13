@@ -1,5 +1,6 @@
 import {
   CARD_HANDOFF_QUERY_PARAM,
+  PANEL_TABS_SCHEMA,
   PANEL_TABS_STORAGE_KEY,
   REDO_STORAGE_KEY,
   SHARE_QUERY_PARAM,
@@ -7,15 +8,73 @@ import {
 } from "./constants.js";
 
 export class PanelTabsMethods {
+  _desktopPanelLayoutAvailable() {
+    if (this._narrow) return false;
+    return typeof globalThis.matchMedia !== "function"
+      || globalThis.matchMedia("(min-width: 769px)").matches;
+  }
+
+  _statisticsCardVersionParts() {
+    const match = String(this._statisticsCardVersion?.() || "")
+      .match(/^v?(\d+)\.(\d+)(?:\.(\d+))?/i);
+    return match ? match.slice(1).map((part) => Number(part || 0)) : null;
+  }
+
+  _panelTabsDependencySupported() {
+    const version = this._statisticsCardVersionParts();
+    if (!version) return false;
+    const [major, minor] = version;
+    return major > 4 || (major === 4 && minor >= 2);
+  }
+
   _panelTabId() {
     return globalThis.crypto?.randomUUID?.()
       || `panel-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
+  _panelEnergyCollectionKeyForId(id) {
+    const safeId = String(id || "panel")
+      .toLowerCase()
+      .replace(/[^a-z0-9_]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "panel";
+    return `energy_advanced_history_${safeId}`;
+  }
+
+  _validPanelEnergyCollectionKey(value) {
+    return typeof value === "string"
+      && /^energy_[a-z0-9_]+$/.test(value)
+      && value.length <= 255;
+  }
+
+  _migratePersistedPanelTabs(stored) {
+    // 2.0-beta.1 already stored complete per-panel snapshots. Preserve those
+    // verbatim and add only the stable Energy collection key needed by beta.2.
+    if (!stored || ![1, PANEL_TABS_SCHEMA].includes(stored.schema)) return null;
+    if (!Array.isArray(stored.tabs)) return null;
+    const migrated = this._clone(stored);
+    migrated.schema = PANEL_TABS_SCHEMA;
+    migrated.tabs = migrated.tabs.map((tab) => ({
+      ...tab,
+      energy_collection_key: this._validPanelEnergyCollectionKey(tab?.energy_collection_key)
+        ? tab.energy_collection_key
+        : this._panelEnergyCollectionKeyForId(tab?.id),
+    }));
+    return migrated;
+  }
+
   _desktopPanelTabsEnabled() {
-    if (this._narrow) return false;
-    return typeof globalThis.matchMedia !== "function"
-      || globalThis.matchMedia("(min-width: 769px)").matches;
+    return this._desktopPanelLayoutAvailable()
+      && this._panelTabsDependencySupported();
+  }
+
+  _panelEnergyCollectionKey() {
+    if (!this._panelTabsDependencySupported()) return null;
+    const tab = this._panelTabs?.find((item) => item.id === this._activePanelTabId);
+    if (tab && !this._validPanelEnergyCollectionKey(tab.energy_collection_key)) {
+      tab.energy_collection_key = this._panelEnergyCollectionKeyForId(tab.id);
+    }
+    return tab?.energy_collection_key
+      || this._panelEnergyCollectionKeyForId(this._activePanelTabId);
   }
 
   _panelTabLabel(index) {
@@ -54,7 +113,7 @@ export class PanelTabsMethods {
     this._saveActivePanelTab();
     try {
       localStorage.setItem(PANEL_TABS_STORAGE_KEY, JSON.stringify({
-        schema: 1,
+        schema: PANEL_TABS_SCHEMA,
         active_id: this._activePanelTabId,
         tabs: this._panelTabs,
       }));
@@ -72,8 +131,9 @@ export class PanelTabsMethods {
       || this._incomingTargetOverride
     ) return false;
     try {
-      const stored = JSON.parse(localStorage.getItem(PANEL_TABS_STORAGE_KEY) || "null");
-      if (stored?.schema !== 1 || !Array.isArray(stored.tabs)) return false;
+      const rawStored = JSON.parse(localStorage.getItem(PANEL_TABS_STORAGE_KEY) || "null");
+      const stored = this._migratePersistedPanelTabs(rawStored);
+      if (!stored) return false;
       const tabs = stored.tabs.filter((tab) => (
         typeof tab?.id === "string"
         && tab.state?.snapshot?.targets
@@ -84,6 +144,13 @@ export class PanelTabsMethods {
       this._activePanelTabId = this._panelTabs.some((tab) => tab.id === stored.active_id)
         ? stored.active_id
         : this._panelTabs[0].id;
+      if (rawStored.schema !== PANEL_TABS_SCHEMA) {
+        localStorage.setItem(PANEL_TABS_STORAGE_KEY, JSON.stringify({
+          schema: PANEL_TABS_SCHEMA,
+          active_id: this._activePanelTabId,
+          tabs: this._panelTabs,
+        }));
+      }
       const active = this._panelTabs.find((tab) => tab.id === this._activePanelTabId);
       this._restorePanelTab(active);
       return true;
@@ -167,7 +234,12 @@ export class PanelTabsMethods {
   _addPanelTab() {
     if (!this._desktopPanelTabsEnabled() || this._panelTabs.length >= this.maxTabs) return;
     this._saveActivePanelTab();
-    const tab = { id: this._panelTabId(), state: this._blankPanelTabState() };
+    const id = this._panelTabId();
+    const tab = {
+      id,
+      energy_collection_key: this._panelEnergyCollectionKeyForId(id),
+      state: this._blankPanelTabState(),
+    };
     this._panelTabs.push(tab);
     this._activePanelTabId = tab.id;
     this._restorePanelTab(tab);

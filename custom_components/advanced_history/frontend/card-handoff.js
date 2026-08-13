@@ -11,6 +11,7 @@ const OMITTED_CARD_KEYS = new Set([
   "type",
   "entities",
   "energy_date_sync",
+  "energy_collection_key",
   "height",
   "hours_to_show",
   "show_y2_axis",

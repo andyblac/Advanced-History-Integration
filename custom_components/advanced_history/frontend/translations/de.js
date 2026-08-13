@@ -6,6 +6,7 @@ export default {
   "bookmark_visibility_error": "Die Sichtbarkeit des Lesezeichens konnte nicht geändert werden.",
   "panels": "Ansichten",
   "add_panel": "Ansicht hinzufügen",
+  "add_panel_requires_version": "Mehrere Ansichten erfordern Statistics Graph Chart Card v4.02 oder neuer",
   "panel_number": "Ansicht {number}",
   "chart_history": "Diagrammverlauf",
   "graph_settings": "Diagrammeinstellungen",

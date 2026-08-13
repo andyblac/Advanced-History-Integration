@@ -976,6 +976,9 @@ export class EnergyMethods {
       if (this._energyRenderToken !== token || !host.isConnected) return;
       const controller = helpers.createCardElement({
         type: "energy-date-selection",
+        ...(this._panelEnergyCollectionKey()
+          ? { collection_key: this._panelEnergyCollectionKey() }
+          : {}),
         vertical_opening_direction: "up",
         opening_direction: "center",
       });
@@ -986,7 +989,12 @@ export class EnergyMethods {
       this._replaceEnergyDownloadAction(controller);
       this._makeEnergySelectorFixed(controller, token);
 
-      const compareCard = helpers.createCardElement({ type: "energy-compare" });
+      const compareCard = helpers.createCardElement({
+        type: "energy-compare",
+        ...(this._panelEnergyCollectionKey()
+          ? { collection_key: this._panelEnergyCollectionKey() }
+          : {}),
+      });
       const syncCompareVisibility = () => {
         compareHost.hidden = this._periodRestoreLoading
           || this._energyInteractionLoading
@@ -1112,7 +1120,12 @@ export class EnergyMethods {
   }
 
   async _bindEnergyCollection(token, host, compareHost, compareCard) {
-    const connectionKey = this._hass.panelUrl ? `_energy_${this._hass.panelUrl}` : "_energy";
+    const panelCollectionKey = this._panelEnergyCollectionKey();
+    const connectionKey = panelCollectionKey
+      ? `_${panelCollectionKey}`
+      : this._hass.panelUrl
+        ? `_energy_${this._hass.panelUrl}`
+        : "_energy";
     let collection;
     for (let attempt = 0; attempt < 30; attempt++) {
       if (this._energyRenderToken !== token || !compareCard.isConnected) return;
@@ -1134,14 +1147,13 @@ export class EnergyMethods {
         collection.setCompare?.(restore.compare);
       }
     }
-    // The Energy collection is shared between tabs. Move it to this panel's
-    // current rolling window before reading or normalizing its cached period;
-    // otherwise the native picker initializes from the panel we just left.
+    // Move the collection to this panel's current rolling window before
+    // reading or normalizing its cached period.
     const rollingPeriodApplied = this._panelRollingHours
       ? this._refreshPanelRollingRange()
       : false;
     // Older partial-day builds stored the selected hours directly in HA's
-    // shared Energy collection. Convert that cached selection back to a
+    // Energy collection. Convert that cached selection back to a
     // native full-day period before mounting the replacement graph cards.
     // The visible hours are now card filters, not an Energy date range.
     const normalizedEnergyDay = this._panelRollingHours

@@ -52,7 +52,7 @@ Advanced History brings those two ideas together: select targets as you would in
 
 - Home Assistant with support for custom integrations.
 - [HACS](https://www.hacs.xyz/) is recommended.
-- [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) **v3.32 or newer** is a separate required dependency.
+- [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) **v3.32 or newer** is a separate required dependency. Multiple panels require **v4.02 or newer** so each panel can use an independent Energy Date Sync collection.
 
 If the graph card is missing, Advanced History displays an **Install using HACS** link and a **Retry** button.
 
