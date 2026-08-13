@@ -1,4 +1,14 @@
 export class TargetPickerMethods {
+  _secondaryAxisEditable() {
+    if (this._narrow) return false;
+    return typeof globalThis.matchMedia !== "function"
+      || globalThis.matchMedia("(min-width: 769px)").matches;
+  }
+
+  _secondaryAxisVisible() {
+    return this._secondaryAxisEditable() || Boolean(this._loadedBookmarkId);
+  }
+
   async _loadNativeHistoryPicker() {
     if (customElements.get("ha-target-picker")) return;
 
@@ -617,7 +627,9 @@ export class TargetPickerMethods {
 
   _targetCount(targets) {
     const count = (value) => value.area_id.length + value.device_id.length + value.entity_id.length;
-    return targets ? count(targets) : count(this._targets) + count(this._y2Targets);
+    return targets
+      ? count(targets)
+      : count(this._targets) + (this._secondaryAxisVisible() ? count(this._y2Targets) : 0);
   }
 
   _snapshotTargetCount(snapshot) {
@@ -651,7 +663,9 @@ export class TargetPickerMethods {
       return { ids, enabled };
     };
     const primary = resolve(this._targets, this._hiddenTargets);
-    const secondary = resolve(this._y2Targets, this._hiddenY2Targets);
+    const secondary = this._secondaryAxisVisible()
+      ? resolve(this._y2Targets, this._hiddenY2Targets)
+      : { ids: new Set(), enabled: new Set() };
     const available = [...new Set([...primary.ids, ...secondary.ids])]
       .filter((id) => this._hass.states[id]);
     this._enabledResolvedEntityIds = new Set([...primary.enabled, ...secondary.enabled]);

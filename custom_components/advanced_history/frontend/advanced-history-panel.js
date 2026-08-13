@@ -248,8 +248,9 @@ class AdvancedHistoryPanel extends HTMLElement {
     const redo = this._localize("ui.common.redo", "Redo");
     const addPanel = this._customLocalize("add_panel");
     const dependencyMissing = Boolean(this._cardLoadError);
+    const secondaryAxisEditable = this._secondaryAxisEditable();
     const hasY1Targets = Boolean(this._targetCount(this._targets));
-    const hasY2Targets = Boolean(this._targetCount(this._y2Targets));
+    const hasY2Targets = secondaryAxisEditable && Boolean(this._targetCount(this._y2Targets));
     const y1TargetClass = !hasY1Targets && hasY2Targets ? " axis-target-compact" : "";
     const y2TargetClass = !hasY2Targets && hasY1Targets ? " axis-target-compact" : "";
     this._nativeTargetPicker = null;
@@ -275,13 +276,13 @@ class AdvancedHistoryPanel extends HTMLElement {
               <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
             </div>
           </div>
-          <div class="axis-target-divider" aria-hidden="true"></div>
+          ${secondaryAxisEditable ? `<div class="axis-target-divider" aria-hidden="true"></div>
           <div class="axis-target-group axis-target-secondary${y2TargetClass}">
             <div class="axis-target-label"><span class="axis-badge">Y2</span><span>${this._escape(this._customLocalize("secondary_axis"))}</span></div>
             <div id="y2-target-picker-host" class="native-target-picker">
               <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
             </div>
-          </div>
+          </div>` : ""}
         </section>`}
         <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
           <ha-circular-progress active size="small"></ha-circular-progress>
@@ -306,8 +307,10 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._bindPanelTabs();
     this._updateUndoRedoButtons();
     if (!dependencyMissing) {
-      void this._renderNativeTargetPicker("primary")
-        .then(() => this._renderNativeTargetPicker("secondary"));
+      void this._renderNativeTargetPicker("primary").then(() => {
+        if (secondaryAxisEditable) return this._renderNativeTargetPicker("secondary");
+        return undefined;
+      });
     }
     this._renderContent();
   }

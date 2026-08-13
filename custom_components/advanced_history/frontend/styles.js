@@ -265,6 +265,9 @@ export const panelStyles = `
   }
   @media (max-width:768px) {
     .desktop-panel-only, .panel-tabs-shell { display:none !important; }
+    .axis-target-secondary, .axis-target-divider { display:none !important; }
+    .axis-target-primary .axis-target-label { display:none; }
+    .axis-target-primary { flex:1 1 auto; width:100%; }
   }
   @media (max-width:600px) {
     .content { padding:0 12px 96px; }
