@@ -48,6 +48,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._energyCollection = null;
     this._panelTimeRange = null;
     this._panelRollingHours = null;
+    this._panelRollingResumeHours = null;
     this._panelRollingTimer = null;
     this._pendingRollingCompareRestore = null;
     this._panelTimeRangePreview = false;

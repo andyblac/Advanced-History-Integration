@@ -310,15 +310,54 @@ export class StorageMethods {
     return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
-  _captureSnapshot(name = "") {
+  _capturePeriodSnapshot() {
     const collection = this._energyCollection;
-    const period = collection?.start ? {
-      start: collection.start.toISOString(),
-      end: collection.end?.toISOString?.() || null,
-      compare: collection.compare ?? "",
-      compare_choice: this._energyCompareChoice || null,
-      compare_count: this._energyCompareCount || 1,
-    } : this._clone(this._pendingPeriodRestore);
+    const validDate = (value) => {
+      const date = value instanceof Date ? value : value ? new Date(value) : null;
+      return date && !Number.isNaN(date.getTime()) ? date : null;
+    };
+    let collectionStart = validDate(collection?.start);
+    let collectionEnd = validDate(collection?.end);
+    const fallback = this._clone(
+      this._pendingPeriodRestore
+      || this._currentSnapshot?.period
+      || null
+    );
+    const rollingCompare = this._pendingRollingCompareRestore;
+    if (!collectionStart && this._panelRollingHours) {
+      collectionEnd = new Date();
+      collectionEnd.setSeconds(0, 0);
+      collectionStart = new Date(
+        collectionEnd.getTime() - this._panelRollingHours * 60 * 60 * 1000,
+      );
+    }
+    if (!collectionStart && !fallback?.start) return null;
+    return {
+      start: collectionStart?.toISOString() || fallback.start,
+      end: collectionEnd?.toISOString() || fallback?.end || null,
+      compare: collection
+        ? collection.compare ?? ""
+        : rollingCompare?.compare ?? fallback?.compare ?? "",
+      compare_choice: this._energyCompareChoice
+        || rollingCompare?.choice
+        || fallback?.compare_choice
+        || null,
+      compare_count: Math.max(
+        1,
+        Math.min(
+          10,
+          Math.trunc(Number(
+            this._energyCompareCount
+            || rollingCompare?.count
+            || fallback?.compare_count
+          )) || 1,
+        ),
+      ),
+    };
+  }
+
+  _captureSnapshot(name = "") {
+    const period = this._capturePeriodSnapshot();
     const activeChart = this._normalizeSnapshotChart(this._activeSnapshot || {});
     const chart = {
       defaults_mode: "overrides",
@@ -338,6 +377,9 @@ export class StorageMethods {
     ].forEach(copyChartValue);
     if (this._panelTimeRange) chart.time_range = this._clone(this._panelTimeRange);
     if (this._panelRollingHours) chart.rolling_hours = this._panelRollingHours;
+    else if (this._panelRollingResumeHours) {
+      chart.rolling_resume_hours = this._panelRollingResumeHours;
+    }
     return {
       schema: 1,
       id: this._newSnapshotId(),
@@ -747,7 +789,12 @@ export class StorageMethods {
     const rollingHours = [1, 2, 4, 8, 12, 24].includes(Number(snapshot.chart.rolling_hours))
       ? Number(snapshot.chart.rolling_hours)
       : null;
+    const rollingResumeHours = !rollingHours
+      && [1, 2, 4, 8, 12, 24].includes(Number(snapshot.chart.rolling_resume_hours))
+      ? Number(snapshot.chart.rolling_resume_hours)
+      : null;
     this._setPanelRollingHours?.(rollingHours);
+    this._panelRollingResumeHours = rollingResumeHours;
     this._panelTimeRange = this._clone(snapshot.chart.time_range) || null;
     if (this._activeSnapshot?.compare === undefined) delete this._activeSnapshot.compare;
     // A saved rolling range must resume from the current time rather than
@@ -770,6 +817,10 @@ export class StorageMethods {
     }
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;
+    // Do not let a rolling-range restore update the Energy collection that
+    // belonged to the panel being replaced. _refreshPanelRollingRange() will
+    // wait for _bindEnergyCollection() to attach the new panel collection.
+    if (rollingHours) this._energyCollection = null;
     if (this._energyCollection && this._pendingPeriodRestore?.start) {
       // Update the selector synchronously, but leave the refresh to
       // _bindEnergyCollection(). Starting it here can publish the restored

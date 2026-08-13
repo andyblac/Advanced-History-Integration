@@ -740,6 +740,7 @@ export class EnergyMethods {
     this._panelRollingHours = [1, 2, 4, 8, 12, 24].includes(Number(hours))
       ? Number(hours)
       : null;
+    this._panelRollingResumeHours = this._panelRollingHours;
     if (!this._panelRollingHours || !this.isConnected) return;
     const delay = 60_000 - (Date.now() % 60_000) + 250;
     this._panelRollingTimer = window.setTimeout(() => {
@@ -749,15 +750,15 @@ export class EnergyMethods {
   }
 
   _refreshPanelRollingRange() {
-    const hours = this._panelRollingHours;
-    if (!hours || !this.isConnected) return;
+    const hours = this._panelRollingHours || this._panelRollingResumeHours;
+    if (!hours || !this.isConnected) return false;
     if (!this._energyCollection) {
       if (this._panelRollingTimer) window.clearTimeout(this._panelRollingTimer);
       this._panelRollingTimer = window.setTimeout(() => {
         this._panelRollingTimer = null;
         this._refreshPanelRollingRange();
       }, 250);
-      return;
+      return false;
     }
     const end = new Date();
     end.setSeconds(0, 0);
@@ -766,8 +767,18 @@ export class EnergyMethods {
       start: start.getHours() * 60 + start.getMinutes(),
       end: end.getHours() * 60 + end.getMinutes(),
     };
-    this._applyPanelTimeRangePeriod(start, true);
+    const applied = this._applyPanelTimeRangePeriod(start, true);
     this._setPanelRollingHours(hours);
+    return applied;
+  }
+
+  _pausePanelRollingRange() {
+    const hours = this._panelRollingHours || this._panelRollingResumeHours;
+    if (!hours) return;
+    if (this._panelRollingTimer) window.clearTimeout(this._panelRollingTimer);
+    this._panelRollingTimer = null;
+    this._panelRollingHours = null;
+    this._panelRollingResumeHours = hours;
   }
 
   _resetPanelTimeRangeOutsideDayView() {
@@ -783,7 +794,7 @@ export class EnergyMethods {
     const period = this._panelDayPeriod();
     if (!this._energyCollection || !period || ![-1, 1].includes(direction)) return false;
     if (!this._panelTimeRange) return this._shiftPanelDay(direction);
-    this._setPanelRollingHours(null);
+    this._pausePanelRollingRange();
     const { start, end } = this._panelTimeRange;
     const duration = (end - start + 1440) % 1440;
     if (!duration) return false;
@@ -1116,17 +1127,32 @@ export class EnergyMethods {
         collection.setCompare?.(restore.compare);
       }
     }
+    // The Energy collection is shared between tabs. Move it to this panel's
+    // current rolling window before reading or normalizing its cached period;
+    // otherwise the native picker initializes from the panel we just left.
+    const rollingPeriodApplied = this._panelRollingHours
+      ? this._refreshPanelRollingRange()
+      : false;
     // Older partial-day builds stored the selected hours directly in HA's
     // shared Energy collection. Convert that cached selection back to a
     // native full-day period before mounting the replacement graph cards.
     // The visible hours are now card filters, not an Energy date range.
-    const normalizedEnergyDay = this._normalizeEnergyDayPeriod(collection, false);
+    const normalizedEnergyDay = this._panelRollingHours
+      ? false
+      : this._normalizeEnergyDayPeriod(collection, false);
     this._activateGraphDataSourceTracking();
     this._renderPanelTimeRangeControl(host);
 
     const restoringPeriod = Boolean(
       this._periodRestoreLoading && this._periodRestoreExpected?.start
     );
+    // Loading a rolling bookmark into an empty panel must supersede the
+    // panel's deferred "reset to Today" action. Fixed-period bookmarks do
+    // this through the period-restore branch below; rolling bookmarks restore
+    // against the current clock and therefore do not enter that branch.
+    if (this._panelRollingHours && this._targetCount()) {
+      this._energyResetPending = false;
+    }
     // Energy subscriptions immediately replay their cached payload. During a
     // saved-range restore that replay may already match the requested period,
     // but it is not the result of the refresh below. Do not complete the
@@ -1241,7 +1267,7 @@ export class EnergyMethods {
         this._recordChange(null, !periodRestored);
       }
     });
-    if (normalizedEnergyDay && !restoringPeriod) {
+    if ((normalizedEnergyDay || rollingPeriodApplied) && !restoringPeriod) {
       collection.refresh?.();
     }
     if (restoringPeriod) {
@@ -1278,12 +1304,13 @@ export class EnergyMethods {
         "Next"
       ),
     ]);
+    const nowActionLabel = this._localize(
+      "ui.panel.lovelace.components.energy_period_selector.now",
+      "Now"
+    );
     const energyActionLabels = new Set([
       ...navigationActionLabels,
-      this._localize(
-        "ui.panel.lovelace.components.energy_period_selector.now",
-        "Now"
-      ),
+      nowActionLabel,
       this._localize(
         "ui.panel.lovelace.components.energy_period_selector.compare",
         "Compare data"
@@ -1304,6 +1331,19 @@ export class EnergyMethods {
         return true;
       });
       if (directEnergyAction) {
+        if (
+          directEnergyAction === nowActionLabel
+          && (this._panelRollingHours || this._panelRollingResumeHours)
+        ) {
+          // HA's native Now action selects the current full period. A rolling
+          // preset instead means "the last N hours ending now", so retain the
+          // preset and move both ends of its window to the current clock.
+          event.preventDefault();
+          event.stopPropagation();
+          event.stopImmediatePropagation();
+          this._refreshPanelRollingRange();
+          return;
+        }
         // In Day view these arrows are intercepted by
         // _bindPanelTimeNavigation(): tap moves the visible hour window and
         // hold calls _shiftPanelDay(), which starts its own Energy loading
