@@ -19,6 +19,7 @@ from homeassistant.helpers.storage import Store
 from .const import (
     CONF_CARD_MODULE_URL,
     CONF_MORE_INFO_CARD_OPTIONS,
+    CONF_MORE_INFO_SHOW_DATE_PICKER,
     CONF_REPLACE_MORE_INFO_HISTORY,
     DOMAIN,
     ENTRY_TYPE_MORE_INFO,
@@ -204,7 +205,7 @@ def _more_info_entity_store(hass: HomeAssistant) -> MoreInfoEntityStore:
 
 
 class MoreInfoPreferenceStore:
-    """Persist the shared and per-user More Info picker preference."""
+    """Persist per-user More Info picker preferences."""
 
     def __init__(self, hass: HomeAssistant) -> None:
         """Initialize the preference store."""
@@ -221,29 +222,32 @@ class MoreInfoPreferenceStore:
             self._data = loaded if isinstance(loaded, dict) else {}
             if not isinstance(self._data.get("users"), dict):
                 self._data["users"] = {}
-            if self._data.get("default_picker_mode") not in {"date", "interval"}:
-                self._data.pop("default_picker_mode", None)
+            # Shared defaults now live in the More-Info config entry so the
+            # integration options flow always reflects the active default.
+            self._data.pop("default_picker_mode", None)
         return self._data
 
     async def async_get(self, user_id: str) -> str | None:
-        """Return a user's picker preference or the shared default."""
+        """Return a user's picker preference."""
         async with self._lock:
             data = await self._async_ensure_loaded()
             user_mode = data["users"].get(user_id)
             if user_mode in {"date", "interval"}:
                 return user_mode
-            default_mode = data.get("default_picker_mode")
-            return default_mode if default_mode in {"date", "interval"} else None
+            return None
 
-    async def async_set(self, user_id: str, mode: str, shared: bool) -> None:
-        """Set the shared default or one user's picker preference."""
+    async def async_set(self, user_id: str, mode: str) -> None:
+        """Set one user's picker preference."""
         async with self._lock:
             data = await self._async_ensure_loaded()
-            if shared:
-                data["default_picker_mode"] = mode
-                data["users"] = {}
-            else:
-                data["users"][user_id] = mode
+            data["users"][user_id] = mode
+            await self._store.async_save(data)
+
+    async def async_clear_all(self) -> None:
+        """Clear user overrides after an administrator changes the default."""
+        async with self._lock:
+            data = await self._async_ensure_loaded()
+            data["users"] = {}
             await self._store.async_save(data)
 
 
@@ -418,12 +422,41 @@ async def websocket_get_more_info_config(
 async def websocket_set_more_info_picker_mode(
     hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Save the shared admin default or one user's picker preference."""
-    await _more_info_preference_store(hass).async_set(
-        connection.user.id,
-        msg["mode"],
-        bool(connection.user.is_admin),
-    )
+    """Update the configured admin default or one user's preference."""
+    mode = msg["mode"]
+    preference_store = _more_info_preference_store(hass)
+    if connection.user.is_admin:
+        entry = next(
+            (
+                candidate
+                for candidate in hass.config_entries.async_entries(DOMAIN)
+                if config_entry_type(candidate) == ENTRY_TYPE_MORE_INFO
+            ),
+            None,
+        )
+        if entry is None:
+            connection.send_error(
+                msg["id"], "not_found", "More-Info service is not configured"
+            )
+            return
+
+        options = deepcopy(dict(entry.options))
+        configured_card_options = options.get(CONF_MORE_INFO_CARD_OPTIONS)
+        card_options = (
+            deepcopy(configured_card_options)
+            if isinstance(configured_card_options, dict)
+            else deepcopy(
+                more_info_options_with_defaults({})[CONF_MORE_INFO_CARD_OPTIONS]
+            )
+        )
+        card_options["show_date_picker"] = mode == "date"
+        card_options["show_interval_picker"] = mode == "interval"
+        options[CONF_MORE_INFO_SHOW_DATE_PICKER] = mode == "date"
+        options[CONF_MORE_INFO_CARD_OPTIONS] = card_options
+        hass.config_entries.async_update_entry(entry, options=options)
+        await preference_store.async_clear_all()
+    else:
+        await preference_store.async_set(connection.user.id, mode)
     connection.send_result(msg["id"])
 
 

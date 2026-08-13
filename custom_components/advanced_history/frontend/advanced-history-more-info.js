@@ -758,10 +758,12 @@ function ensureMoreInfoActionButtons(historyView, serviceConfig, cardConfig) {
           type: MORE_INFO_PICKER_MODE_SET_TYPE,
           mode,
         });
-        historyView.__advancedHistoryMoreInfoPickerSelection = {
-          entityId: historyView.entityId,
-          mode,
-        };
+        historyView.__advancedHistoryMoreInfoPickerSelection = serviceConfig?.can_edit_entity_config
+          ? null
+          : {
+            entityId: historyView.entityId,
+            mode,
+          };
         invalidateMoreInfoConfig(historyView.entityId);
         scheduleMoreInfoReplacement(historyView);
       } catch (error) {
