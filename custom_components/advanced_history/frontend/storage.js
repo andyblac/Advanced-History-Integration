@@ -1221,8 +1221,8 @@ export class StorageMethods {
           <span class="library-name">${this._escape(item.name || this._snapshotLabel(item))}</span>
           <span class="library-summary">${showOwner && item._owner_name ? `${this._escape(item._owner_name)} · ` : ""}${this._escape(this._snapshotSummary(item))}</span>
         </button>
-        ${canPublish ? `<button class="visibility ${item.visible_everyone ? "active" : ""}" data-toggle-visible="${this._escape(item.id)}" data-owner-user-id="${this._escape(item._owner_user_id || ownerUserId || this._hass.user.id)}" aria-pressed="${item.visible_everyone ? "true" : "false"}" title="${this._escape(visibleLabel)}"><ha-icon icon="${item.visible_everyone ? "mdi:account-multiple" : "mdi:account-multiple-outline"}"></ha-icon></button>` : ""}
         ${!readOnly && isBookmarks && this._bookmarkHasChanges(item) ? `<button class="update" data-update-snapshot="${this._escape(item.id)}" title="${this._escape(updateLabel)}"><ha-icon icon="mdi:update"></ha-icon></button>` : ""}
+        ${canPublish ? `<button class="visibility ${item.visible_everyone ? "active" : ""}" data-toggle-visible="${this._escape(item.id)}" data-owner-user-id="${this._escape(item._owner_user_id || ownerUserId || this._hass.user.id)}" aria-pressed="${item.visible_everyone ? "true" : "false"}" title="${this._escape(visibleLabel)}"><ha-icon icon="${item.visible_everyone ? "mdi:account-multiple" : "mdi:account-multiple-outline"}"></ha-icon></button>` : ""}
         ${readOnly ? "" : `<button class="delete" data-delete-snapshot="${this._escape(item.id)}" title="${this._escape(deleteLabel)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>`}
       </div>`).join("");
   }
