@@ -1,5 +1,9 @@
 export default {
   "bookmarks": "Bookmarks",
+  "my_bookmarks": "My bookmarks",
+  "shared_bookmarks": "Shared",
+  "visible_to_everyone": "Visible to everyone",
+  "bookmark_visibility_error": "Bookmark visibility could not be changed.",
   "panels": "Panels",
   "add_panel": "Add panel",
   "panel_number": "Panel {number}",

@@ -1,5 +1,9 @@
 export default {
   "bookmarks": "Segnalibri",
+  "my_bookmarks": "I miei segnalibri",
+  "shared_bookmarks": "Condivisi",
+  "visible_to_everyone": "Visibile a tutti",
+  "bookmark_visibility_error": "Impossibile modificare la visibilità del segnalibro.",
   "panels": "Pannelli",
   "add_panel": "Aggiungi pannello",
   "panel_number": "Pannello {number}",

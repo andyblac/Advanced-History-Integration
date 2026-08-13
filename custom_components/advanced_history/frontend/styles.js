@@ -194,6 +194,10 @@ export const panelStyles = `
     color:var(--primary-text-color); background:var(--card-background-color); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.35);
   }
   .library-save { padding:14px 18px; display:flex; gap:10px; border-bottom:1px solid var(--divider-color); }
+  .bookmark-user-tabs { min-height:48px; padding:0 12px; display:flex; gap:4px; overflow-x:auto; border-bottom:1px solid var(--divider-color); scrollbar-width:thin; }
+  .bookmark-user-tabs button { position:relative; flex:0 0 auto; min-width:88px; padding:0 14px; border:0; color:var(--secondary-text-color); background:transparent; cursor:pointer; font:inherit; font-weight:500; }
+  .bookmark-user-tabs button[aria-selected="true"] { color:var(--primary-text-color); }
+  .bookmark-user-tabs button[aria-selected="true"]::after { content:""; position:absolute; right:8px; bottom:0; left:8px; height:2px; background:var(--primary-color); }
   .library-save input { flex:1; min-width:0; height:42px; padding:0 12px; color:var(--primary-text-color); background:var(--secondary-background-color); border:1px solid var(--divider-color); border-radius:8px; }
   .library-save button, .library-row button { min-width:40px; height:40px; padding:0 12px; border:0; border-radius:8px; cursor:pointer; color:var(--primary-color); background:transparent; font-weight:500; }
   .library-save button { color:var(--text-primary-color,white); background:var(--primary-color); }
@@ -205,6 +209,8 @@ export const panelStyles = `
   .library-summary { display:block; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--secondary-text-color); font-size:12px; }
   .library-row .delete { width:40px; padding:8px; color:var(--secondary-text-color); }
   .library-row .update { width:40px; padding:8px; color:var(--primary-color); }
+  .library-row .visibility { width:40px; padding:8px; color:var(--secondary-text-color); }
+  .library-row .visibility.active { color:var(--primary-color); }
   .library-empty { padding:40px 20px; color:var(--secondary-text-color); text-align:center; }
   .dialog-title { min-height:64px; padding:0 24px 0 12px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--divider-color); }
   .dialog-title h2 { margin:0; font-size:20px; font-weight:500; }

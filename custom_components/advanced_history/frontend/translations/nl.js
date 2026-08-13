@@ -1,5 +1,9 @@
 export default {
   "bookmarks": "Bladwijzers",
+  "my_bookmarks": "Mijn bladwijzers",
+  "shared_bookmarks": "Gedeeld",
+  "visible_to_everyone": "Zichtbaar voor iedereen",
+  "bookmark_visibility_error": "De zichtbaarheid van de bladwijzer kon niet worden gewijzigd.",
   "panels": "Panelen",
   "add_panel": "Paneel toevoegen",
   "panel_number": "Paneel {number}",

@@ -36,6 +36,7 @@ export class StorageMethods {
     const incomingSnapshot = handedOffSnapshot || sharedSnapshot;
     if (incomingSnapshot) {
       this._loadedBookmarkId = null;
+      this._loadedExternalBookmark = false;
       if (
         previous?.targets &&
         this._snapshotTargetCount(previous) &&
@@ -66,6 +67,7 @@ export class StorageMethods {
       .some((items) => items.length);
     if (hasUrlTargets) {
       this._loadedBookmarkId = null;
+      this._loadedExternalBookmark = false;
       if (
         previous?.targets &&
         this._snapshotTargetCount(previous) &&
@@ -98,6 +100,7 @@ export class StorageMethods {
     ) {
       this._currentSnapshot = this._clone(previous);
       this._loadedBookmarkId = previous.source_bookmark_id || null;
+      this._loadedExternalBookmark = Boolean(previous.source_external_bookmark);
       const loadedBookmark = this._loadedBookmarkId
         ? this._loadLibrary(BOOKMARKS_STORAGE_KEY).find((item) => item.id === this._loadedBookmarkId)
         : null;
@@ -240,6 +243,7 @@ export class StorageMethods {
 
     try {
       const result = await this._hass.callWS({ type: "advanced_history/bookmarks/get" });
+      this._updateBookmarkCatalog(result);
       const remoteBookmarks = Array.isArray(result?.bookmarks)
         ? result.bookmarks.slice(0, BOOKMARKS_LIMIT)
         : [];
@@ -267,6 +271,7 @@ export class StorageMethods {
         await this._saveBookmarksToServer(this._loadLibrary(BOOKMARKS_STORAGE_KEY));
       }
       const result = await this._hass.callWS({ type: "advanced_history/bookmarks/get" });
+      this._updateBookmarkCatalog(result);
       if (result?.initialized && Array.isArray(result.bookmarks)) {
         this._saveLocalLibrary(
           BOOKMARKS_STORAGE_KEY,
@@ -277,6 +282,24 @@ export class StorageMethods {
       console.warn("Advanced History: unable to refresh bookmarks", error);
       this._notice = this._customLocalize("bookmark_sync_error");
     }
+  }
+
+  _updateBookmarkCatalog(result) {
+    this._bookmarkCatalog = {
+      shared: Array.isArray(result?.shared_bookmarks) ? result.shared_bookmarks : [],
+      users: Array.isArray(result?.users) ? result.users : [],
+    };
+  }
+
+  async _loadRemoteBookmarkLibrary(userId) {
+    const result = await this._hass.callWS({
+      type: "advanced_history/bookmarks/get",
+      user_id: userId,
+    });
+    this._updateBookmarkCatalog(result);
+    const bookmarks = Array.isArray(result?.bookmarks) ? result.bookmarks : [];
+    this._bookmarkRemoteLibraries.set(userId, bookmarks);
+    return bookmarks;
   }
 
   _newSnapshotId() {
@@ -321,6 +344,7 @@ export class StorageMethods {
       chart,
       period,
       source_bookmark_id: this._loadedBookmarkId || null,
+      source_external_bookmark: Boolean(this._loadedExternalBookmark),
     };
   }
 
@@ -374,8 +398,10 @@ export class StorageMethods {
     const source = snapshot ? this._clone(snapshot) : this._captureSnapshot();
     if (!this._snapshotTargetCount(source)) {
       this._loadedBookmarkId = null;
+      this._loadedExternalBookmark = false;
     }
     source.source_bookmark_id = this._loadedBookmarkId || null;
+    source.source_external_bookmark = Boolean(this._loadedExternalBookmark);
     source.id = this._newSnapshotId();
     source.name = this._snapshotLabel(source);
     source.saved_at = new Date().toISOString();
@@ -395,7 +421,7 @@ export class StorageMethods {
       freshSessionFingerprint
       && !this._periodRestoreLoading
       && !bookmarkEdit
-      && this._loadedBookmarkId
+      && (this._loadedBookmarkId || this._loadedExternalBookmark)
     );
 
     if (changed && !this._incomingTargetOverride && !restoringFreshSession) {
@@ -412,12 +438,16 @@ export class StorageMethods {
     if (completingFreshSession) {
       this._loadedBookmarkBaselineFingerprint = sourceFingerprint;
       this._loadedBookmarkDirty = false;
-    } else if (this._loadedBookmarkId && bookmarkEdit && !restoringFreshSession) {
+    } else if (
+      (this._loadedBookmarkId || this._loadedExternalBookmark)
+      && bookmarkEdit
+      && !restoringFreshSession
+    ) {
       this._loadedBookmarkDirty = Boolean(
         this._loadedBookmarkBaselineFingerprint &&
         sourceFingerprint !== this._loadedBookmarkBaselineFingerprint
       );
-    } else if (!this._loadedBookmarkId) {
+    } else if (!this._loadedBookmarkId && !this._loadedExternalBookmark) {
       this._loadedBookmarkDirty = false;
     }
     this._updateUndoRedoButtons();
@@ -480,9 +510,10 @@ export class StorageMethods {
   async _requestClearCurrentChart() {
     if (!this._targetCount()) return true;
     const loadedBookmarkChanged = Boolean(
-      this._loadedBookmarkId && this._loadedBookmarkDirty
+      (this._loadedBookmarkId || this._loadedExternalBookmark)
+      && this._loadedBookmarkDirty
     );
-    const newChart = !this._loadedBookmarkId;
+    const newChart = !this._loadedBookmarkId && !this._loadedExternalBookmark;
     if (!newChart && !loadedBookmarkChanged) {
       this._clearCurrentChart();
       return true;
@@ -491,17 +522,17 @@ export class StorageMethods {
     const action = await this._showUnsavedChangesDialog({
       title: this._customLocalize("unsaved_chart_title"),
       message: this._customLocalize(
-        loadedBookmarkChanged
+        loadedBookmarkChanged && this._loadedBookmarkId
           ? "clear_changed_bookmark_message"
           : "clear_new_chart_message"
       ),
-      saveLabel: loadedBookmarkChanged
+      saveLabel: loadedBookmarkChanged && this._loadedBookmarkId
         ? this._localize("ui.common.save", "Save")
         : this._customLocalize("create_bookmark"),
       discardLabel: this._localize("ui.common.clear", "Clear"),
     });
     if (action === "save") {
-      const saved = loadedBookmarkChanged
+      const saved = loadedBookmarkChanged && this._loadedBookmarkId
         ? this._updateBookmark(this._loadedBookmarkId)
         : this._saveCurrentBookmark(this._snapshotLabel());
       if (!saved) return false;
@@ -594,6 +625,7 @@ export class StorageMethods {
     this._saveLibrary(destinationKey, [this._clone(current), ...destination].slice(0, UNDO_LIMIT));
     this._currentSnapshot = this._clone(restored);
     this._loadedBookmarkId = restored.source_bookmark_id || null;
+    this._loadedExternalBookmark = Boolean(restored.source_external_bookmark);
     const loadedBookmark = this._loadedBookmarkId
       ? this._loadLibrary(BOOKMARKS_STORAGE_KEY).find((item) => item.id === this._loadedBookmarkId)
       : null;
@@ -619,9 +651,11 @@ export class StorageMethods {
   _saveCurrentBookmark(name) {
     const snapshot = this._captureSnapshot(name.trim() || this._snapshotLabel());
     delete snapshot.source_bookmark_id;
+    delete snapshot.source_external_bookmark;
     const items = this._loadLibrary(BOOKMARKS_STORAGE_KEY);
     if (this._saveLibrary(BOOKMARKS_STORAGE_KEY, [snapshot, ...items])) {
       this._loadedBookmarkId = snapshot.id;
+      this._loadedExternalBookmark = false;
       this._loadedBookmarkBaselineFingerprint = this._snapshotFingerprint(snapshot);
       this._loadedBookmarkDirty = false;
       this._recordChange();
@@ -643,10 +677,13 @@ export class StorageMethods {
     if (index === -1) return false;
     const current = this._captureSnapshot(items[index].name || this._snapshotLabel(items[index]));
     current.id = items[index].id;
+    current.visible_everyone = Boolean(items[index].visible_everyone);
     delete current.source_bookmark_id;
+    delete current.source_external_bookmark;
     items[index] = current;
     if (!this._saveLibrary(BOOKMARKS_STORAGE_KEY, items)) return false;
     this._loadedBookmarkId = current.id;
+    this._loadedExternalBookmark = false;
     this._loadedBookmarkBaselineFingerprint = this._snapshotFingerprint(current);
     this._loadedBookmarkDirty = false;
     this._recordChange();
@@ -656,10 +693,12 @@ export class StorageMethods {
   _clearLoadedBookmark(id = null) {
     if (id && this._loadedBookmarkId !== id) return;
     this._loadedBookmarkId = null;
+    this._loadedExternalBookmark = false;
     this._loadedBookmarkBaselineFingerprint = null;
     this._loadedBookmarkDirty = false;
     if (!this._currentSnapshot) return;
     this._currentSnapshot.source_bookmark_id = null;
+    this._currentSnapshot.source_external_bookmark = false;
     this._saveCurrentSnapshot(this._currentSnapshot);
   }
 
@@ -727,6 +766,7 @@ export class StorageMethods {
   _startFreshSnapshotSession(snapshot) {
     const current = this._clone(snapshot);
     current.source_bookmark_id = this._loadedBookmarkId || null;
+    current.source_external_bookmark = Boolean(this._loadedExternalBookmark);
     this._applySnapshot(current, false, true);
     // A saved bookmark can predate newly introduced card defaults. Loading it
     // applies those defaults immediately, so use the resulting effective
@@ -737,6 +777,7 @@ export class StorageMethods {
     effective.id = current.id;
     effective.saved_at = current.saved_at;
     effective.source_bookmark_id = current.source_bookmark_id;
+    effective.source_external_bookmark = current.source_external_bookmark;
     this._freshSnapshotSessionFingerprint = this._snapshotFingerprint(effective);
     this._loadedBookmarkBaselineFingerprint = this._freshSnapshotSessionFingerprint;
     this._loadedBookmarkDirty = false;
@@ -1030,26 +1071,77 @@ export class StorageMethods {
     return `${targetCount} · ${period} · ${height}px · ${this._formatSnapshotTime(snapshot.saved_at)}`;
   }
 
-  _libraryRows(items, isBookmarks = false) {
+  _libraryRows(items, isBookmarks = false, options = {}) {
     if (!items.length) return `<div class="library-empty">${this._escape(this._localize("ui.components.media-browser.no_items", "No items"))}</div>`;
+    const { readOnly = false, ownerUserId = null, showOwner = false } = options;
     const deleteLabel = this._localize("ui.common.delete", "Delete");
     const updateLabel = this._customLocalize("update_bookmark");
+    const visibleLabel = this._customLocalize("visible_to_everyone");
+    const canPublish = isBookmarks && Boolean(this._hass?.user?.is_admin);
     return items.map((item) => `
       <div class="library-row">
-        <button class="library-main" data-open-snapshot="${this._escape(item.id)}">
+        <button class="library-main" data-open-snapshot="${this._escape(item.id)}" data-owner-user-id="${this._escape(item._owner_user_id || ownerUserId || "")}">
           <span class="library-name">${this._escape(item.name || this._snapshotLabel(item))}</span>
-          <span class="library-summary">${this._escape(this._snapshotSummary(item))}</span>
+          <span class="library-summary">${showOwner && item._owner_name ? `${this._escape(item._owner_name)} · ` : ""}${this._escape(this._snapshotSummary(item))}</span>
         </button>
-        ${isBookmarks && this._bookmarkHasChanges(item) ? `<button class="update" data-update-snapshot="${this._escape(item.id)}" title="${this._escape(updateLabel)}"><ha-icon icon="mdi:update"></ha-icon></button>` : ""}
-        <button class="delete" data-delete-snapshot="${this._escape(item.id)}" title="${this._escape(deleteLabel)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>
+        ${canPublish ? `<button class="visibility ${item.visible_everyone ? "active" : ""}" data-toggle-visible="${this._escape(item.id)}" data-owner-user-id="${this._escape(item._owner_user_id || ownerUserId || this._hass.user.id)}" aria-pressed="${item.visible_everyone ? "true" : "false"}" title="${this._escape(visibleLabel)}"><ha-icon icon="${item.visible_everyone ? "mdi:account-multiple" : "mdi:account-multiple-outline"}"></ha-icon></button>` : ""}
+        ${!readOnly && isBookmarks && this._bookmarkHasChanges(item) ? `<button class="update" data-update-snapshot="${this._escape(item.id)}" title="${this._escape(updateLabel)}"><ha-icon icon="mdi:update"></ha-icon></button>` : ""}
+        ${readOnly ? "" : `<button class="delete" data-delete-snapshot="${this._escape(item.id)}" title="${this._escape(deleteLabel)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>`}
       </div>`).join("");
+  }
+
+  _bookmarkLibraryState() {
+    const currentUserId = this._hass?.user?.id;
+    if (this._bookmarkLibraryView === "shared") {
+      return {
+        items: this._bookmarkCatalog.shared,
+        readOnly: true,
+        ownerUserId: null,
+        showOwner: true,
+      };
+    }
+    const selectedUserId = this._bookmarkLibraryView === "mine"
+      ? currentUserId
+      : this._bookmarkLibraryView;
+    return {
+      items: selectedUserId === currentUserId
+        ? this._loadLibrary(BOOKMARKS_STORAGE_KEY)
+        : (this._bookmarkRemoteLibraries.get(selectedUserId) || []),
+      readOnly: selectedUserId !== currentUserId,
+      ownerUserId: selectedUserId,
+      showOwner: false,
+    };
+  }
+
+  _bookmarkTabs() {
+    const mine = this._customLocalize("my_bookmarks");
+    const shared = this._customLocalize("shared_bookmarks");
+    const currentUserId = this._hass?.user?.id;
+    const tabs = [
+      { id: "mine", label: mine },
+      { id: "shared", label: shared },
+    ];
+    if (this._hass?.user?.is_admin) {
+      for (const user of this._bookmarkCatalog.users) {
+        if (!user?.id || user.id === currentUserId) continue;
+        tabs.push({ id: user.id, label: user.name || user.id });
+      }
+    }
+    return `<div class="bookmark-user-tabs" role="tablist">${tabs.map((tab) => `
+      <button role="tab" data-bookmark-view="${this._escape(tab.id)}" aria-selected="${this._bookmarkLibraryView === tab.id ? "true" : "false"}">${this._escape(tab.label)}</button>
+    `).join("")}</div>`;
   }
 
   async _openLibrary(kind = "bookmarks") {
     if (this.shadowRoot.querySelector(".backdrop") || this._libraryOpening) return;
     this._libraryOpening = true;
     try {
-      if (kind === "bookmarks") await this._refreshSyncedBookmarks();
+      if (kind === "bookmarks") {
+        await this._refreshSyncedBookmarks();
+        if (this._bookmarkLibraryView !== "mine" && this._bookmarkLibraryView !== "shared") {
+          await this._loadRemoteBookmarkLibrary(this._bookmarkLibraryView);
+        }
+      }
       this._renderLibrary(kind);
     } finally {
       this._libraryOpening = false;
@@ -1060,7 +1152,8 @@ export class StorageMethods {
     this.shadowRoot.querySelector(".backdrop")?.remove();
     const isBookmarks = kind === "bookmarks";
     const key = isBookmarks ? BOOKMARKS_STORAGE_KEY : HISTORY_STORAGE_KEY;
-    const items = this._loadLibrary(key);
+    const bookmarkState = isBookmarks ? this._bookmarkLibraryState() : null;
+    const items = isBookmarks ? bookmarkState.items : this._loadLibrary(key);
     const title = this._customLocalize(isBookmarks ? "bookmarks" : "chart_history");
     const clearLabel = this._customLocalize(isBookmarks ? "clear_bookmarks" : "clear_history");
     const copyShareLink = this._customLocalize("copy_share_link");
@@ -1069,9 +1162,10 @@ export class StorageMethods {
     backdrop.className = "backdrop";
     backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${title}">
       <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${title}</h2><span class="count">${items.length}${isBookmarks ? "" : ` / ${HISTORY_LIMIT}`}</span></header>
-      ${isBookmarks ? `<div class="library-save"><input id="bookmark-name" maxlength="80" placeholder="${this._escape(this._customLocalize("bookmark_name"))}" value="${this._escape(this._snapshotLabel())}"><button data-action="save-current">${this._escape(this._customLocalize("save_current"))}</button></div>` : ""}
-      <div class="library-list">${this._libraryRows(items, isBookmarks)}</div>
-      <footer class="dialog-actions"><button data-action="clear" style="margin-right:auto" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</button>${isBookmarks ? `<button data-action="share" ${this._targetCount() ? "" : "disabled"}>${this._escape(copyShareLink)}</button>` : ""}<button data-action="close">${this._escape(close)}</button></footer>
+      ${isBookmarks ? this._bookmarkTabs() : ""}
+      ${isBookmarks && !bookmarkState.readOnly ? `<div class="library-save"><input id="bookmark-name" maxlength="80" placeholder="${this._escape(this._customLocalize("bookmark_name"))}" value="${this._escape(this._snapshotLabel())}"><button data-action="save-current">${this._escape(this._customLocalize("save_current"))}</button></div>` : ""}
+      <div class="library-list">${this._libraryRows(items, isBookmarks, bookmarkState || {})}</div>
+      <footer class="dialog-actions">${!isBookmarks || !bookmarkState.readOnly ? `<button data-action="clear" style="margin-right:auto" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</button>` : `<span style="margin-right:auto"></span>`}${isBookmarks ? `<button data-action="share" ${this._targetCount() ? "" : "disabled"}>${this._escape(copyShareLink)}</button>` : ""}<button data-action="close">${this._escape(close)}</button></footer>
     </section>`;
     backdrop.addEventListener("click", (event) => { if (event.target === backdrop) backdrop.remove(); });
     backdrop.querySelector('[data-action="close"]').addEventListener("click", () => backdrop.remove());
@@ -1081,43 +1175,59 @@ export class StorageMethods {
       if (this._saveCurrentBookmark(input.value)) this._renderLibrary(kind);
     });
     backdrop.querySelector('[data-action="share"]')?.addEventListener("click", (event) => this._copyShareLink(event.currentTarget));
-    backdrop.querySelector('[data-action="clear"]').addEventListener("click", () => {
+    backdrop.querySelector('[data-action="clear"]')?.addEventListener("click", () => {
       const message = this._customLocalize(isBookmarks ? "confirm_clear_bookmarks" : "confirm_clear_history");
       if (!items.length || !window.confirm(message)) return;
       if (isBookmarks) this._clearLoadedBookmark();
       this._saveLibrary(key, []);
       this._renderLibrary(kind);
     });
+    backdrop.querySelectorAll("[data-bookmark-view]").forEach((button) => button.addEventListener("click", async () => {
+      const view = button.dataset.bookmarkView;
+      if (!view || view === this._bookmarkLibraryView) return;
+      this._bookmarkLibraryView = view;
+      if (view !== "mine" && view !== "shared" && !this._bookmarkRemoteLibraries.has(view)) {
+        try {
+          await this._loadRemoteBookmarkLibrary(view);
+        } catch (error) {
+          console.warn("Advanced History: unable to load user bookmarks", error);
+          this._notice = this._customLocalize("bookmark_sync_error");
+        }
+      }
+      this._renderLibrary(kind);
+    }));
     backdrop.querySelectorAll("[data-open-snapshot]").forEach((button) => button.addEventListener("click", async () => {
       const snapshot = items.find((item) => item.id === button.dataset.openSnapshot);
       if (!snapshot) return;
       const changedLoadedBookmark = Boolean(
-        this._loadedBookmarkId
+        (this._loadedBookmarkId || this._loadedExternalBookmark)
         && this._loadedBookmarkDirty
-        && snapshot.id !== this._loadedBookmarkId
+        && (this._loadedExternalBookmark || snapshot.id !== this._loadedBookmarkId)
       );
       const unsavedNewChart = Boolean(
-        !this._loadedBookmarkId && this._targetCount()
+        !this._loadedBookmarkId
+        && !this._loadedExternalBookmark
+        && this._targetCount()
       );
       if (isBookmarks && (changedLoadedBookmark || unsavedNewChart)) {
         const action = await this._showUnsavedChangesDialog({
           title: this._customLocalize(
-            changedLoadedBookmark
+            changedLoadedBookmark && this._loadedBookmarkId
               ? "unsaved_bookmark_title"
               : "unsaved_chart_title"
           ),
           message: this._customLocalize(
-            changedLoadedBookmark
+            changedLoadedBookmark && this._loadedBookmarkId
               ? "switch_bookmark_message"
               : "load_bookmark_new_chart_message"
           ),
-          saveLabel: changedLoadedBookmark
+          saveLabel: changedLoadedBookmark && this._loadedBookmarkId
             ? this._localize("ui.common.save", "Save")
             : this._customLocalize("create_bookmark"),
           discardLabel: this._localize("ui.common.dont_save", "Don't save"),
         });
         if (action === "save") {
-          const saved = changedLoadedBookmark
+          const saved = changedLoadedBookmark && this._loadedBookmarkId
             ? this._updateBookmark(this._loadedBookmarkId)
             : this._saveCurrentBookmark(this._snapshotLabel());
           if (!saved) return;
@@ -1125,9 +1235,29 @@ export class StorageMethods {
           return;
         }
       }
-      this._loadedBookmarkId = isBookmarks ? snapshot.id : null;
+      const ownBookmark = isBookmarks && !bookmarkState.readOnly;
+      this._loadedBookmarkId = ownBookmark ? snapshot.id : null;
+      this._loadedExternalBookmark = isBookmarks && !ownBookmark;
       if (isBookmarks) this._startFreshSnapshotSession(snapshot);
       else this._applySnapshot(snapshot);
+    }));
+    backdrop.querySelectorAll("[data-toggle-visible]").forEach((button) => button.addEventListener("click", async () => {
+      try {
+        await this._hass.callWS({
+          type: "advanced_history/bookmarks/set_visible_everyone",
+          user_id: button.dataset.ownerUserId,
+          bookmark_id: button.dataset.toggleVisible,
+          visible: button.getAttribute("aria-pressed") !== "true",
+        });
+        await this._refreshSyncedBookmarks();
+        if (this._bookmarkLibraryView !== "mine" && this._bookmarkLibraryView !== "shared") {
+          await this._loadRemoteBookmarkLibrary(this._bookmarkLibraryView);
+        }
+        this._renderLibrary(kind);
+      } catch (error) {
+        console.warn("Advanced History: unable to change bookmark visibility", error);
+        this._notice = this._customLocalize("bookmark_visibility_error");
+      }
     }));
     backdrop.querySelectorAll("[data-update-snapshot]").forEach((button) => button.addEventListener("click", () => {
       if (this._updateBookmark(button.dataset.updateSnapshot)) this._renderLibrary(kind);

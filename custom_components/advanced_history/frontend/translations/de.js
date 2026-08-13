@@ -1,5 +1,9 @@
 export default {
   "bookmarks": "Lesezeichen",
+  "my_bookmarks": "Meine Lesezeichen",
+  "shared_bookmarks": "Freigegeben",
+  "visible_to_everyone": "Für alle sichtbar",
+  "bookmark_visibility_error": "Die Sichtbarkeit des Lesezeichens konnte nicht geändert werden.",
   "panels": "Ansichten",
   "add_panel": "Ansicht hinzufügen",
   "panel_number": "Ansicht {number}",

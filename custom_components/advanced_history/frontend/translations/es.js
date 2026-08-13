@@ -1,5 +1,9 @@
 export default {
   "bookmarks": "Marcadores",
+  "my_bookmarks": "Mis marcadores",
+  "shared_bookmarks": "Compartidos",
+  "visible_to_everyone": "Visible para todos",
+  "bookmark_visibility_error": "No se pudo cambiar la visibilidad del marcador.",
   "panels": "Paneles",
   "add_panel": "Añadir panel",
   "panel_number": "Panel {number}",

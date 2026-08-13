@@ -1,5 +1,9 @@
 export default {
   "bookmarks": "Favoris",
+  "my_bookmarks": "Mes favoris",
+  "shared_bookmarks": "Partagés",
+  "visible_to_everyone": "Visible par tous",
+  "bookmark_visibility_error": "La visibilité du favori n’a pas pu être modifiée.",
   "panels": "Panneaux",
   "add_panel": "Ajouter un panneau",
   "panel_number": "Panneau {number}",

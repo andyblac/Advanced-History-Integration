@@ -6,7 +6,8 @@ export class TargetPickerMethods {
   }
 
   _secondaryAxisVisible() {
-    return this._secondaryAxisEditable() || Boolean(this._loadedBookmarkId);
+    return this._secondaryAxisEditable()
+      || Boolean(this._loadedBookmarkId || this._loadedExternalBookmark);
   }
 
   async _loadNativeHistoryPicker() {

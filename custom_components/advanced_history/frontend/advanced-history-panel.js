@@ -58,8 +58,12 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._bookmarkSyncReady = false;
     this._bookmarkSaveQueue = Promise.resolve();
     this._loadedBookmarkId = null;
+    this._loadedExternalBookmark = false;
     this._loadedBookmarkBaselineFingerprint = null;
     this._loadedBookmarkDirty = false;
+    this._bookmarkCatalog = { shared: [], users: [] };
+    this._bookmarkLibraryView = "mine";
+    this._bookmarkRemoteLibraries = new Map();
     this._unsavedDialogPromise = null;
     this._periodRestoreLoading = false;
     this._periodRestoreExpected = null;

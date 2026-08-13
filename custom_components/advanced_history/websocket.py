@@ -74,6 +74,67 @@ class BookmarkStore:
             data["users"][user_id] = deepcopy(bookmarks)
             await self._store.async_save(data)
 
+    async def async_save_user_bookmarks(
+        self, user_id: str, bookmarks: list[dict[str, Any]]
+    ) -> bool:
+        """Save a user's bookmarks without overwriting administrator visibility."""
+        async with self._lock:
+            data = await self._async_ensure_loaded()
+            existing = data["users"].get(user_id, [])
+            existing_visibility = {
+                item.get("id"): bool(item.get("visible_everyone"))
+                for item in existing
+                if isinstance(item, dict) and isinstance(item.get("id"), str)
+            }
+            normalized = deepcopy(bookmarks)
+            for bookmark in normalized:
+                bookmark.pop("_owner_user_id", None)
+                bookmark.pop("_owner_name", None)
+                bookmark["visible_everyone"] = existing_visibility.get(
+                    bookmark.get("id"), False
+                )
+            if (
+                len(json.dumps(normalized, separators=(",", ":")).encode())
+                > _MAX_BOOKMARK_BYTES
+            ):
+                return False
+            data["users"][user_id] = normalized
+            await self._store.async_save(data)
+            return True
+
+    async def async_catalog(self) -> dict[str, list[dict[str, Any]]]:
+        """Return a copy of every user library for access filtering."""
+        async with self._lock:
+            data = await self._async_ensure_loaded()
+            return {
+                user_id: deepcopy(bookmarks)
+                for user_id, bookmarks in data["users"].items()
+                if isinstance(user_id, str) and isinstance(bookmarks, list)
+            }
+
+    async def async_set_visible_everyone(
+        self, user_id: str, bookmark_id: str, visible: bool
+    ) -> bool:
+        """Set the public visibility flag on one bookmark."""
+        async with self._lock:
+            data = await self._async_ensure_loaded()
+            bookmarks = data["users"].get(user_id)
+            if not isinstance(bookmarks, list):
+                return False
+            bookmark = next(
+                (
+                    item
+                    for item in bookmarks
+                    if isinstance(item, dict) and item.get("id") == bookmark_id
+                ),
+                None,
+            )
+            if bookmark is None:
+                return False
+            bookmark["visible_everyone"] = visible
+            await self._store.async_save(data)
+            return True
+
 
 def _bookmark_store(hass: HomeAssistant) -> BookmarkStore:
     """Return the integration bookmark store."""
@@ -142,16 +203,63 @@ def _more_info_entity_store(hass: HomeAssistant) -> MoreInfoEntityStore:
 
 
 @websocket_api.websocket_command(
-    {vol.Required("type"): f"{DOMAIN}/bookmarks/get"}
+    {
+        vol.Required("type"): f"{DOMAIN}/bookmarks/get",
+        vol.Optional("user_id"): str,
+    }
 )
 @websocket_api.async_response
 async def websocket_get_bookmarks(
     hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
 ) -> None:
-    """Return bookmarks belonging to the connected Home Assistant user."""
-    initialized, bookmarks = await _bookmark_store(hass).async_get(connection.user.id)
+    """Return the user's bookmarks and the libraries they may view."""
+    current_user_id = connection.user.id
+    requested_user_id = msg.get("user_id", current_user_id)
+    catalog = await _bookmark_store(hass).async_catalog()
+    own_library = catalog.get(requested_user_id, [])
+    if requested_user_id != current_user_id:
+        if not connection.user.is_admin:
+            connection.send_error(msg["id"], "unauthorized", "Admin access required")
+            return
+        bookmarks = own_library
+    else:
+        bookmarks = own_library
+
+    users = await hass.auth.async_get_users()
+    user_names = {user.id: user.name or user.id for user in users}
+    shared_bookmarks: list[dict[str, Any]] = []
+    for owner_id, owner_bookmarks in catalog.items():
+        for bookmark in owner_bookmarks:
+            if not bookmark.get("visible_everyone"):
+                continue
+            shared = deepcopy(bookmark)
+            shared["_owner_user_id"] = owner_id
+            shared["_owner_name"] = user_names.get(owner_id, owner_id)
+            shared_bookmarks.append(shared)
+    shared_bookmarks.sort(key=lambda item: item.get("saved_at", ""), reverse=True)
+
+    admin_users = []
+    if connection.user.is_admin:
+        for user in users:
+            bookmark_count = len(catalog.get(user.id, []))
+            if user.id == current_user_id or bookmark_count:
+                admin_users.append(
+                    {
+                        "id": user.id,
+                        "name": user.name or user.id,
+                        "bookmark_count": bookmark_count,
+                    }
+                )
+
     connection.send_result(
-        msg["id"], {"initialized": initialized, "bookmarks": bookmarks}
+        msg["id"],
+        {
+            "initialized": requested_user_id in catalog,
+            "bookmarks": bookmarks,
+            "selected_user_id": requested_user_id,
+            "shared_bookmarks": shared_bookmarks,
+            "users": admin_users,
+        },
     )
 
 
@@ -168,14 +276,35 @@ async def websocket_save_bookmarks(
     hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
 ) -> None:
     """Save bookmarks belonging to the connected Home Assistant user."""
-    bookmarks = msg["bookmarks"]
-    if len(json.dumps(bookmarks, separators=(",", ":")).encode()) > _MAX_BOOKMARK_BYTES:
+    if not await _bookmark_store(hass).async_save_user_bookmarks(
+        connection.user.id, msg["bookmarks"]
+    ):
         connection.send_error(
             msg["id"], "too_large", "Bookmark library exceeds the storage limit"
         )
         return
+    connection.send_result(msg["id"])
 
-    await _bookmark_store(hass).async_save(connection.user.id, bookmarks)
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/bookmarks/set_visible_everyone",
+        vol.Required("user_id"): str,
+        vol.Required("bookmark_id"): str,
+        vol.Required("visible"): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def websocket_set_bookmark_visible_everyone(
+    hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Allow an administrator to publish or unpublish any bookmark."""
+    if not await _bookmark_store(hass).async_set_visible_everyone(
+        msg["user_id"], msg["bookmark_id"], msg["visible"]
+    ):
+        connection.send_error(msg["id"], "not_found", "Bookmark is not accessible")
+        return
     connection.send_result(msg["id"])
 
 
@@ -263,6 +392,9 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
 
     websocket_api.async_register_command(hass, websocket_get_bookmarks)
     websocket_api.async_register_command(hass, websocket_save_bookmarks)
+    websocket_api.async_register_command(
+        hass, websocket_set_bookmark_visible_everyone
+    )
     websocket_api.async_register_command(hass, websocket_get_more_info_config)
     websocket_api.async_register_command(hass, websocket_set_more_info_entity_config)
     hass.data[_WEBSOCKET_REGISTERED] = True
