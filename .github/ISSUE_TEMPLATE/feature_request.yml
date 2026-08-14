@@ -1,0 +1,58 @@
+name: Feature request
+description: Suggest an improvement or new feature for Advanced History
+title: "[FR]: "
+labels:
+  - enhancement
+body:
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Which area would this feature affect?
+      description: Select the part of Advanced History where the feature would be used.
+      options:
+        - Advanced History panel
+        - More Info dialog
+        - Both
+        - Other or unsure
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this feature solve?
+      description: Describe the use case or limitation you are trying to address.
+      placeholder: Explain what you are trying to achieve and why it would be useful.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe how you would like the feature to work.
+      placeholder: Describe the behaviour or interface you would expect.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe any current workarounds or alternative approaches you have tried.
+
+  - type: textarea
+    id: examples
+    attributes:
+      label: Examples, mock-ups, or screenshots
+      description: Drag and drop anything that helps demonstrate the request.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and did not find an existing request for this feature.
+          required: true
+        - label: This request describes one feature or closely related set of changes.
+          required: true
