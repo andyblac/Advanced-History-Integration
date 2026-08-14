@@ -10,37 +10,93 @@ export class EnergyMethods {
   }
 
   _energyCompareRange(start, end, choice, count = 1) {
-    if (!(start instanceof Date) || !(end instanceof Date)) return null;
+    const ranges = this._energyCompareRanges(start, end, choice, count);
+    if (!ranges.length) return null;
     if (choice === "previous_period") {
       const duration = end.getTime() - start.getTime();
-      if (duration <= 0) return null;
       const periods = Math.max(1, Math.min(10, Math.trunc(Number(count)) || 1));
       return {
         start: new Date(start.getTime() - duration * periods),
         end: new Date(start),
+        ranges,
       };
     }
-    if (choice === "last_month") {
-      const compareStart = new Date(start);
-      const dayOfMonth = compareStart.getDate();
-      compareStart.setDate(1);
-      compareStart.setMonth(compareStart.getMonth() - 1);
-      const lastTargetDay = new Date(
-        compareStart.getFullYear(),
-        compareStart.getMonth() + 1,
-        0,
-      ).getDate();
-      compareStart.setDate(Math.min(dayOfMonth, lastTargetDay));
-      const offset = start.getTime() - compareStart.getTime();
-      return { start: compareStart, end: new Date(end.getTime() - offset) };
-    }
+    return {
+      start: ranges[0].start,
+      end: ranges[ranges.length - 1].end,
+      ranges,
+    };
+  }
+
+  _energyCompareRanges(start, end, choice, count = 1) {
+    if (!(start instanceof Date) || !(end instanceof Date)) return [];
+    const periods = Math.max(1, Math.min(10, Math.trunc(Number(count)) || 1));
+    const duration = end.getTime() - start.getTime();
+    if (duration <= 0) return [];
+    const periodKind = this._energyPeriodKind(start, end);
     const days = choice === "yesterday" ? 1 : choice === "last_week" ? 7 : 0;
-    if (!days) return null;
-    const compareStart = new Date(start);
-    const compareEnd = new Date(end);
-    compareStart.setDate(compareStart.getDate() - days);
-    compareEnd.setDate(compareEnd.getDate() - days);
-    return { start: compareStart, end: compareEnd };
+    const ranges = [];
+    for (let periodsBack = periods; periodsBack >= 1; periodsBack -= 1) {
+      let compareStart;
+      let compareEnd;
+      if (choice === "previous_period") {
+        if (periodKind === "month") {
+          compareStart = this._shiftEnergyCompareMonth(start, -periodsBack);
+          compareEnd = this._shiftEnergyCompareMonth(end, -periodsBack);
+        } else if (periodKind === "year") {
+          compareStart = this._shiftEnergyCompareYear(start, -periodsBack);
+          compareEnd = this._shiftEnergyCompareYear(end, -periodsBack);
+        } else {
+          compareStart = new Date(start.getTime() - duration * periodsBack);
+          compareEnd = new Date(end.getTime() - duration * periodsBack);
+        }
+      } else if (choice === "last_month") {
+        compareStart = this._shiftEnergyCompareMonth(start, -periodsBack);
+        compareEnd = this._shiftEnergyCompareMonth(end, -periodsBack);
+      } else if (choice === "last_year") {
+        compareStart = this._shiftEnergyCompareYear(start, -periodsBack);
+        compareEnd = this._shiftEnergyCompareYear(end, -periodsBack);
+      } else if (days) {
+        compareStart = new Date(start);
+        compareEnd = new Date(end);
+        compareStart.setDate(compareStart.getDate() - days * periodsBack);
+        compareEnd.setDate(compareEnd.getDate() - days * periodsBack);
+      } else {
+        return [];
+      }
+      ranges.push({ start: compareStart, end: compareEnd });
+    }
+    return ranges;
+  }
+
+  _shiftEnergyCompareMonth(value, offset) {
+    const shifted = new Date(value);
+    const targetDay = shifted.getDate();
+    shifted.setDate(1);
+    shifted.setMonth(shifted.getMonth() + offset);
+    const lastTargetDay = new Date(
+      shifted.getFullYear(),
+      shifted.getMonth() + 1,
+      0,
+    ).getDate();
+    shifted.setDate(Math.min(targetDay, lastTargetDay));
+    return shifted;
+  }
+
+  _shiftEnergyCompareYear(value, offset) {
+    const shifted = new Date(value);
+    const targetMonth = shifted.getMonth();
+    const targetDay = shifted.getDate();
+    shifted.setDate(1);
+    shifted.setFullYear(shifted.getFullYear() + offset);
+    shifted.setMonth(targetMonth);
+    const lastTargetDay = new Date(
+      shifted.getFullYear(),
+      targetMonth + 1,
+      0,
+    ).getDate();
+    shifted.setDate(Math.min(targetDay, lastTargetDay));
+    return shifted;
   }
 
   _energyPeriodKind(start, end) {
@@ -80,8 +136,8 @@ export class EnergyMethods {
     const previousYear = ["last_year", "compare_previous_year"];
     if (periodKind === "day") {
       return this._panelTimeRange
-        ? [previousPeriod, previousDay, previousWeek, previousYear]
-        : [previousPeriod, previousWeek, previousYear];
+        ? [previousPeriod, previousDay, previousWeek, previousMonth, previousYear]
+        : [previousPeriod, previousWeek, previousMonth, previousYear];
     }
     if (periodKind === "week") return [previousPeriod, previousMonth, previousYear];
     if (periodKind === "month") return [previousPeriod, previousYear];
@@ -119,15 +175,35 @@ export class EnergyMethods {
     return collectionMode ? (dataMode || collectionMode) : "";
   }
 
-  _energyCompareRangeLabel(start, end) {
+  _energyCompareRangeLabel(start, end, includeTime = true, periodKind = "other") {
     const language = this._hass?.locale?.language || this._hass?.language;
     const timeZone = this._resolvedTimeZone?.() || this._hass?.config?.time_zone;
+    if (!includeTime && periodKind === "day") {
+      return new Intl.DateTimeFormat(language, {
+        dateStyle: "long",
+        ...(timeZone ? { timeZone } : {}),
+      }).format(start);
+    }
+    if (!includeTime && periodKind === "month") {
+      return new Intl.DateTimeFormat(language, {
+        month: "long",
+        year: "numeric",
+        ...(timeZone ? { timeZone } : {}),
+      }).format(start);
+    }
+    if (!includeTime && periodKind === "year") {
+      return new Intl.DateTimeFormat(language, {
+        year: "numeric",
+        ...(timeZone ? { timeZone } : {}),
+      }).format(start);
+    }
     const dateOptions = { dateStyle: "long", ...(timeZone ? { timeZone } : {}) };
     const timeOptions = { timeStyle: "short", ...(timeZone ? { timeZone } : {}) };
     const dateFormatter = new Intl.DateTimeFormat(language, dateOptions);
     const timeFormatter = new Intl.DateTimeFormat(language, timeOptions);
     const startDate = dateFormatter.format(start);
     const endDate = dateFormatter.format(end);
+    if (!includeTime) return startDate === endDate ? startDate : `${startDate} – ${endDate}`;
     const startTime = timeFormatter.format(start);
     const endTime = timeFormatter.format(end);
     return startDate === endDate
@@ -138,7 +214,11 @@ export class EnergyMethods {
   _renderEnergyCompareRangeBanner(compareCard, wrapper) {
     const range = compareCard?.__advancedHistoryCompareRange;
     const alert = compareCard?.shadowRoot?.querySelector("ha-alert");
-    if (!this._panelTimeRange || !range || !alert || !wrapper) return;
+    const comparisonCount = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._energyCompareCount)) || 1),
+    );
+    if ((!this._panelTimeRange && comparisonCount === 1) || !range || !alert || !wrapper) return;
     const startMarker = "__ADVANCED_HISTORY_START__";
     const endMarker = "__ADVANCED_HISTORY_END__";
     const message = this._localize(
@@ -146,9 +226,40 @@ export class EnergyMethods {
       `You are comparing the period ${startMarker} with the period ${endMarker}`,
       { start: startMarker, end: endMarker },
     );
+    const includeTime = Boolean(this._panelTimeRange);
+    const periodKind = this._energyPeriodKind(range.start, range.end);
+    let compareLabelEnd = range.compareEnd;
+    if (
+      !includeTime
+      && this._energyCompareChoice === "previous_period"
+      && compareLabelEnd?.getTime?.() === range.start?.getTime?.()
+    ) {
+      compareLabelEnd = new Date(compareLabelEnd.getTime() - 1);
+    }
+    const compareRanges = Array.isArray(range.compareRanges) && range.compareRanges.length
+      ? range.compareRanges
+      : [{ start: range.compareStart, end: compareLabelEnd }];
+    const compareRangeLabels = compareRanges.map((comparisonRange) => (
+      this._energyCompareRangeLabel(
+        comparisonRange.start,
+        comparisonRange.end,
+        includeTime,
+        periodKind,
+      )
+    ));
+    const language = this._hass?.locale?.language || this._hass?.language;
+    const compareRangesLabel = compareRangeLabels.length > 1
+      ? new Intl.ListFormat(language, { style: "long", type: "conjunction" })
+        .format(compareRangeLabels)
+      : compareRangeLabels[0];
     const labels = {
-      [startMarker]: this._energyCompareRangeLabel(range.start, range.end),
-      [endMarker]: this._energyCompareRangeLabel(range.compareStart, range.compareEnd),
+      [startMarker]: this._energyCompareRangeLabel(
+        range.start,
+        range.end,
+        includeTime,
+        periodKind,
+      ),
+      [endMarker]: compareRangesLabel,
     };
     const markerPattern = new RegExp(`(${startMarker}|${endMarker})`, "g");
     const content = document.createDocumentFragment();
@@ -203,6 +314,7 @@ export class EnergyMethods {
         end: rangeEnd,
         compareStart: customRange.start,
         compareEnd: customRange.end,
+        compareRanges: customRange.ranges,
       };
       compareCard.requestUpdate?.();
     };

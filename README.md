@@ -34,6 +34,8 @@ Advanced History brings those two ideas together: select targets as you would in
 ## Highlights
 
 - Select multiple areas, devices, or entities with Home Assistant's native target picker.
+- Work across independent desktop panels that can be renamed, rearranged, and restored automatically.
+- Plot targets on separate Y1 and Y2 scales, with the option to exclude Y2 from period comparisons.
 - Display numeric history and state timelines.
 - Navigate dates and compare periods with native Energy controls.
 - Edit the current chart through the Statistics Graph Chart Card visual editor.
