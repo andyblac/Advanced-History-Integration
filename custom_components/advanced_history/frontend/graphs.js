@@ -176,8 +176,9 @@ export class GraphMethods {
         ? { auto_scale_points: true }
         : { auto_scale_points: false, group_by: detail.groupBy, show_group_by_picker: true };
     const palette = customElements.get(CARD_TAG)?.PALETTE;
-    const entities = series.map((item, index) => {
-      const configured = this._entityCardConfig(item, mode);
+    const entities = series.map((item) => this._entityCardConfig(item, mode));
+    const automaticEntityColors = entities.map((configured) => configured.color == null);
+    entities.forEach((configured, index) => {
       // Keep automatically assigned colors stable when entities are toggled.
       // The card otherwise reindexes its palette after disabled entities are
       // removed, causing the remaining series to change color.
@@ -189,11 +190,40 @@ export class GraphMethods {
       ) {
         configured.color = palette[index % palette.length];
       }
-      if (series.length === 1) {
-        this._colorAutomaticComparisons(configured, palette, index);
-      }
-      return configured;
     });
+    const comparedEntities = entities.filter((configured) => Array.isArray(configured.compare));
+    const soleComparedEntity = comparedEntities.length === 1
+      && (series.length === 1 || this._excludeY2Comparison)
+      ? comparedEntities[0]
+      : null;
+    if (soleComparedEntity) {
+      const comparedIndex = entities.indexOf(soleComparedEntity);
+      this._colorAutomaticComparisons(soleComparedEntity, palette, comparedIndex);
+
+      // When Y2 is excluded from comparison, keep the sole Y1 entity's
+      // single-entity comparison palette and place automatic Y2 colours after
+      // every colour already used by Y1 and its comparison periods.
+      if (
+        this._excludeY2Comparison
+        && Array.isArray(palette)
+        && palette.length
+      ) {
+        const usedColors = new Set([
+          soleComparedEntity.color,
+          ...soleComparedEntity.compare.map((comparison) => comparison?.color),
+        ].filter(Boolean));
+        entities.forEach((configured, index) => {
+          if (
+            configured.y_axis !== "secondary"
+            || !automaticEntityColors[index]
+            || Array.isArray(configured.compare)
+          ) return;
+          const available = palette.find((color) => !usedColors.has(color));
+          if (available) configured.color = available;
+          usedColors.add(configured.color);
+        });
+      }
+    }
     const hasSecondaryAxis = mode !== "state_timeline"
       && entities.some((entity) => entity.y_axis === "secondary");
     const height = this._effectiveGraphHeight();
@@ -465,6 +495,7 @@ export class GraphMethods {
       startKey,
       endKey,
       compareKey,
+      this._excludeY2Comparison ? "exclude-y2-comparison" : "compare-y2",
     ].join("\u001e");
   }
 
@@ -844,12 +875,14 @@ export class GraphMethods {
     const enabled = this._enabledResolvedEntityIds?.has(entity) !== false;
     const { compare: compareDefaults, ...options } = entityOptions;
     const activeCompare = this._effectiveCompare();
-    const compare = this._withTimeRangeComparisonLayout(
+    let compare = this._withTimeRangeComparisonLayout(
       this._mergeCompareOptions(activeCompare, compareDefaults),
     );
     if (mode !== "state_timeline") {
       delete options.state_map;
-      options.y_axis = this._y2ResolvedEntityIds?.has(entity) ? "secondary" : "primary";
+      const secondaryAxis = this._y2ResolvedEntityIds?.has(entity);
+      options.y_axis = secondaryAxis ? "secondary" : "primary";
+      if (secondaryAxis && this._excludeY2Comparison) compare = null;
       return compare == null
         ? { ...options, entity, enabled }
         : { ...options, entity, enabled, compare };

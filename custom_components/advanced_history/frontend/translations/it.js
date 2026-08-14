@@ -14,6 +14,8 @@ export default {
   "state_history": "Cronologia degli stati",
   "primary_axis": "Asse principale",
   "secondary_axis": "Asse secondario",
+  "exclude_y2_comparison": "Escludi Y2 dal confronto",
+  "include_y2_comparison": "Includi Y2 nel confronto",
   "bookmark_name": "Nome del segnalibro",
   "save_current": "Salva corrente",
   "update_bookmark": "Aggiorna segnalibro",

@@ -14,6 +14,8 @@ export default {
   "state_history": "Historial de estados",
   "primary_axis": "Eje principal",
   "secondary_axis": "Eje secundario",
+  "exclude_y2_comparison": "Excluir Y2 de la comparación",
+  "include_y2_comparison": "Incluir Y2 en la comparación",
   "bookmark_name": "Nombre del marcador",
   "save_current": "Guardar actual",
   "update_bookmark": "Actualizar marcador",

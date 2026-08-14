@@ -14,6 +14,8 @@ export default {
   "state_history": "Zustandsverlauf",
   "primary_axis": "Primärachse",
   "secondary_axis": "Sekundärachse",
+  "exclude_y2_comparison": "Y2 vom Vergleich ausschließen",
+  "include_y2_comparison": "Y2 in den Vergleich einbeziehen",
   "bookmark_name": "Name des Lesezeichens",
   "save_current": "Aktuelles Diagramm speichern",
   "update_bookmark": "Lesezeichen aktualisieren",

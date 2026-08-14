@@ -1209,6 +1209,7 @@ export class EnergyMethods {
           this._energyCompareCount,
         )
         : null;
+      this._syncY2ComparisonToggle(Boolean(next));
       const nextDetailKey = this._largeRangeDetailRenderKey();
       if (this._periodRestoreLoading) {
         this._energyCompare = next;

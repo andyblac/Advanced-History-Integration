@@ -158,6 +158,7 @@ export class DiagnosticsMethods {
         default_hours: snapshot.chart?.default_hours ?? this._effectiveDefaultHours(),
         graph_height: snapshot.chart?.graph_height ?? this._effectiveGraphHeight(),
         compare: this._sanitizeDiagnosticValue(snapshot.chart?.compare ?? this._effectiveCompare(), aliases),
+        exclude_y2_comparison: Boolean(snapshot.chart?.exclude_y2_comparison),
         large_range_detail: (() => {
           const profile = this._largeRangeDetailProfile();
           return {

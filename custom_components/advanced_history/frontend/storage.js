@@ -51,6 +51,7 @@ export class StorageMethods {
       this._y2Targets = this._normalizeTargets(incomingSnapshot.y2_targets || {});
       this._hiddenY2Targets = this._normalizeTargets(incomingSnapshot.hidden_y2_targets || {});
       incomingSnapshot.chart = this._normalizeSnapshotChart(incomingSnapshot.chart);
+      this._excludeY2Comparison = Boolean(incomingSnapshot.chart.exclude_y2_comparison);
       this._activeSnapshot = this._clone(incomingSnapshot.chart);
       this._panelTimeRange = this._clone(incomingSnapshot.chart?.time_range) || null;
       this._pendingPeriodRestore = this._clone(incomingSnapshot.period);
@@ -113,6 +114,7 @@ export class StorageMethods {
         this._snapshotFingerprint(previous) !== this._loadedBookmarkBaselineFingerprint
       );
       previous.chart = this._normalizeSnapshotChart(previous.chart);
+      this._excludeY2Comparison = Boolean(previous.chart.exclude_y2_comparison);
       this._activeSnapshot = this._clone(previous.chart);
       this._currentSnapshot.chart = this._clone(previous.chart);
       this._saveCurrentSnapshot(this._currentSnapshot);
@@ -380,6 +382,7 @@ export class StorageMethods {
     else if (this._panelRollingResumeHours) {
       chart.rolling_resume_hours = this._panelRollingResumeHours;
     }
+    if (this._excludeY2Comparison) chart.exclude_y2_comparison = true;
     return {
       schema: 1,
       id: this._newSnapshotId(),
@@ -547,6 +550,7 @@ export class StorageMethods {
     this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
     this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
+    this._excludeY2Comparison = false;
     this._resetEnergySelection();
     this._saveTargets();
     this._recordChange();
@@ -785,6 +789,7 @@ export class StorageMethods {
     }
     snapshot = this._clone(snapshot);
     snapshot.chart = this._normalizeSnapshotChart(snapshot.chart);
+    this._excludeY2Comparison = Boolean(snapshot.chart.exclude_y2_comparison);
     this._activeSnapshot = this._clone(snapshot.chart);
     const rollingHours = [1, 2, 4, 8, 12, 24].includes(Number(snapshot.chart.rolling_hours))
       ? Number(snapshot.chart.rolling_hours)

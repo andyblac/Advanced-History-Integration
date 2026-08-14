@@ -14,6 +14,8 @@ export default {
   "state_history": "Historique des états",
   "primary_axis": "Axe principal",
   "secondary_axis": "Axe secondaire",
+  "exclude_y2_comparison": "Exclure Y2 de la comparaison",
+  "include_y2_comparison": "Inclure Y2 dans la comparaison",
   "bookmark_name": "Nom du favori",
   "save_current": "Enregistrer l’affichage actuel",
   "update_bookmark": "Mettre à jour le favori",

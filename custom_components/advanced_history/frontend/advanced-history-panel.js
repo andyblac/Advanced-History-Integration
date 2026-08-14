@@ -26,6 +26,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
     this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
+    this._excludeY2Comparison = false;
     this._draftTargets = null;
     this._activeTab = "area_id";
     this._dialogSearch = "";
@@ -115,6 +116,36 @@ class AdvancedHistoryPanel extends HTMLElement {
   get maxEntities() { return Number(this.config.max_entities) || 30; }
   get maxTabs() {
     return Math.max(1, Math.min(50, Math.trunc(Number(this.config.max_tabs)) || 10));
+  }
+
+  _comparisonIsActive(value = this._effectiveCompare?.()) {
+    return value !== null
+      && value !== undefined
+      && value !== false
+      && value !== ""
+      && (!Array.isArray(value) || value.length > 0);
+  }
+
+  _syncY2ComparisonToggle(compareActive = this._comparisonIsActive()) {
+    const button = this.shadowRoot?.getElementById("toggle-y2-comparison");
+    if (!button) return;
+    const excluded = Boolean(this._excludeY2Comparison);
+    button.hidden = !compareActive || !this._targetCount(this._y2Targets);
+    button.classList.toggle("active", !excluded);
+    button.setAttribute("aria-pressed", String(!excluded));
+    const label = this._customLocalize(
+      excluded ? "include_y2_comparison" : "exclude_y2_comparison",
+    );
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.querySelector("ha-icon")?.setAttribute("icon", "mdi:compare-horizontal");
+  }
+
+  _toggleY2Comparison() {
+    this._excludeY2Comparison = !this._excludeY2Comparison;
+    this._syncY2ComparisonToggle(true);
+    this._recordChange(null, true);
+    this._renderGraphs();
   }
 
   _localize(key, fallback, replacements) {
@@ -284,7 +315,10 @@ class AdvancedHistoryPanel extends HTMLElement {
           </div>
           ${secondaryAxisEditable ? `<div class="axis-target-divider" aria-hidden="true"></div>
           <div class="axis-target-group axis-target-secondary${y2TargetClass}">
-            <div class="axis-target-label"><span class="axis-badge">Y2</span><span>${this._escape(this._customLocalize("secondary_axis"))}</span></div>
+            <div class="axis-target-label">
+              <button id="toggle-y2-comparison" class="axis-compare-toggle${this._excludeY2Comparison ? "" : " active"}" type="button" hidden aria-pressed="${this._excludeY2Comparison ? "false" : "true"}"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+              <span class="axis-badge">Y2</span><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
+            </div>
             <div id="y2-target-picker-host" class="native-target-picker">
               <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
             </div>
@@ -310,6 +344,11 @@ class AdvancedHistoryPanel extends HTMLElement {
     this.shadowRoot.getElementById("chart-history")?.addEventListener("click", () => this._openLibrary("history"));
     this.shadowRoot.getElementById("undo")?.addEventListener("click", () => this._undo());
     this.shadowRoot.getElementById("redo")?.addEventListener("click", () => this._redo());
+    this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
+      "click",
+      () => this._toggleY2Comparison(),
+    );
+    this._syncY2ComparisonToggle();
     this._bindPanelTabs();
     this._updateUndoRedoButtons();
     if (!dependencyMissing) {

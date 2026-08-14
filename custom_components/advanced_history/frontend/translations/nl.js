@@ -14,6 +14,8 @@ export default {
   "state_history": "Statusgeschiedenis",
   "primary_axis": "Primaire as",
   "secondary_axis": "Secundaire as",
+  "exclude_y2_comparison": "Y2 uitsluiten van vergelijking",
+  "include_y2_comparison": "Y2 opnemen in vergelijking",
   "bookmark_name": "Naam van bladwijzer",
   "save_current": "Huidige opslaan",
   "update_bookmark": "Bladwijzer bijwerken",
