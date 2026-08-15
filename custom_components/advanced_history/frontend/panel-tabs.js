@@ -93,6 +93,7 @@ export class PanelTabsMethods {
       undo: this._clone(this._loadLibrary(UNDO_STORAGE_KEY)),
       redo: this._clone(this._loadLibrary(REDO_STORAGE_KEY)),
       loaded_bookmark_id: this._loadedBookmarkId || null,
+      loaded_external_bookmark: Boolean(this._loadedExternalBookmark),
       loaded_bookmark_baseline: this._loadedBookmarkBaselineFingerprint || null,
       loaded_bookmark_dirty: Boolean(this._loadedBookmarkDirty),
       fresh_snapshot_fingerprint: this._freshSnapshotSessionFingerprint || null,
@@ -222,6 +223,7 @@ export class PanelTabsMethods {
       undo: [],
       redo: [],
       loaded_bookmark_id: null,
+      loaded_external_bookmark: false,
       loaded_bookmark_baseline: null,
       loaded_bookmark_dirty: false,
       fresh_snapshot_fingerprint: null,
@@ -235,6 +237,10 @@ export class PanelTabsMethods {
     const state = tab?.state || this._blankPanelTabState();
     tab.state = state;
     this._loadedBookmarkId = state.loaded_bookmark_id || null;
+    this._loadedExternalBookmark = Boolean(
+      state.loaded_external_bookmark
+      ?? state.snapshot?.source_external_bookmark
+    );
     this._loadedBookmarkBaselineFingerprint = state.loaded_bookmark_baseline || null;
     this._loadedBookmarkDirty = Boolean(state.loaded_bookmark_dirty);
     this._freshSnapshotSessionFingerprint = state.fresh_snapshot_fingerprint || null;

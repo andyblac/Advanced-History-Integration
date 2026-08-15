@@ -517,10 +517,11 @@ export class GraphMethods {
       card.__advancedHistoryConfig = config;
       this._setGraphCardHass(card, this._hass);
       shell.append(card, sourceIndicator);
-      if (
-        this.config.settings_path
-        && this._hass?.user?.is_admin
-      ) {
+      // Panel chart overrides belong to the current user's chart state. A
+      // bookmark loaded from another user's shared library remains read-only;
+      // service defaults and More Info entity overrides retain their separate
+      // administrator checks.
+      if (this._canEditPanelChart()) {
         shell.classList.add("has-card-editor");
         const editorButton = document.createElement("button");
         editorButton.className = "graph-card-editor icon-button";
@@ -665,6 +666,10 @@ export class GraphMethods {
       banner.hidden = true;
       banner.replaceChildren();
     });
+  }
+
+  _canEditPanelChart() {
+    return Boolean(this.config.settings_path) && !this._loadedExternalBookmark;
   }
 
   _createDataSourceTracker(indicator, active = true, sourceKey = null) {
