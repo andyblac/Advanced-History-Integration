@@ -130,6 +130,7 @@ DEFAULT_NUMERIC_CARD_OPTIONS = {
             "state_timeline_label_font_size",
         }
     },
+    "height": "auto",
     "entities": deepcopy(DEFAULT_ENTITY_OPTIONS),
 }
 DEFAULT_STATE_CARD_OPTIONS = {

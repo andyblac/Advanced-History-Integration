@@ -142,10 +142,10 @@ export const panelStyles = `
   .charts.dynamic-numeric { grid-template-rows:minmax(240px,1fr); }
   .charts.dynamic-numeric.has-state-graph { grid-template-rows:var(--numeric-graph-height,240px) auto; align-content:start; }
   .graph-shell { position:relative; min-width:0; }
-  .graph-shell.numeric-graph { min-height:0; height:100%; }
+  .charts.dynamic-numeric .graph-shell.numeric-graph { min-height:0; height:100%; }
   .graph-shell.state-controls-row { padding-top:44px; }
   .graph-shell > statistics-graph-chart-card { display:block; }
-  .graph-shell.numeric-graph > statistics-graph-chart-card { height:100%; }
+  .charts.dynamic-numeric .graph-shell.numeric-graph > statistics-graph-chart-card { height:100%; }
   .graph-card-editor {
     position:absolute; z-index:3; top:4px; right:44px;
   }

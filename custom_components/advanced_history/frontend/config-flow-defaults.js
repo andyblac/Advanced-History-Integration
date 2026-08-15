@@ -8,7 +8,7 @@ const NUMERIC_ENTITIES_KEY = "numeric_entities";
 const STATE_ENTITIES_KEY = "state_entities";
 const PANEL_MANAGED_EDITOR_KEYS = new Set([
   "energy_date_sync", "energy_collection_key",
-  "hours_to_show", "height",
+  "hours_to_show",
   "show_date_picker", "date_picker_position", "date_picker_nav_position",
   "date_picker_shortcuts_position", "date_picker_group", "date_picker_modes",
   "date_picker_default_mode", "date_picker_step",
@@ -84,7 +84,7 @@ function integrationDefaults(profile, variant) {
     ...(variant === "numeric"
       ? {
           auto_scale_points: true,
-          ...(profile === "more-info" ? { height: 240 } : {}),
+          height: profile === "more-info" ? 240 : "auto",
         }
       : {}),
     ...(variant === "state"
@@ -232,7 +232,9 @@ export function editorConfig(hass, defaults, profile = "panel", variant = "numer
         ? { hours_to_show: defaults.hours_to_show }
         : {})
       : { hours_to_show: 24 }),
-    height: profile === "more-info" ? Number(defaults?.height) || 300 : 500,
+    height: variant === "numeric"
+      ? (defaults?.height ?? (profile === "more-info" ? 240 : "auto"))
+      : "auto",
     entities,
   };
   if (profile === "panel") {
@@ -245,16 +247,16 @@ export function editorConfig(hass, defaults, profile = "panel", variant = "numer
   return config;
 }
 
-export function defaultsFromEditor(config, profile = "panel") {
+export function defaultsFromEditor(config, profile = "panel", variant = "numeric") {
   const protectedKeys = new Set([
     "type", "energy_date_sync", "entities",
   ]);
   if (profile === "panel") {
     protectedKeys.add("hours_to_show");
-    protectedKeys.add("height");
   } else {
     protectedKeys.add("card_header");
   }
+  if (variant === "state") protectedKeys.add("height");
   const defaults = {};
   for (const [key, value] of Object.entries(config || {})) {
     if (!protectedKeys.has(key) && value !== undefined) defaults[key] = structuredClone(value);
@@ -294,7 +296,6 @@ function panelEditorStyles(variant) {
     .overlay-row:has(#energy_date_sync),
     .overlay-row:has(#show_date_picker),
     .f:has(#hours_to_show),
-    .f:has(#height),
     label:has(#show_y2_axis),
     .overlay-row:has(#show_interval_picker),
     .overlay-row:has(#show_attribute_list) { display: none !important; }
@@ -352,7 +353,7 @@ export function moreInfoEditorStyles(variant) {
 }
 
 function separateDefaultsFromEditor(draft, profile, variant) {
-  const defaults = defaultsFromEditor(draft, profile);
+  const defaults = defaultsFromEditor(draft, profile, variant);
   const managed = profile === "more-info"
     ? MORE_INFO_MANAGED_EDITOR_KEYS
     : PANEL_MANAGED_EDITOR_KEYS;

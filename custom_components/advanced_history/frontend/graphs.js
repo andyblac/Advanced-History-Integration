@@ -258,9 +258,13 @@ export class GraphMethods {
   }
 
   _configureDynamicGraphLayout(host, hasNumeric, hasState) {
-    host.classList.toggle("dynamic-numeric", hasNumeric);
-    host.classList.toggle("has-state-graph", hasNumeric && hasState);
-    if (!hasNumeric) {
+    const configuredNumericHeight = this._cardOptions("timeline").height;
+    const autoNumericHeight = hasNumeric && (
+      configuredNumericHeight == null || configuredNumericHeight === "auto"
+    );
+    host.classList.toggle("dynamic-numeric", autoNumericHeight);
+    host.classList.toggle("has-state-graph", autoNumericHeight && hasState);
+    if (!autoNumericHeight) {
       host.style.removeProperty("height");
       host.style.removeProperty("min-height");
       host.style.removeProperty("--numeric-graph-height");
@@ -272,7 +276,7 @@ export class GraphMethods {
           this._fitStateTimelineCard(stateCard);
         }
       }
-      if (!hasNumeric) return;
+      if (!autoNumericHeight) return;
       const viewportHeight = window.visualViewport?.height || window.innerHeight;
       const controller = this.shadowRoot?.getElementById("date-controller");
       const controllerRect = controller?.getBoundingClientRect?.();
@@ -463,7 +467,7 @@ export class GraphMethods {
       entities,
       hours_to_show: this._effectiveDefaultHours(),
       ...cardOptions,
-      height: "auto",
+      height: mode === "state_timeline" ? "auto" : (cardOptions.height ?? "auto"),
       chart_mode: mode === "state_timeline"
         ? "state_timeline"
         : (cardOptions.chart_mode ?? mode),
@@ -479,7 +483,7 @@ export class GraphMethods {
         : {}),
       ...this._panelGraphHourOptions(),
     };
-    if (mode !== "state_timeline") {
+    if (mode !== "state_timeline" && config.height === "auto") {
       // The card's native height:auto implementation only enables its
       // fill-height path when it is hosted in a numeric grid row. AHP owns
       // the containing block, so expose its current size using the same
@@ -1255,7 +1259,7 @@ export class GraphMethods {
     delete options.entities;
     delete options.energy_date_sync;
     delete options.energy_collection_key;
-    delete options.height;
+    if (mode === "state_timeline") delete options.height;
     delete options.hours_to_show;
     delete options.numeric_entities;
     delete options.state_entities;
@@ -1333,7 +1337,7 @@ export class GraphMethods {
     return {
       hours_to_show: editDefaults ? Number(this.config.default_hours) || 24 : this._effectiveDefaultHours(),
       ...cardOptions,
-      height: "auto",
+      height: editorMode === "state_timeline" ? "auto" : (cardOptions.height ?? "auto"),
       type: `custom:${CARD_TAG}`,
       card_header: cardOptions.card_header ?? editorHeader,
       chart_mode: editorMode === "state_timeline"
@@ -1374,8 +1378,9 @@ export class GraphMethods {
       Array.isArray(existingRemovals) ? existingRemovals : [],
     );
     const protectedKeys = new Set([
-      "type", "entities", "energy_date_sync", "energy_collection_key", "height", "hours_to_show",
+      "type", "entities", "energy_date_sync", "energy_collection_key", "hours_to_show",
     ]);
+    if (editorMode === "state_timeline") protectedKeys.add("height");
     const cardOptions = {};
     for (const [key, value] of Object.entries(config || {})) {
       if (protectedKeys.has(key) || value === undefined) continue;
@@ -1612,7 +1617,6 @@ export class GraphMethods {
     editorMode = null,
   ) {
     const defaultHours = Number(config?.hours_to_show) || this._effectiveDefaultHours();
-    const graphHeight = Number(config?.height) || this._effectiveGraphHeight();
     const compare = this._activeSnapshot?.compare;
     const singleGraph = Boolean(this._activeSnapshot?.single_graph);
     const attributeSelection = this._clone(this._activeSnapshot?.attribute_selection);
@@ -1660,16 +1664,13 @@ export class GraphMethods {
     if (defaultHours !== (Number(this.config.default_hours) || 24)) {
       this._activeSnapshot.default_hours = defaultHours;
     }
-    if (graphHeight !== (Number(this.config.graph_height) || 300)) {
-      this._activeSnapshot.graph_height = graphHeight;
-    }
     if (singleGraph) this._activeSnapshot.single_graph = true;
     if (attributeSelection && Object.keys(attributeSelection).length) {
       this._activeSnapshot.attribute_selection = attributeSelection;
     }
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
     this._recordChange(null, true);
-    return { cardOptions, entityOptions, defaultHours, graphHeight };
+    return { cardOptions, entityOptions, defaultHours };
   }
 
   _applyGraphEditorVariants(variants) {
@@ -1746,7 +1747,6 @@ export class GraphMethods {
         .f:has(.e-y_axis),
         .overlay-row:has(#energy_date_sync),
         .overlay-row:has(#show_date_picker),
-        .f:has(#height),
         .f:has(#hours_to_show),
         label:has(#show_y2_axis),
         .overlay-row:has(#show_interval_picker),
@@ -1754,6 +1754,7 @@ export class GraphMethods {
         ${entry.mode === "state_timeline"
           ? `
             .f:has(#chart_mode),
+            .f:has(#height),
             .f:has(#group_by),
             label:has(#auto_scale_points),
             .f:has(#points_per_hour),
@@ -1765,7 +1766,7 @@ export class GraphMethods {
     }
     const initialEntry = entries.find((entry) => entry.mode === scopedMode) || entries[0];
     const variantSpecificKeys = new Set([
-      "entities", "chart_mode", "group_by", "auto_scale_points", "points_per_hour",
+      "entities", "chart_mode", "height", "group_by", "auto_scale_points", "points_per_hour",
       "show_pph_picker", "pph_picker_position", "pph_picker_group",
       "show_group_by_picker", "group_by_picker_position", "group_by_picker_group",
     ]);
