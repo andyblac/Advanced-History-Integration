@@ -795,9 +795,16 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
       confirmReset: custom(hass, "more_info_entity_reset_confirm"),
     },
     ensureLoaded: () => ensureCardLoaded(hass, serviceConfig.card_module_url),
-    visualEditorStyles: baseConfig.entities.length === 1
-      ? '.edb[data-action="delete"] { display: none !important; }'
-      : "",
+    visualEditorStyles: `
+      ${baseConfig.entities.length === 1
+        ? `
+          #add-entity,
+          .edb[data-action="delete"],
+          .edup[data-action="duplicate"] { display: none !important; }
+        `
+        : ""}
+      ${numeric ? "" : ".f:has(#chart_mode) { display: none !important; }"}
+    `,
     resetDisabled: !serviceConfig.entity_config,
     onSave: (draft) => saveMoreInfoEntityConfig(
       historyView,

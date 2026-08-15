@@ -74,9 +74,10 @@ function sampleEntities(hass, count) {
 
 export function editorConfig(hass, defaults, profile = "panel") {
   const templates = entityTemplates(defaults);
-  const samples = sampleEntities(hass, templates.length || 1);
+  const editorTemplates = profile === "more-info" ? templates.slice(0, 1) : templates;
+  const samples = sampleEntities(hass, editorTemplates.length || 1);
   const entities = samples.map((entity, index) => ({
-    ...(templates[index] || templates[0] || {}),
+    ...(editorTemplates[index] || editorTemplates[0] || {}),
     entity,
   }));
   const config = {
@@ -118,6 +119,7 @@ export function defaultsFromEditor(config, profile = "panel") {
     delete template.statistic_id;
     if (profile === "panel") delete template.compare;
     if (Object.keys(template).length) templates.push(template);
+    if (profile === "more-info") break;
   }
   if (templates.length === 1) defaults.entities = templates[0];
   else if (templates.length > 1) defaults.entities = templates;
@@ -169,6 +171,12 @@ async function openDefaultsEditor(selector, profile) {
       loadError: custom(hass, "graph_editor_load_error"),
     },
     allowCode: false,
+    visualEditorStyles: isMoreInfo
+      ? `
+        #add-entity,
+        .edup[data-action="duplicate"] { display: none !important; }
+      `
+      : "",
     ensureLoaded: () => ensureCardLoaded(hass),
     onSave: (draft) => {
       updateObjectSelector(selector, defaultsFromEditor(draft, profile));

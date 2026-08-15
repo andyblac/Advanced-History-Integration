@@ -231,11 +231,14 @@ export class GraphMethods {
       && entities.some((entity) => entity.y_axis === "secondary");
     const height = this._effectiveGraphHeight();
     const config = {
-      type: `custom:${CARD_TAG}`, card_header: title, chart_mode: mode,
+      type: `custom:${CARD_TAG}`, card_header: title,
       entities,
       hours_to_show: this._effectiveDefaultHours(),
       height,
       ...cardOptions,
+      chart_mode: mode === "state_timeline"
+        ? "state_timeline"
+        : (cardOptions.chart_mode ?? mode),
       show_y2_axis: hasSecondaryAxis,
       ...detailOptions,
       ...(mode === "state_timeline"
@@ -1069,7 +1072,9 @@ export class GraphMethods {
       ...cardOptions,
       type: `custom:${CARD_TAG}`,
       card_header: cardOptions.card_header ?? editorHeader,
-      chart_mode: cardOptions.chart_mode ?? editorMode,
+      chart_mode: editorMode === "state_timeline"
+        ? "state_timeline"
+        : (cardOptions.chart_mode ?? editorMode),
       entities,
       energy_date_sync: true,
       ...(this._panelEnergyCollectionKey()
@@ -1343,6 +1348,9 @@ export class GraphMethods {
         .f:has(.e-attribute),
         .f:has(.e-enabled),
         .f:has(.e-y_axis) { display: none !important; }
+        ${scopedMode === "state_timeline"
+          ? ".f:has(#chart_mode) { display: none !important; }"
+          : ""}
       `,
       onSave: (draft) => {
         this._applyGraphEditorConfig(draft, scopedSeries, initialConfig);
