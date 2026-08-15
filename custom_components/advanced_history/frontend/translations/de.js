@@ -33,7 +33,7 @@ export default {
   "switch_bookmark_message": "Änderungen am aktuellen Lesezeichen speichern, bevor ein anderes geladen wird?",
   "load_bookmark_new_chart_message": "Ein Lesezeichen für das aktuelle Diagramm erstellen, bevor dieses Lesezeichen geladen wird?",
   "empty_chart": "Leeres Diagramm",
-  "graph_editor_note": "Dies sind die Einstellungen der Statistics Graph Chart Card. Ziele werden weiterhin auf der Verlaufsseite verwaltet; die Entitätseinträge hier steuern ihre Darstellung im Diagramm. Verwende Entität hinzufügen und das Feld Attribut, um ein oder mehrere Entitätsattribute darzustellen.",
+  "graph_editor_note": "Dies sind die Einstellungen der Statistics Graph Chart Card. Ziele und Attribute werden weiterhin auf der Verlaufsseite verwaltet; die Entitätseinträge hier steuern ihre Darstellung im Diagramm.",
   "graph_editor_load_error": "Der Diagrammeditor konnte nicht geladen werden.",
   "graph_code_editor_mapping_error": "Die Kartenkonfiguration muss eine YAML-Zuordnung sein.",
   "energy_selector_error": "Die Energie-Datumsauswahl konnte nicht geladen werden.",

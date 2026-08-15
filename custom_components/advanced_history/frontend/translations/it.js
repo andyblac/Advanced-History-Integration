@@ -33,7 +33,7 @@ export default {
   "switch_bookmark_message": "Salvare le modifiche al segnalibro corrente prima di caricarne un altro?",
   "load_bookmark_new_chart_message": "Creare un segnalibro per il grafico corrente prima di caricare questo segnalibro?",
   "empty_chart": "Grafico vuoto",
-  "graph_editor_note": "Queste sono le impostazioni di Statistics Graph Chart Card. Gli obiettivi restano gestiti dalla pagina Cronologia; le voci delle entità ne controllano qui l’aspetto nel grafico. Usa Aggiungi entità e il campo Attributo per mostrare uno o più attributi di un’entità.",
+  "graph_editor_note": "Queste sono le impostazioni di Statistics Graph Chart Card. Gli obiettivi e gli attributi restano gestiti dalla pagina Cronologia; le voci delle entità ne controllano qui l’aspetto nel grafico.",
   "graph_editor_load_error": "Impossibile caricare l’editor dei grafici.",
   "graph_code_editor_mapping_error": "La configurazione della scheda deve essere una mappatura YAML.",
   "energy_selector_error": "Impossibile caricare il selettore delle date di Energia.",

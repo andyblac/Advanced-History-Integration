@@ -13,6 +13,7 @@ import {
 } from "./state-colors.js";
 
 const DATA_SOURCE_CACHE = new Map();
+const ENTITY_OPTION_REMOVALS = "__advanced_history_remove_options";
 
 function historyTimestamp(value) {
   const numeric = Number(value);
@@ -860,9 +861,16 @@ export class GraphMethods {
     const entityOptions = {
       ...automaticEntityOptions(this._hass.states[entity], mode),
       ...this._defaultEntityOptions(cardOptionsConfig),
-      ...(entitySavedOptions && typeof entitySavedOptions === "object" ? entitySavedOptions : {}),
-      ...(seriesSavedOptions && typeof seriesSavedOptions === "object" ? seriesSavedOptions : {}),
     };
+    const applySavedOptions = (saved) => {
+      if (!saved || typeof saved !== "object" || Array.isArray(saved)) return;
+      for (const [option, value] of Object.entries(saved)) {
+        if (option !== ENTITY_OPTION_REMOVALS) entityOptions[option] = value;
+      }
+      for (const option of saved[ENTITY_OPTION_REMOVALS] || []) delete entityOptions[option];
+    };
+    applySavedOptions(entitySavedOptions);
+    applySavedOptions(seriesSavedOptions);
     if (attribute) {
       entityOptions.attribute = attribute;
       // Let the card derive its own attribute label so card-level naming
@@ -1070,7 +1078,7 @@ export class GraphMethods {
     };
   }
 
-  _splitGraphEditorConfig(config, editDefaults = false) {
+  _splitGraphEditorConfig(config, editDefaults = false, editorBase = null) {
     const configuredCardOptions = editDefaults ? this.config.card_options : this._effectiveCardOptionsConfig();
     const configuredEntityOptions = editDefaults ? this.config.entity_options : this._effectiveEntityOptionsConfig();
     const integrationCardDefaults = this._cardOptions(this.config.card_options);
@@ -1122,8 +1130,38 @@ export class GraphMethods {
       cardOptions.entities = structuredClone(configuredCardOptions.entities);
     }
 
+    const editorBaseEntities = new Map();
+    for (const raw of editorBase?.entities || []) {
+      if (!raw || typeof raw === "string") continue;
+      const entity = raw.entity || raw.statistic_id;
+      if (!entity) continue;
+      editorBaseEntities.set(this._seriesKey(entity, raw.attribute), raw);
+    }
+    let editorRows = config?.entities || [];
+    if (editorBaseEntities.size) {
+      const draftEntities = new Map();
+      for (const raw of editorRows) {
+        if (!raw || typeof raw === "string") continue;
+        const entity = raw.entity || raw.statistic_id;
+        if (!entity) continue;
+        draftEntities.set(this._seriesKey(entity, raw.attribute), raw);
+      }
+      editorRows = [...editorBaseEntities.entries()].map(([seriesKey, base]) => {
+        const row = structuredClone(draftEntities.get(seriesKey) || base);
+        if (base.entity != null) {
+          row.entity = base.entity;
+          delete row.statistic_id;
+        } else {
+          row.statistic_id = base.statistic_id;
+          delete row.entity;
+        }
+        if (base.attribute != null) row.attribute = base.attribute;
+        else delete row.attribute;
+        return row;
+      });
+    }
     const entityOptions = editDefaults ? structuredClone(configuredEntityOptions || {}) : {};
-    for (const raw of config?.entities || []) {
+    for (const raw of editorRows) {
       if (!raw || typeof raw === "string") continue;
       const entity = raw.entity || raw.statistic_id;
       if (!entity) continue;
@@ -1131,6 +1169,7 @@ export class GraphMethods {
       const options = structuredClone(raw);
       delete options.entity;
       delete options.statistic_id;
+      delete options[ENTITY_OPTION_REMOVALS];
       const compareOptions = this._comparisonEditorDefaults(options.compare);
       delete options.compare;
       if (compareOptions !== undefined) options.compare = compareOptions;
@@ -1144,6 +1183,32 @@ export class GraphMethods {
         ...(integrationEntityDefaults?.[entity] || {}),
         ...(integrationEntityDefaults?.[seriesKey] || {}),
       };
+      delete integrationBase[ENTITY_OPTION_REMOVALS];
+      const existingOptions = configuredEntityOptions?.[seriesKey];
+      const removedOptions = new Set(
+        Array.isArray(existingOptions?.[ENTITY_OPTION_REMOVALS])
+          ? existingOptions[ENTITY_OPTION_REMOVALS]
+          : [],
+      );
+      for (const key of Object.keys(options)) removedOptions.delete(key);
+      const editorBaseOptions = structuredClone(editorBaseEntities.get(seriesKey) || {});
+      delete editorBaseOptions.entity;
+      delete editorBaseOptions.statistic_id;
+      delete editorBaseOptions.enabled;
+      delete editorBaseOptions[ENTITY_OPTION_REMOVALS];
+      const baseCompareOptions = this._comparisonEditorDefaults(editorBaseOptions.compare);
+      delete editorBaseOptions.compare;
+      if (baseCompareOptions !== undefined) editorBaseOptions.compare = baseCompareOptions;
+      if (!editDefaults) {
+        for (const key of Object.keys(editorBaseOptions)) {
+          if (
+            !Object.prototype.hasOwnProperty.call(options, key)
+            && Object.prototype.hasOwnProperty.call(integrationBase, key)
+          ) {
+            removedOptions.add(key);
+          }
+        }
+      }
       if (
         !Object.prototype.hasOwnProperty.call(options, "aggregate_func")
         && (integrationBase.aggregate_func ?? CARD_DEFAULT_AGGREGATE) !== CARD_DEFAULT_AGGREGATE
@@ -1170,6 +1235,9 @@ export class GraphMethods {
         for (const [key, value] of Object.entries(options)) {
           if (this._sameGraphOption(value, integrationBase[key])) delete options[key];
         }
+        if (removedOptions.size) {
+          options[ENTITY_OPTION_REMOVALS] = [...removedOptions].sort();
+        }
       }
       if (Object.keys(options).length) entityOptions[seriesKey] = options;
       else delete entityOptions[seriesKey];
@@ -1189,8 +1257,12 @@ export class GraphMethods {
     }
   }
 
-  _applyGraphEditorConfig(config, scopedSeries = null) {
-    const { cardOptions, entityOptions: editedEntityOptions } = this._splitGraphEditorConfig(config);
+  _applyGraphEditorConfig(config, scopedSeries = null, editorBase = null) {
+    const { cardOptions, entityOptions: editedEntityOptions } = this._splitGraphEditorConfig(
+      config,
+      false,
+      editorBase,
+    );
     let entityOptions = editedEntityOptions;
     if (Array.isArray(scopedSeries)) {
       entityOptions = structuredClone(this._activeSnapshot?.entity_options || {});
@@ -1227,15 +1299,16 @@ export class GraphMethods {
   }
 
   async _openGraphEditor(scopedSeries = null, scopedMode = null, scopedHeader = null) {
+    const initialConfig = this._graphEditorConfig(
+      false,
+      scopedSeries,
+      scopedMode,
+      scopedHeader,
+    );
     await openCardEditorDialog({
       hass: this._hass,
       container: this,
-      initialConfig: this._graphEditorConfig(
-        false,
-        scopedSeries,
-        scopedMode,
-        scopedHeader,
-      ),
+      initialConfig,
       title: this._customLocalize("graph_settings"),
       note: this._customLocalize("graph_editor_note"),
       labels: {
@@ -1257,8 +1330,22 @@ export class GraphMethods {
         label: this._customLocalize("diagnostics"),
         onClick: () => this._openDiagnostics(),
       },
+      visualEditorStyles: `
+        #add-entity,
+        .edb[data-action="delete"],
+        .edup[data-action="duplicate"],
+        .cmp-add,
+        .cmp-del,
+        .cmp-row .f:has(.cmp-period),
+        .cmp-row .f:has(.cmp-back),
+        .f:has(.e-entity),
+        .f:has(.e-statistic_id),
+        .f:has(.e-attribute),
+        .f:has(.e-enabled),
+        .f:has(.e-y_axis) { display: none !important; }
+      `,
       onSave: (draft) => {
-        this._applyGraphEditorConfig(draft, scopedSeries);
+        this._applyGraphEditorConfig(draft, scopedSeries, initialConfig);
         this._render();
       },
     });

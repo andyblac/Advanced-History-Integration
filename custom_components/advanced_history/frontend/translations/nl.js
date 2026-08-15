@@ -33,7 +33,7 @@ export default {
   "switch_bookmark_message": "Wijzigingen in de huidige bladwijzer opslaan voordat een andere bladwijzer wordt geladen?",
   "load_bookmark_new_chart_message": "Een bladwijzer voor de huidige grafiek maken voordat deze bladwijzer wordt geladen?",
   "empty_chart": "Lege grafiek",
-  "graph_editor_note": "Dit zijn de instellingen van Statistics Graph Chart Card. Doelen blijven beheerd via de pagina Geschiedenis; de entiteitsvermeldingen bepalen hier hun weergave in de grafiek. Gebruik Entiteit toevoegen en het veld Attribuut om een of meer kenmerken van een entiteit te tonen.",
+  "graph_editor_note": "Dit zijn de instellingen van Statistics Graph Chart Card. Doelen en attributen blijven beheerd via de pagina Geschiedenis; de entiteitsvermeldingen bepalen hier hun weergave in de grafiek.",
   "graph_editor_load_error": "De grafiekeditor kon niet worden geladen.",
   "graph_code_editor_mapping_error": "De kaartconfiguratie moet een YAML-toewijzing zijn.",
   "energy_selector_error": "De Energiedatumkiezer kon niet worden geladen.",

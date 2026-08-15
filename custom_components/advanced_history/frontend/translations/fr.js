@@ -33,7 +33,7 @@ export default {
   "switch_bookmark_message": "Enregistrer les modifications du favori actuel avant d’en charger un autre ?",
   "load_bookmark_new_chart_message": "Créer un favori pour le graphique actuel avant de charger ce favori ?",
   "empty_chart": "Graphique vide",
-  "graph_editor_note": "Voici les paramètres de Statistics Graph Chart Card. Les cibles restent gérées depuis la page Historique ; les entrées d’entités contrôlent ici leur apparence dans le graphique. Utilisez Ajouter une entité et le champ Attribut pour afficher un ou plusieurs attributs d’une entité.",
+  "graph_editor_note": "Voici les paramètres de Statistics Graph Chart Card. Les cibles et les attributs restent gérés depuis la page Historique ; les entrées d’entités contrôlent ici leur apparence dans le graphique.",
   "graph_editor_load_error": "L’éditeur de graphiques n’a pas pu être chargé.",
   "graph_code_editor_mapping_error": "La configuration de la carte doit être un mappage YAML.",
   "energy_selector_error": "Le sélecteur de dates Énergie n’a pas pu être chargé.",

@@ -174,8 +174,28 @@ export async function openCardEditorDialog({
         editor = document.createElement("statistics-graph-chart-card-editor");
       }
       if (token !== renderToken || !dialogHost.isConnected) return;
+      let configSyncQueued = false;
+      let syncingConfig = false;
       editor.addEventListener("config-changed", (event) => {
-        if (event.detail?.config) draft = event.detail.config;
+        if (syncingConfig || !event.detail?.config) return;
+        draft = structuredClone(event.detail.config);
+        if (configSyncQueued) return;
+        configSyncQueued = true;
+        queueMicrotask(() => {
+          configSyncQueued = false;
+          if (token !== renderToken || !editor.isConnected || mode !== "visual") return;
+          // The normal Lovelace card dialog feeds emitted configuration back
+          // into the editor. Some dependent controls (for example State Row)
+          // do not refresh until setConfig receives that updated configuration.
+          syncingConfig = true;
+          try {
+            editor.setConfig(draft);
+            editor.requestUpdate?.();
+          } finally {
+            syncingConfig = false;
+          }
+          applyVisualEditorStyles(editor);
+        });
       });
       editor.hass = hass;
       editor.setConfig(draft);

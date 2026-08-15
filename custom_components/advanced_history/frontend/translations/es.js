@@ -33,7 +33,7 @@ export default {
   "switch_bookmark_message": "¿Guardar los cambios del marcador actual antes de cargar otro marcador?",
   "load_bookmark_new_chart_message": "¿Crear un marcador para el gráfico actual antes de cargar este marcador?",
   "empty_chart": "Gráfico vacío",
-  "graph_editor_note": "Estos son los ajustes de Statistics Graph Chart Card. Los objetivos se siguen gestionando desde la página Historial; las entradas de entidades controlan aquí su apariencia en el gráfico. Usa Añadir entidad y el campo Atributo para representar uno o varios atributos de una entidad.",
+  "graph_editor_note": "Estos son los ajustes de Statistics Graph Chart Card. Los objetivos y atributos se siguen gestionando desde la página Historial; las entradas de entidades controlan aquí su apariencia en el gráfico.",
   "graph_editor_load_error": "No se pudo cargar el editor de gráficos.",
   "graph_code_editor_mapping_error": "La configuración de la tarjeta debe ser un mapa YAML.",
   "energy_selector_error": "No se pudo cargar el selector de fechas de Energía.",

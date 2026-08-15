@@ -33,7 +33,7 @@ export default {
   "switch_bookmark_message": "Save changes to the current bookmark before loading another bookmark?",
   "load_bookmark_new_chart_message": "Create a bookmark for the current chart before loading this bookmark?",
   "empty_chart": "Empty chart",
-  "graph_editor_note": "These are the Statistics Graph Chart Card settings. Targets remain managed by the History page; entity entries here control their graph appearance. Use Add Entity and the Attribute field to graph one or more entity attributes.",
+  "graph_editor_note": "These are the Statistics Graph Chart Card settings. Targets and attributes remain managed by the History page; entity entries here control their graph appearance.",
   "graph_editor_load_error": "Graph editor could not be loaded.",
   "graph_code_editor_mapping_error": "Card configuration must be a YAML mapping.",
   "energy_selector_error": "Energy date selector could not be loaded.",
