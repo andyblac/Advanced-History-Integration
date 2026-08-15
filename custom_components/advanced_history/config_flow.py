@@ -86,9 +86,6 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
                 CONF_INCLUDE_HIDDEN, default=values[CONF_INCLUDE_HIDDEN]
             ): selector.BooleanSelector(),
             vol.Optional(
-                CONF_CARD_MODULE_URL, default=values[CONF_CARD_MODULE_URL]
-            ): selector.TextSelector(),
-            vol.Optional(
                 CONF_NUMERIC_CARD_OPTIONS,
                 default=values[CONF_NUMERIC_CARD_OPTIONS],
             ): selector.ObjectSelector(),
@@ -99,6 +96,9 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
             vol.Optional(
                 CONF_REQUIRE_ADMIN, default=values[CONF_REQUIRE_ADMIN]
             ): selector.BooleanSelector(),
+            vol.Optional(
+                CONF_CARD_MODULE_URL, default=values[CONF_CARD_MODULE_URL]
+            ): selector.TextSelector(),
         }
     )
 
@@ -119,9 +119,6 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
                 CONF_REDIRECT_SHOW_MORE, default=values[CONF_REDIRECT_SHOW_MORE]
             ): selector.BooleanSelector(),
             vol.Optional(
-                CONF_CARD_MODULE_URL, default=values[CONF_CARD_MODULE_URL]
-            ): selector.TextSelector(),
-            vol.Optional(
                 CONF_NUMERIC_CARD_OPTIONS,
                 default=values[CONF_NUMERIC_CARD_OPTIONS],
             ): selector.ObjectSelector(),
@@ -129,6 +126,9 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
                 CONF_STATE_CARD_OPTIONS,
                 default=values[CONF_STATE_CARD_OPTIONS],
             ): selector.ObjectSelector(),
+            vol.Optional(
+                CONF_CARD_MODULE_URL, default=values[CONF_CARD_MODULE_URL]
+            ): selector.TextSelector(),
         }
     )
 
