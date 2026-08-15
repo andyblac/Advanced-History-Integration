@@ -80,6 +80,8 @@ class AdvancedHistoryPanel extends HTMLElement {
       || `panel-${Date.now()}-${Math.random().toString(36).slice(2)}`;
     this._panelTabs = [{ id: initialPanelTabId, state: null }];
     this._activePanelTabId = initialPanelTabId;
+    this._panelTabsStorageInspected = false;
+    this._panelTabsPersistenceSuppressed = false;
     this._persistPanelsOnPageHide = () => this._persistPanelTabs();
   }
 

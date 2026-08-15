@@ -376,6 +376,7 @@ export class StorageMethods {
       "single_graph",
       "attribute_selection",
       "compare",
+      "remove_card_options",
     ].forEach(copyChartValue);
     if (this._panelTimeRange) chart.time_range = this._clone(this._panelTimeRange);
     if (this._panelRollingHours) chart.rolling_hours = this._panelRollingHours;
@@ -941,12 +942,31 @@ export class StorageMethods {
 
   _effectiveCardOptionsConfig(mode = "timeline") {
     const defaults = this._configuredCardOptions(mode);
-    const overrides = this._activeSnapshot?.card_options;
-    if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) return defaults;
-    return {
+    const configuredOverrides = this._activeSnapshot?.card_options;
+    const typedOverrides = configuredOverrides
+      && typeof configuredOverrides === "object"
+      && !Array.isArray(configuredOverrides)
+      && (configuredOverrides.numeric || configuredOverrides.state);
+    const overrides = typedOverrides
+      ? (mode === "state_timeline"
+          ? configuredOverrides.state
+          : configuredOverrides.numeric)
+      : configuredOverrides;
+    const configuredRemovals = this._activeSnapshot?.remove_card_options;
+    const typedRemovals = configuredRemovals
+      && typeof configuredRemovals === "object"
+      && !Array.isArray(configuredRemovals);
+    const removals = typedRemovals
+      ? (mode === "state_timeline"
+          ? configuredRemovals.state
+          : configuredRemovals.numeric)
+      : configuredRemovals;
+    const effective = {
       ...(defaults && typeof defaults === "object" && !Array.isArray(defaults) ? defaults : {}),
-      ...overrides,
+      ...(overrides && typeof overrides === "object" && !Array.isArray(overrides) ? overrides : {}),
     };
+    for (const key of Array.isArray(removals) ? removals : []) delete effective[key];
+    return effective;
   }
 
   _effectiveEntityOptionsConfig() {

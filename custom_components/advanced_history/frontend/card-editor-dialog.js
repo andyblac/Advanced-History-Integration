@@ -329,7 +329,8 @@ export async function openCardEditorDialog({
     }
   };
 
-  modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+  // Keep edits safe from accidental pointer clicks on the modal backdrop.
+  // The explicit close and Cancel controls remain available.
   modal.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
   root.querySelector('[data-action="cancel"]').addEventListener("click", close);
   root.querySelector('[data-action="close-editor"]').addEventListener("click", close);
@@ -356,9 +357,8 @@ export async function openCardEditorDialog({
       event.preventDefault();
       cancelReset();
     });
-    confirmModal.addEventListener("click", (event) => {
-      if (event.target === confirmModal) cancelReset();
-    });
+    // Reset confirmation is also explicit: backdrop clicks do not choose an
+    // action on the user's behalf.
     root.querySelector('[data-action="cancel-reset"]').addEventListener("click", cancelReset);
     root.querySelector('[data-action="close-reset"]').addEventListener("click", cancelReset);
     root.querySelector('[data-action="confirm-reset"]').addEventListener("click", async () => {

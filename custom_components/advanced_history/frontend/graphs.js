@@ -1122,14 +1122,43 @@ export class GraphMethods {
     const integrationConfiguredCardOptions = this._configuredCardOptions(editorMode);
     const integrationCardDefaults = this._cardOptions(editorMode, integrationConfiguredCardOptions);
     const integrationEntityDefaults = this.config.entity_options || {};
+    const configuredRemovals = this._activeSnapshot?.remove_card_options;
+    const typedRemovals = configuredRemovals
+      && typeof configuredRemovals === "object"
+      && !Array.isArray(configuredRemovals);
+    const existingRemovals = editDefaults
+      ? []
+      : typedRemovals
+        ? (editorMode === "state_timeline"
+            ? configuredRemovals.state
+            : configuredRemovals.numeric)
+        : configuredRemovals;
+    const removedCardOptions = new Set(
+      Array.isArray(existingRemovals) ? existingRemovals : [],
+    );
     const protectedKeys = new Set([
       "type", "entities", "energy_date_sync", "energy_collection_key", "height", "hours_to_show",
     ]);
     const cardOptions = {};
     for (const [key, value] of Object.entries(config || {})) {
       if (protectedKeys.has(key) || value === undefined) continue;
+      removedCardOptions.delete(key);
       if (editDefaults || !this._sameGraphOption(value, integrationCardDefaults[key])) {
         cardOptions[key] = structuredClone(value);
+      }
+    }
+    if (!editDefaults) {
+      for (const key of Object.keys(editorBase || {})) {
+        if (
+          protectedKeys.has(key)
+          || Object.prototype.hasOwnProperty.call(config || {}, key)
+          || !Object.prototype.hasOwnProperty.call(integrationCardDefaults, key)
+        ) continue;
+        // The native editor drops options changed back to its own default.
+        // Record that omission so the integration default is removed rather
+        // than silently inherited again.
+        removedCardOptions.add(key);
+        delete cardOptions[key];
       }
     }
     const configuredHasHeader = Object.prototype.hasOwnProperty.call(
@@ -1286,7 +1315,11 @@ export class GraphMethods {
       if (Object.keys(options).length) entityOptions[seriesKey] = options;
       else delete entityOptions[seriesKey];
     }
-    return { cardOptions, entityOptions };
+    return {
+      cardOptions,
+      cardOptionRemovals: [...removedCardOptions].sort(),
+      entityOptions,
+    };
   }
 
   _sameGraphOption(left, right) {
@@ -1302,7 +1335,11 @@ export class GraphMethods {
   }
 
   _applyGraphEditorConfig(config, scopedSeries = null, editorBase = null) {
-    const { cardOptions, entityOptions: editedEntityOptions } = this._splitGraphEditorConfig(
+    const {
+      cardOptions,
+      cardOptionRemovals,
+      entityOptions: editedEntityOptions,
+    } = this._splitGraphEditorConfig(
       config,
       false,
       editorBase,
@@ -1317,20 +1354,72 @@ export class GraphMethods {
       }
       Object.assign(entityOptions, editedEntityOptions);
     }
-    return this._commitGraphEditorConfig(cardOptions, entityOptions, config);
+    const editorMode = editorBase?.chart_mode === "state_timeline"
+      || config?.chart_mode === "state_timeline"
+      ? "state_timeline"
+      : "timeline";
+    return this._commitGraphEditorConfig(
+      cardOptions,
+      cardOptionRemovals,
+      entityOptions,
+      config,
+      editorMode,
+    );
   }
 
-  _commitGraphEditorConfig(cardOptions, entityOptions, config) {
+  _commitGraphEditorConfig(
+    cardOptions,
+    cardOptionRemovals,
+    entityOptions,
+    config,
+    editorMode = null,
+  ) {
     const defaultHours = Number(config?.hours_to_show) || this._effectiveDefaultHours();
     const graphHeight = Number(config?.height) || this._effectiveGraphHeight();
     const compare = this._activeSnapshot?.compare;
     const singleGraph = Boolean(this._activeSnapshot?.single_graph);
     const attributeSelection = this._clone(this._activeSnapshot?.attribute_selection);
+    const currentCardOptions = this._activeSnapshot?.card_options;
+    const currentTypedOptions = currentCardOptions
+      && typeof currentCardOptions === "object"
+      && !Array.isArray(currentCardOptions)
+      && (currentCardOptions.numeric || currentCardOptions.state);
+    const typedCardOptions = editorMode == null
+      ? this._clone(cardOptions || { numeric: {}, state: {} })
+      : currentTypedOptions
+        ? this._clone(currentCardOptions)
+        : {
+            numeric: this._clone(currentCardOptions || {}),
+            state: this._clone(currentCardOptions || {}),
+          };
+    const currentRemovals = this._activeSnapshot?.remove_card_options;
+    const currentTypedRemovals = currentRemovals
+      && typeof currentRemovals === "object"
+      && !Array.isArray(currentRemovals);
+    const typedCardOptionRemovals = editorMode == null
+      ? this._clone(cardOptionRemovals || { numeric: [], state: [] })
+      : currentTypedRemovals
+        ? this._clone(currentRemovals)
+        : {
+            numeric: this._clone(Array.isArray(currentRemovals) ? currentRemovals : []),
+            state: this._clone(Array.isArray(currentRemovals) ? currentRemovals : []),
+          };
+    if (editorMode != null) {
+      const variant = editorMode === "state_timeline" ? "state" : "numeric";
+      typedCardOptions[variant] = this._clone(cardOptions || {});
+      typedCardOptionRemovals[variant] = this._clone(cardOptionRemovals || []);
+    }
     this._activeSnapshot = {
       defaults_mode: "overrides",
-      card_options: cardOptions,
+      card_options: typedCardOptions,
       entity_options: entityOptions,
     };
+    if (
+      typedCardOptionRemovals.numeric?.length
+      || typedCardOptionRemovals.state?.length
+    ) {
+      this._activeSnapshot.remove_card_options = typedCardOptionRemovals;
+    }
     if (defaultHours !== (Number(this.config.default_hours) || 24)) {
       this._activeSnapshot.default_hours = defaultHours;
     }
@@ -1348,14 +1437,15 @@ export class GraphMethods {
 
   _applyGraphEditorVariants(variants) {
     const entityOptions = structuredClone(this._activeSnapshot?.entity_options || {});
-    let cardOptions = null;
+    const cardOptions = { numeric: {}, state: {} };
+    const cardOptionRemovals = { numeric: [], state: [] };
     let primaryConfig = null;
     for (const variant of variants) {
       const split = this._splitGraphEditorConfig(variant.config, false, variant.initialConfig);
-      if (!primaryConfig || variant.mode !== "state_timeline") {
-        primaryConfig = variant.config;
-        cardOptions = split.cardOptions;
-      }
+      const key = variant.mode === "state_timeline" ? "state" : "numeric";
+      cardOptions[key] = split.cardOptions;
+      cardOptionRemovals[key] = split.cardOptionRemovals;
+      if (!primaryConfig || key === "numeric") primaryConfig = variant.config;
       for (const item of variant.series) {
         const descriptor = this._seriesDescriptor(item);
         delete entityOptions[descriptor.key];
@@ -1363,7 +1453,12 @@ export class GraphMethods {
       }
       Object.assign(entityOptions, split.entityOptions);
     }
-    return this._commitGraphEditorConfig(cardOptions || {}, entityOptions, primaryConfig || {});
+    return this._commitGraphEditorConfig(
+      cardOptions,
+      cardOptionRemovals,
+      entityOptions,
+      primaryConfig || {},
+    );
   }
 
   async _openGraphEditor(scopedSeries = null, scopedMode = null, scopedHeader = null) {
@@ -1446,6 +1541,9 @@ export class GraphMethods {
         loading: this._localize("ui.common.loading", "Loading"),
         cancel: this._localize("ui.common.cancel", "Cancel"),
         save: this._localize("ui.common.save", "Save"),
+        reset: this._localize("ui.common.reset", "Reset"),
+        confirmResetTitle: `${this._localize("ui.common.reset", "Reset")} ${this._customLocalize("graph_settings")}?`,
+        confirmReset: "This removes this panel's saved graph and entity overrides and restores the integration defaults.",
         showCode: this._localize(
           "ui.panel.lovelace.editor.edit_card.show_code_editor",
           "Show code editor",
@@ -1474,6 +1572,16 @@ export class GraphMethods {
         ? (key) => !variantSpecificKeys.has(key)
         : null,
       visualEditorStyles: initialEntry.styles,
+      onReset: () => {
+        const snapshot = this._clone(this._activeSnapshot || {});
+        snapshot.defaults_mode = "overrides";
+        snapshot.card_options = { numeric: {}, state: {} };
+        snapshot.entity_options = {};
+        delete snapshot.remove_card_options;
+        this._activeSnapshot = snapshot;
+        this._recordChange(null, true);
+        this._render();
+      },
       onSave: (draft, variantState) => {
         if (combinedEditor) {
           this._applyGraphEditorVariants(entries.map((entry) => ({

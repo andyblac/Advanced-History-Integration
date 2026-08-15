@@ -109,7 +109,14 @@ export class PanelTabsMethods {
   }
 
   _persistPanelTabs() {
-    if (!this._desktopPanelTabsEnabled() || !this._panelTabs?.length) return;
+    // Storage must not depend on the current viewport or on version metadata
+    // being available. Both are transient and previously allowed the initial
+    // singleton tab to overwrite a saved multi-panel session.
+    if (
+      !this._panelTabsStorageInspected
+      || this._panelTabsPersistenceSuppressed
+      || !this._panelTabs?.length
+    ) return;
     this._saveActivePanelTab();
     try {
       localStorage.setItem(PANEL_TABS_STORAGE_KEY, JSON.stringify({
@@ -123,27 +130,43 @@ export class PanelTabsMethods {
   }
 
   _restorePersistedPanelTabs() {
-    if (!this._desktopPanelTabsEnabled()) return false;
     const params = new URLSearchParams(location.search);
     if (
       params.has(SHARE_QUERY_PARAM)
       || params.has(CARD_HANDOFF_QUERY_PARAM)
       || this._incomingTargetOverride
-    ) return false;
+    ) {
+      // The incoming view intentionally replaces the active panel for this
+      // session, but it must never replace the user's saved panel collection.
+      this._panelTabsPersistenceSuppressed = true;
+      return false;
+    }
     try {
-      const rawStored = JSON.parse(localStorage.getItem(PANEL_TABS_STORAGE_KEY) || "null");
+      const rawValue = localStorage.getItem(PANEL_TABS_STORAGE_KEY);
+      if (!rawValue) {
+        this._panelTabsStorageInspected = true;
+        return false;
+      }
+      const rawStored = JSON.parse(rawValue);
       const stored = this._migratePersistedPanelTabs(rawStored);
-      if (!stored) return false;
+      if (!stored) {
+        this._panelTabsPersistenceSuppressed = true;
+        return false;
+      }
       const tabs = stored.tabs.filter((tab) => (
         typeof tab?.id === "string"
         && tab.state?.snapshot?.targets
         && tab.state?.snapshot?.chart
       )).slice(0, this.maxTabs);
-      if (!tabs.length) return false;
+      if (!tabs.length) {
+        this._panelTabsPersistenceSuppressed = true;
+        return false;
+      }
       this._panelTabs = this._clone(tabs);
       this._activePanelTabId = this._panelTabs.some((tab) => tab.id === stored.active_id)
         ? stored.active_id
         : this._panelTabs[0].id;
+      this._panelTabsStorageInspected = true;
       if (rawStored.schema !== PANEL_TABS_SCHEMA) {
         localStorage.setItem(PANEL_TABS_STORAGE_KEY, JSON.stringify({
           schema: PANEL_TABS_SCHEMA,
@@ -155,6 +178,9 @@ export class PanelTabsMethods {
       this._restorePanelTab(active);
       return true;
     } catch (error) {
+      // Preserve malformed or temporarily inaccessible data for recovery
+      // instead of replacing it with the constructor's blank panel.
+      this._panelTabsPersistenceSuppressed = true;
       console.warn("Advanced History: unable to restore panel tabs", error);
       return false;
     }
@@ -168,7 +194,7 @@ export class PanelTabsMethods {
     end.setHours(23, 59, 59, 999);
     const chart = {
       defaults_mode: "overrides",
-      card_options: {},
+      card_options: { numeric: {}, state: {} },
       entity_options: {},
     };
     const snapshot = {
