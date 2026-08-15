@@ -143,7 +143,21 @@ export async function openCardEditorDialog({
     ? structuredClone(variantDrafts.get(activeVariantKey))
     : structuredClone(initialConfig || {});
   let mode = "visual";
+  let visualEditor = null;
   let renderToken = 0;
+
+  const flushVisualDraft = () => {
+    if (
+      mode !== "visual"
+      || !visualEditor?.isConnected
+      || typeof visualEditor._valueChanged !== "function"
+    ) return;
+    // The card's visual editor renders a few controls without wiring their
+    // change event to its serializer (x_axis_font_size is one example). Its
+    // canonical serializer does read every rendered option, so invoke it at
+    // our dialog boundaries to ensure the draft contains the current form.
+    visualEditor._valueChanged();
+  };
 
   const close = () => {
     if (modal.open) modal.close();
@@ -269,6 +283,14 @@ export async function openCardEditorDialog({
       editor.hass = hass;
       editor.setConfig(draft);
       editorHost.replaceChildren(editor);
+      visualEditor = editor;
+      editor.shadowRoot?.addEventListener("change", () => {
+        queueMicrotask(() => {
+          if (editor === visualEditor && editor.isConnected && mode === "visual") {
+            editor._valueChanged?.();
+          }
+        });
+      });
       applyVisualEditorStyles(editor);
       Promise.resolve(editor.updateComplete)
         .then(() => {
@@ -286,6 +308,7 @@ export async function openCardEditorDialog({
   const renderCode = async () => {
     ++renderToken;
     mode = "code";
+    visualEditor = null;
     status.textContent = "";
     save.disabled = false;
     toggle.disabled = false;
@@ -335,13 +358,17 @@ export async function openCardEditorDialog({
   root.querySelector('[data-action="cancel"]').addEventListener("click", close);
   root.querySelector('[data-action="close-editor"]').addEventListener("click", close);
   toggle?.addEventListener("click", () => {
-    if (mode === "visual") renderCode();
+    if (mode === "visual") {
+      flushVisualDraft();
+      renderCode();
+    }
     else renderVisual();
   });
   for (const button of root.querySelectorAll("[data-editor-variant]")) {
     button.addEventListener("click", () => {
       const key = button.dataset.editorVariant;
       if (!key || key === activeVariantKey || !variantDrafts.has(key)) return;
+      flushVisualDraft();
       activeVariantKey = key;
       draft = structuredClone(variantDrafts.get(key));
       updateVariantTabs();
@@ -381,6 +408,7 @@ export async function openCardEditorDialog({
     leadingAction.onClick();
   });
   save.addEventListener("click", async () => {
+    flushVisualDraft();
     save.disabled = true;
     if (reset) reset.disabled = true;
     status.textContent = "";
