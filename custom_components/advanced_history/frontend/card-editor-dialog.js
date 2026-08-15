@@ -1,6 +1,7 @@
 import { CARD_TAG } from "./constants.js";
 
 const DIALOG_TAG = "advanced-history-card-editor-dialog";
+const VISUAL_EDITOR_STYLE_KEY = "__advancedHistoryVisualEditorStyleSheet";
 let activeDialogHost = null;
 
 function escapeHtml(value) {
@@ -22,6 +23,7 @@ export async function openCardEditorDialog({
   resetDisabled = false,
   leadingAction,
   allowCode = true,
+  visualEditorStyles = "",
 }) {
   if (activeDialogHost?.isConnected) return null;
   const dialogHost = document.createElement(DIALOG_TAG);
@@ -136,6 +138,23 @@ export async function openCardEditorDialog({
     toggle.title = label;
   };
 
+  const applyVisualEditorStyles = (editor) => {
+    if (!visualEditorStyles || !editor.shadowRoot) return;
+    const root = editor.shadowRoot;
+    if (editor[VISUAL_EDITOR_STYLE_KEY]) return;
+    if (typeof CSSStyleSheet === "function" && "adoptedStyleSheets" in root) {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(visualEditorStyles);
+      root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
+      editor[VISUAL_EDITOR_STYLE_KEY] = sheet;
+      return;
+    }
+    const style = document.createElement("style");
+    style.textContent = visualEditorStyles;
+    root.append(style);
+    editor[VISUAL_EDITOR_STYLE_KEY] = style;
+  };
+
   const renderVisual = async () => {
     const token = ++renderToken;
     mode = "visual";
@@ -161,6 +180,12 @@ export async function openCardEditorDialog({
       editor.hass = hass;
       editor.setConfig(draft);
       editorHost.replaceChildren(editor);
+      applyVisualEditorStyles(editor);
+      Promise.resolve(editor.updateComplete)
+        .then(() => {
+          if (token === renderToken && editor.isConnected) applyVisualEditorStyles(editor);
+        })
+        .catch(() => undefined);
     } catch (error) {
       if (token !== renderToken) return;
       editorHost.innerHTML = `<div class="error">${escapeHtml(error?.message || strings.loadError)}</div>`;

@@ -141,6 +141,45 @@ function optionKeysToRemove(config, scope) {
     : [];
 }
 
+function activeComparisons(configured) {
+  const active = (comparison) => {
+    if (typeof comparison === "string") return comparison ? comparison : null;
+    if (!comparison || typeof comparison !== "object" || Array.isArray(comparison)) return null;
+    return typeof comparison.period === "string" && comparison.period
+      ? comparison
+      : null;
+  };
+  if (Array.isArray(configured)) {
+    const rows = configured.map(active).filter(Boolean);
+    return rows.length ? rows : undefined;
+  }
+  return active(configured) || undefined;
+}
+
+function mergeComparisonDefaults(active, defaults) {
+  const configuredActive = activeComparisons(active);
+  if (configuredActive == null || defaults == null) return configuredActive;
+  const defaultRows = Array.isArray(defaults) ? defaults : null;
+  const mergeOne = (configured, index = 0) => {
+    const fallback = defaultRows
+      ? defaultRows.length === 1
+        ? defaultRows[0]
+        : defaultRows[index]
+      : defaults;
+    const options = fallback && typeof fallback === "object" && !Array.isArray(fallback)
+      ? fallback
+      : {};
+    if (configured === true) return { ...options };
+    if (configured && typeof configured === "object" && !Array.isArray(configured)) {
+      return { ...structuredClone(options), ...configured };
+    }
+    return { ...structuredClone(options), period: configured };
+  };
+  return Array.isArray(configuredActive)
+    ? configuredActive.map((configured, index) => mergeOne(configured, index))
+    : mergeOne(configuredActive);
+}
+
 function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   const entityId = historyView.entityId;
   const availableNativeAttributes = nativeMoreInfoAttributes(historyView);
@@ -159,9 +198,12 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   if (entityConfig?.card_options && typeof entityConfig.card_options === "object") {
     Object.assign(cardOptions, structuredClone(entityConfig.card_options));
   }
+  const configuredTemplate = structuredClone(entityTemplate(cardOptions));
+  const comparisonDefaults = configuredTemplate.compare;
+  delete configuredTemplate.compare;
   const template = {
     ...automaticEntityOptions(historyView.hass?.states?.[entityId], numeric ? "timeline" : "state_timeline"),
-    ...structuredClone(entityTemplate(cardOptions)),
+    ...configuredTemplate,
   };
   for (const key of optionKeysToRemove(entityConfig, "remove_entity_options")) {
     delete template[key];
@@ -172,7 +214,6 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   delete cardOptions.entities;
   delete template.entity;
   delete template.statistic_id;
-  delete template.compare;
   if (
     numeric
     && nativeAttributes.length === 0
@@ -211,6 +252,10 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
       if (attributeOptions && typeof attributeOptions === "object") {
         Object.assign(row, structuredClone(attributeOptions));
       }
+      if (Object.prototype.hasOwnProperty.call(row, "compare")) {
+        row.compare = mergeComparisonDefaults(row.compare, comparisonDefaults);
+        if (row.compare === undefined) delete row.compare;
+      }
       if (!Object.prototype.hasOwnProperty.call(row, "color")) {
         const color = nativeGraphColor(
           historyView,
@@ -231,7 +276,14 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
         ...(row.unit == null && unit != null ? { unit } : {}),
       };
     })
-    : [{ ...template, entity: entityId }];
+    : (() => {
+      const row = { ...template, entity: entityId };
+      if (Object.prototype.hasOwnProperty.call(row, "compare")) {
+        row.compare = mergeComparisonDefaults(row.compare, comparisonDefaults);
+        if (row.compare === undefined) delete row.compare;
+      }
+      return [row];
+    })();
   const configuredHeight = Number(cardOptions.height) || 240;
   const datePickerGroup = cardOptions.date_picker_group
     || `advanced-history-more-info:${entityId}`;
@@ -564,7 +616,33 @@ function graphOptionChanges(draft, base, protectedKeys) {
   return { configured, removed: removed.sort() };
 }
 
-function entityOverrideFromEditor(draft, base, numeric) {
+function comparisonOverrides(active, defaults) {
+  const configuredActive = activeComparisons(active);
+  if (configuredActive == null || defaults == null) return configuredActive;
+  const defaultRows = Array.isArray(defaults) ? defaults : null;
+  const stripOne = (configured, index = 0) => {
+    if (!configured || typeof configured !== "object" || Array.isArray(configured)) {
+      return configured;
+    }
+    const fallback = defaultRows
+      ? defaultRows.length === 1
+        ? defaultRows[0]
+        : defaultRows[index]
+      : defaults;
+    const result = structuredClone(configured);
+    if (fallback && typeof fallback === "object" && !Array.isArray(fallback)) {
+      for (const [key, value] of Object.entries(fallback)) {
+        if (sameGraphOption(result[key], value)) delete result[key];
+      }
+    }
+    return Object.keys(result).length ? result : true;
+  };
+  return Array.isArray(configuredActive)
+    ? configuredActive.map((configured, index) => stripOne(configured, index))
+    : stripOne(configuredActive);
+}
+
+function entityOverrideFromEditor(draft, base, numeric, comparisonDefaults) {
   const cardChanges = graphOptionChanges(
     draft,
     base,
@@ -584,10 +662,14 @@ function entityOverrideFromEditor(draft, base, numeric) {
     ? base.entities.filter((row) => row && typeof row === "object" && !Array.isArray(row))
     : [];
   if (baseEntities.length < 2) {
+    const draftEntity = structuredClone(draftEntities[0] || {});
+    if (Object.prototype.hasOwnProperty.call(draftEntity, "compare")) {
+      draftEntity.compare = comparisonOverrides(draftEntity.compare, comparisonDefaults);
+    }
     const entityChanges = graphOptionChanges(
-      draftEntities[0] || {},
+      draftEntity,
       baseEntities[0] || {},
-      new Set(["entity", "statistic_id", "compare"]),
+      new Set(["entity", "statistic_id"]),
     );
     if (Object.keys(entityChanges.configured).length) {
       result.entity_options = entityChanges.configured;
@@ -603,14 +685,18 @@ function entityOverrideFromEditor(draft, base, numeric) {
     );
     const selected = [];
     const attributeOptions = {};
-    for (const row of draftEntities) {
+    for (const configuredRow of draftEntities) {
+      const row = structuredClone(configuredRow);
       const attribute = row.attribute;
       if (!baseByAttribute.has(attribute)) continue;
       selected.push(attribute);
+      if (Object.prototype.hasOwnProperty.call(row, "compare")) {
+        row.compare = comparisonOverrides(row.compare, comparisonDefaults);
+      }
       const changes = graphOptionChanges(
         row,
         baseByAttribute.get(attribute),
-        new Set(["entity", "statistic_id", "attribute", "compare"]),
+        new Set(["entity", "statistic_id", "attribute"]),
       );
       if (Object.keys(changes.configured).length || changes.removed.length) {
         attributeOptions[attribute] = {
@@ -709,11 +795,19 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
       confirmReset: custom(hass, "more_info_entity_reset_confirm"),
     },
     ensureLoaded: () => ensureCardLoaded(hass, serviceConfig.card_module_url),
+    visualEditorStyles: baseConfig.entities.length === 1
+      ? '.edb[data-action="delete"] { display: none !important; }'
+      : "",
     resetDisabled: !serviceConfig.entity_config,
     onSave: (draft) => saveMoreInfoEntityConfig(
       historyView,
       entityId,
-      entityOverrideFromEditor(draft, baseConfig, numeric),
+      entityOverrideFromEditor(
+        draft,
+        baseConfig,
+        numeric,
+        entityTemplate(serviceConfig.card_options || {}).compare,
+      ),
     ),
     onReset: () => saveMoreInfoEntityConfig(historyView, entityId, null),
   });
@@ -956,6 +1050,10 @@ function rewriteShowMoreLink(event) {
 
 if (!window[SHOW_MORE_REDIRECT_INSTALL_KEY]) {
   window[SHOW_MORE_REDIRECT_INSTALL_KEY] = true;
+  // Config-entry options are edited on a separate Home Assistant route. Clear
+  // cached More Info configs when navigating away so the next entity dialog
+  // immediately fetches newly submitted defaults instead of reusing them.
+  window.addEventListener("location-changed", () => moreInfoConfigCache.clear());
   // Rewriting the real anchor preserves Home Assistant's normal navigation,
   // including dialog closure, modifier keys, new tabs, and browser history.
   document.addEventListener("click", rewriteShowMoreLink, true);

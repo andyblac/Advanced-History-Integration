@@ -116,7 +116,7 @@ export function defaultsFromEditor(config, profile = "panel") {
     const template = structuredClone(raw);
     delete template.entity;
     delete template.statistic_id;
-    delete template.compare;
+    if (profile === "panel") delete template.compare;
     if (Object.keys(template).length) templates.push(template);
   }
   if (templates.length === 1) defaults.entities = templates[0];
