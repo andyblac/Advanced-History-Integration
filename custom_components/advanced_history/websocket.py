@@ -148,6 +148,25 @@ class BookmarkStore:
             await self._store.async_save(data)
             return True
 
+    async def async_delete_bookmark(self, user_id: str, bookmark_id: str) -> bool:
+        """Delete one bookmark and therefore remove any public share of it."""
+        async with self._lock:
+            data = await self._async_ensure_loaded()
+            bookmarks = data["users"].get(user_id)
+            if not isinstance(bookmarks, list):
+                return False
+            remaining = [
+                bookmark
+                for bookmark in bookmarks
+                if not isinstance(bookmark, dict)
+                or bookmark.get("id") != bookmark_id
+            ]
+            if len(remaining) == len(bookmarks):
+                return False
+            data["users"][user_id] = remaining
+            await self._store.async_save(data)
+            return True
+
 
 def _bookmark_store(hass: HomeAssistant) -> BookmarkStore:
     """Return the integration bookmark store."""
@@ -355,6 +374,23 @@ async def websocket_save_bookmarks(
 
 @websocket_api.websocket_command(
     {
+        vol.Required("type"): f"{DOMAIN}/bookmarks/delete",
+        vol.Required("bookmark_id"): str,
+    }
+)
+@websocket_api.async_response
+async def websocket_delete_bookmark(
+    hass: HomeAssistant, connection: ActiveConnection, msg: dict[str, Any]
+) -> None:
+    """Delete a bookmark belonging to the connected Home Assistant user."""
+    deleted = await _bookmark_store(hass).async_delete_bookmark(
+        connection.user.id, msg["bookmark_id"]
+    )
+    connection.send_result(msg["id"], {"deleted": deleted})
+
+
+@websocket_api.websocket_command(
+    {
         vol.Required("type"): f"{DOMAIN}/bookmarks/set_visible_everyone",
         vol.Required("user_id"): str,
         vol.Required("bookmark_id"): str,
@@ -522,6 +558,7 @@ def async_register_websocket_commands(hass: HomeAssistant) -> None:
 
     websocket_api.async_register_command(hass, websocket_get_bookmarks)
     websocket_api.async_register_command(hass, websocket_save_bookmarks)
+    websocket_api.async_register_command(hass, websocket_delete_bookmark)
     websocket_api.async_register_command(
         hass, websocket_set_bookmark_visible_everyone
     )

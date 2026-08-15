@@ -61,6 +61,9 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._bookmarkSaveQueue = Promise.resolve();
     this._loadedBookmarkId = null;
     this._loadedExternalBookmark = false;
+    this._loadedExternalBookmarkOwnerId = null;
+    this._loadedExternalBookmarkId = null;
+    this._externalBookmarkRefreshToken = 0;
     this._loadedBookmarkBaselineFingerprint = null;
     this._loadedBookmarkDirty = false;
     this._bookmarkCatalog = { shared: [], users: [] };
@@ -83,6 +86,11 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._panelTabsStorageInspected = false;
     this._panelTabsPersistenceSuppressed = false;
     this._persistPanelsOnPageHide = () => this._persistPanelTabs();
+    this._refreshAliasOnVisibility = () => {
+      if (document.visibilityState === "visible") {
+        this._scheduleExternalBookmarkRefresh?.();
+      }
+    };
   }
 
   set hass(value) {
@@ -161,17 +169,20 @@ class AdvancedHistoryPanel extends HTMLElement {
 
   connectedCallback() {
     window.addEventListener("pagehide", this._persistPanelsOnPageHide);
+    document.addEventListener("visibilitychange", this._refreshAliasOnVisibility);
     if (!this._initialized || !this._hass) return;
     queueMicrotask(() => {
       if (!this.isConnected) return;
       if (!this._energyUnsubscribe) this._render();
       if (this._panelRollingHours) this._refreshPanelRollingRange();
+      this._scheduleExternalBookmarkRefresh?.();
     });
   }
 
   disconnectedCallback() {
     this._persistPanelTabs();
     window.removeEventListener("pagehide", this._persistPanelsOnPageHide);
+    document.removeEventListener("visibilitychange", this._refreshAliasOnVisibility);
     this._panelTabsResizeObserver?.disconnect();
     this._panelTabsResizeObserver = null;
     this._disconnectDynamicGraphLayout?.();
@@ -211,6 +222,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._initialized = true;
     const restoredPanels = this._restorePersistedPanelTabs();
     if (this.isConnected && !restoredPanels) this._render();
+    this._scheduleExternalBookmarkRefresh?.();
   }
 
   async _loadEnergyTranslations() {

@@ -80,6 +80,7 @@ export default {
   "share_link_copied": "Share link copied",
   "share_link_error": "Share link could not be copied",
   "shared_link_invalid": "This shared chart link is invalid or is not supported by this browser.",
+  "shared_bookmark_unavailable": "This shared chart is no longer available.",
   "diagnostics": "Diagnostics",
   "diagnostics_note": "Review this privacy-safe report before copying it. It excludes history values, names, registry IDs, bookmarks and Home Assistant URLs.",
   "copy_diagnostics": "Copy diagnostics",

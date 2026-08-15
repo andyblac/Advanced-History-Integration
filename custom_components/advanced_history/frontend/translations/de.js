@@ -77,6 +77,7 @@ export default {
   "share_link_copied": "Freigabelink kopiert",
   "share_link_error": "Freigabelink konnte nicht kopiert werden",
   "shared_link_invalid": "Dieser freigegebene Diagrammlink ist ungültig oder wird von diesem Browser nicht unterstützt.",
+  "shared_bookmark_unavailable": "Dieses freigegebene Diagramm ist nicht mehr verfügbar.",
   "diagnostics": "Diagnose",
   "diagnostics_note": "Prüfe diesen datenschutzfreundlichen Bericht vor dem Kopieren. Verlaufswerte, Namen, Registry-IDs, Lesezeichen und Home-Assistant-URLs sind ausgeschlossen.",
   "copy_diagnostics": "Diagnose kopieren",

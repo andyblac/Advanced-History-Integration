@@ -77,6 +77,7 @@ export default {
   "share_link_copied": "Link di condivisione copiato",
   "share_link_error": "Impossibile copiare il link di condivisione",
   "shared_link_invalid": "Questo link al grafico condiviso non è valido o non è supportato da questo browser.",
+  "shared_bookmark_unavailable": "Questo grafico condiviso non è più disponibile.",
   "diagnostics": "Diagnostica",
   "diagnostics_note": "Controlla questo rapporto rispettoso della privacy prima di copiarlo. Esclude valori della cronologia, nomi, ID del registro, segnalibri e URL di Home Assistant.",
   "copy_diagnostics": "Copia diagnostica",

@@ -77,6 +77,7 @@ export default {
   "share_link_copied": "Deellink gekopieerd",
   "share_link_error": "Deellink kon niet worden gekopieerd",
   "shared_link_invalid": "Deze gedeelde grafiekkoppeling is ongeldig of wordt niet door deze browser ondersteund.",
+  "shared_bookmark_unavailable": "Deze gedeelde grafiek is niet meer beschikbaar.",
   "diagnostics": "Diagnostiek",
   "diagnostics_note": "Controleer dit privacyveilige rapport voordat je het kopieert. Geschiedeniswaarden, namen, register-ID’s, bladwijzers en Home Assistant-URL’s zijn uitgesloten.",
   "copy_diagnostics": "Diagnostiek kopiëren",
