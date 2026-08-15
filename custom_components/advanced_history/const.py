@@ -298,7 +298,6 @@ def options_with_defaults(options: Mapping[str, Any]) -> dict[str, Any]:
             if isinstance(configured, Mapping)
             else deepcopy(defaults)
         )
-        merged[key].pop("height", None)
         merged[key].pop("hours_to_show", None)
         locked = (
             NUMERIC_LOCKED_CARD_OPTIONS
