@@ -17,7 +17,6 @@ from .const import (
     CONF_CARD_MODULE_URL,
     CONF_ENTITY_OPTIONS,
     CONF_ENTRY_TYPE,
-    CONF_GRAPH_HEIGHT,
     CONF_INCLUDE_HIDDEN,
     CONF_LARGE_RANGE_AUTOMATIC_DETAIL,
     CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS,
@@ -73,13 +72,6 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=7, max=3650, step=1, mode=selector.NumberSelectorMode.BOX
-                )
-            ),
-            vol.Optional(
-                CONF_GRAPH_HEIGHT, default=values[CONF_GRAPH_HEIGHT]
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=150, max=1200, step=10, mode=selector.NumberSelectorMode.BOX
                 )
             ),
             vol.Optional(

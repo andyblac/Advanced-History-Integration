@@ -174,6 +174,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     window.removeEventListener("pagehide", this._persistPanelsOnPageHide);
     this._panelTabsResizeObserver?.disconnect();
     this._panelTabsResizeObserver = null;
+    this._disconnectDynamicGraphLayout?.();
     this._energyRenderToken = null;
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;

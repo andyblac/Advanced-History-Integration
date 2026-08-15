@@ -85,6 +85,7 @@ export class GraphMethods {
   _renderGraphs() {
     const host = this.shadowRoot.getElementById("charts");
     if (!host) return;
+    this._disconnectDynamicGraphLayout();
     const detail = this._largeRangeDetailProfile();
     this._cards = this._cards.filter((card) => !this._graphCards.includes(card));
     this._graphCards = [];
@@ -124,6 +125,11 @@ export class GraphMethods {
         : "state_timeline";
       const graphDetail = mode === "state_timeline" ? null : detail;
       this._renderLargeRangeDetailBanner(graphDetail);
+      this._configureDynamicGraphLayout(
+        host,
+        mode !== "state_timeline",
+        mode === "state_timeline",
+      );
       this._createGraph(host, series, "", mode, graphDetail);
       return;
     }
@@ -131,6 +137,9 @@ export class GraphMethods {
     const states = series.filter((item) => !this._isNumeric(item));
     const multipleCharts = Boolean(numeric.length && states.length);
     this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
+    // Establish the available chart region before configuring cards with the
+    // card's native height:auto + numeric grid-row contract.
+    this._configureDynamicGraphLayout(host, Boolean(numeric.length), Boolean(states.length));
     if (numeric.length) {
       const numericMode = this._cardOptions("timeline").chart_mode || "timeline";
       this._createGraph(
@@ -152,9 +161,224 @@ export class GraphMethods {
     }
   }
 
+  _disconnectDynamicGraphLayout() {
+    this._graphLayoutResizeObserver?.disconnect();
+    this._graphLayoutResizeObserver = null;
+    this._graphLayoutMutationObserver?.disconnect();
+    this._graphLayoutMutationObserver = null;
+    this._graphLayoutObservedElements = null;
+    this._graphLayoutObservedRoots = null;
+    if (this._graphLayoutAnimationFrame) {
+      cancelAnimationFrame(this._graphLayoutAnimationFrame);
+    }
+    if (this._graphLayoutSettleFrame) {
+      cancelAnimationFrame(this._graphLayoutSettleFrame);
+    }
+    this._graphLayoutAnimationFrame = null;
+    this._graphLayoutSettleFrame = null;
+    this._graphLayoutSchedule = null;
+    this._graphLayoutObserveCard = null;
+    if (this._graphLayoutResizeHandler) {
+      window.removeEventListener("resize", this._graphLayoutResizeHandler);
+      window.visualViewport?.removeEventListener("resize", this._graphLayoutResizeHandler);
+    }
+    this._graphLayoutResizeHandler = null;
+  }
+
+  _numericCardRequiredHeight(card) {
+    const root = card?.shadowRoot;
+    const cardElement = root?.querySelector("ha-card.sgc-card");
+    const plotWrap = root?.querySelector(".sgc-plot-wrap");
+    if (!cardElement || !plotWrap) return 0;
+    const cardStyle = getComputedStyle(cardElement);
+    const pixels = (value) => Number.parseFloat(value) || 0;
+    let required = pixels(cardStyle.paddingTop)
+      + pixels(cardStyle.paddingBottom)
+      + pixels(cardStyle.borderTopWidth)
+      + pixels(cardStyle.borderBottomWidth);
+
+    // Fill-height mode is deliberately allowed to shrink the plot, so the
+    // card's outer scrollHeight is not a reliable intrinsic measurement. Sum
+    // every in-flow section instead. In particular, a wrapping detail legend
+    // can overflow its flex allocation without changing the outer card box.
+    for (const section of cardElement.children) {
+      const style = getComputedStyle(section);
+      if (
+        section === plotWrap
+        || style.display === "none"
+        || style.position === "absolute"
+        || style.position === "fixed"
+      ) continue;
+      required += Math.max(
+        section.getBoundingClientRect().height,
+        section.scrollHeight || 0,
+      ) + pixels(style.marginTop) + pixels(style.marginBottom);
+    }
+
+    const plotStyle = getComputedStyle(plotWrap);
+    required += 200 + pixels(plotStyle.marginTop) + pixels(plotStyle.marginBottom);
+    return Math.ceil(required);
+  }
+
+  _fitStateTimelineCard(card) {
+    const root = card?.shadowRoot;
+    const plotWrap = root?.querySelector(".sgc-plot-wrap");
+    if (!plotWrap) return;
+    const plotRect = plotWrap.getBoundingClientRect();
+    if (!plotRect.height) return;
+
+    // height:auto in Statistics Graph Chart Card retains its generic 200px
+    // plot minimum. State timelines only need enough plot space for their
+    // rendered rows and x-axis. Measure those rendered primitives so wrapped
+    // entity labels and comparison rows are accounted for exactly.
+    let rowsBottom = 0;
+    const cells = plotWrap.querySelectorAll(".sgc-stl-cell");
+    for (const element of cells) {
+      const rect = element.getBoundingClientRect();
+      if (!rect.width || !rect.height) continue;
+      rowsBottom = Math.max(rowsBottom, rect.bottom - plotRect.top);
+    }
+    if (!rowsBottom) return;
+
+    let axisTextHeight = 0;
+    for (const element of plotWrap.querySelectorAll("svg text")) {
+      const rect = element.getBoundingClientRect();
+      if (!rect.width || !rect.height || rect.top < plotRect.top + rowsBottom - 1) continue;
+      axisTextHeight = Math.max(axisTextHeight, rect.height);
+    }
+
+    const height = Math.max(48, Math.ceil(rowsBottom + axisTextHeight + 12));
+    if (card.__advancedHistoryStateHeight === height) return;
+    const config = card.__advancedHistoryConfig;
+    if (!config || config.chart_mode !== "state_timeline") return;
+    card.__advancedHistoryStateHeight = height;
+    const fittedConfig = { ...config, height };
+    card.__advancedHistoryConfig = fittedConfig;
+    card.setConfig(fittedConfig);
+  }
+
+  _configureDynamicGraphLayout(host, hasNumeric, hasState) {
+    host.classList.toggle("dynamic-numeric", hasNumeric);
+    host.classList.toggle("has-state-graph", hasNumeric && hasState);
+    if (!hasNumeric) {
+      host.style.removeProperty("height");
+      host.style.removeProperty("min-height");
+      host.style.removeProperty("--numeric-graph-height");
+    }
+    const resize = () => {
+      if (!this.isConnected || this.shadowRoot?.getElementById("charts") !== host) return;
+      if (hasState) {
+        for (const stateCard of host.querySelectorAll(".state-graph > statistics-graph-chart-card")) {
+          this._fitStateTimelineCard(stateCard);
+        }
+      }
+      if (!hasNumeric) return;
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const controller = this.shadowRoot?.getElementById("date-controller");
+      const controllerRect = controller?.getBoundingClientRect?.();
+      const bottom = controllerRect?.height > 0
+        ? Math.min(viewportHeight, controllerRect.top)
+        : viewportHeight;
+      const top = Math.max(0, host.getBoundingClientRect().top);
+      const available = Math.max(240, Math.floor(bottom - top - 16));
+      const numericShell = host.querySelector(".graph-shell.numeric-graph");
+      const numericCard = numericShell?.querySelector(CARD_TAG);
+      const cardRoot = numericCard?.shadowRoot;
+      const cardElement = cardRoot?.querySelector("ha-card.sgc-card");
+      const detailLegend = cardRoot?.querySelector(".sgc-detail-legend");
+      const observe = (element) => {
+        if (
+          !element
+          || !this._graphLayoutResizeObserver
+          || this._graphLayoutObservedElements?.has(element)
+        ) return;
+        this._graphLayoutResizeObserver.observe(element);
+        this._graphLayoutObservedElements?.add(element);
+      };
+      observe(cardElement);
+      observe(detailLegend);
+      const numericRequirement = this._numericCardRequiredHeight(numericCard);
+      if (hasState) {
+        host.style.removeProperty("height");
+        // Do not give the grid a viewport-sized minimum: an auto state row is
+        // otherwise allowed to absorb that free space and stops being natural
+        // height. The explicit numeric row owns the remaining viewport space.
+        host.style.removeProperty("min-height");
+        const stateShell = host.querySelector(".graph-shell.state-graph");
+        const stateHeight = Math.ceil(stateShell?.getBoundingClientRect().height || 0);
+        const numericHeight = `${Math.max(
+          240,
+          available - stateHeight - 16,
+          numericRequirement,
+        )}px`;
+        if (host.style.getPropertyValue("--numeric-graph-height") !== numericHeight) {
+          host.style.setProperty("--numeric-graph-height", numericHeight);
+        }
+      } else {
+        host.style.removeProperty("min-height");
+        host.style.removeProperty("--numeric-graph-height");
+        const next = `${Math.max(available, numericRequirement)}px`;
+        if (host.style.height !== next) host.style.height = next;
+      }
+    };
+    const schedule = () => {
+      if (this._graphLayoutAnimationFrame) return;
+      this._graphLayoutAnimationFrame = requestAnimationFrame(() => {
+        this._graphLayoutAnimationFrame = null;
+        resize();
+        // The card rebuilds its SVG and legend asynchronously. A second frame
+        // catches the resulting flex layout without an open-ended timer loop.
+        if (this._graphLayoutSettleFrame) cancelAnimationFrame(this._graphLayoutSettleFrame);
+        this._graphLayoutSettleFrame = requestAnimationFrame(() => {
+          this._graphLayoutSettleFrame = null;
+          resize();
+        });
+      });
+    };
+    this._graphLayoutResizeHandler = schedule;
+    this._graphLayoutSchedule = schedule;
+    window.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("resize", schedule);
+    if (typeof ResizeObserver !== "undefined") {
+      this._graphLayoutResizeObserver = new ResizeObserver(schedule);
+      this._graphLayoutObservedElements = new WeakSet();
+      const content = host.closest(".content");
+      if (content) {
+        this._graphLayoutResizeObserver.observe(content);
+        this._graphLayoutObservedElements.add(content);
+      }
+    }
+    if (typeof MutationObserver !== "undefined") {
+      this._graphLayoutMutationObserver = new MutationObserver(schedule);
+      this._graphLayoutObservedRoots = new WeakSet();
+    }
+    this._graphLayoutObserveCard = (card) => {
+      const observeRoot = () => {
+        const root = card?.shadowRoot;
+        if (!root || this._graphLayoutObservedRoots?.has(root)) return Boolean(root);
+        this._graphLayoutMutationObserver?.observe(root, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+        this._graphLayoutObservedRoots?.add(root);
+        schedule();
+        return true;
+      };
+      if (!observeRoot()) requestAnimationFrame(observeRoot);
+      card?.updateComplete?.then(() => {
+        observeRoot();
+        schedule();
+      });
+    };
+    resize();
+    schedule();
+  }
+
   _createGraph(host, series, title, mode, detail = null) {
     const shell = document.createElement("div");
     shell.className = "graph-shell";
+    shell.classList.add(mode === "state_timeline" ? "state-graph" : "numeric-graph");
     const sourceIndicator = document.createElement("span");
     sourceIndicator.className = "data-source-indicator pending";
     sourceIndicator.textContent = this._customLocalize("data_source_pending");
@@ -234,20 +458,19 @@ export class GraphMethods {
     }
     const hasSecondaryAxis = mode !== "state_timeline"
       && entities.some((entity) => entity.y_axis === "secondary");
-    const height = this._effectiveGraphHeight();
     const config = {
       type: `custom:${CARD_TAG}`, card_header: title,
       entities,
       hours_to_show: this._effectiveDefaultHours(),
-      height,
       ...cardOptions,
+      height: "auto",
       chart_mode: mode === "state_timeline"
         ? "state_timeline"
         : (cardOptions.chart_mode ?? mode),
       show_y2_axis: hasSecondaryAxis,
       ...detailOptions,
       ...(mode === "state_timeline"
-        ? { height: "auto", auto_scale_points: false, group_by: "raw" }
+        ? { auto_scale_points: false, group_by: "raw" }
         : {}),
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
       energy_date_sync: true,
@@ -256,6 +479,16 @@ export class GraphMethods {
         : {}),
       ...this._panelGraphHourOptions(),
     };
+    if (mode !== "state_timeline") {
+      // The card's native height:auto implementation only enables its
+      // fill-height path when it is hosted in a numeric grid row. AHP owns
+      // the containing block, so expose its current size using the same
+      // 50px row convention as the card's getCardSize() implementation.
+      config.grid_options = {
+        ...(cardOptions.grid_options || {}),
+        rows: Math.max(1, Math.ceil(host.getBoundingClientRect().height / 50)),
+      };
+    }
     if (
       mode === "state_timeline"
       && !String(config.card_header || "").trim()
@@ -299,6 +532,10 @@ export class GraphMethods {
       host.append(shell);
       this._cards.push(card);
       this._graphCards.push(card);
+      this._graphLayoutObserveCard?.(card);
+      card.updateComplete?.then(() => {
+        this._graphLayoutSchedule?.();
+      });
     }
     catch (error) { host.insertAdjacentHTML("beforeend", `<div class="error">${this._escape(error.message || error)}</div>`); }
   }
@@ -1095,8 +1332,8 @@ export class GraphMethods {
     });
     return {
       hours_to_show: editDefaults ? Number(this.config.default_hours) || 24 : this._effectiveDefaultHours(),
-      height: editDefaults ? Number(this.config.graph_height) || 300 : this._effectiveGraphHeight(),
       ...cardOptions,
+      height: "auto",
       type: `custom:${CARD_TAG}`,
       card_header: cardOptions.card_header ?? editorHeader,
       chart_mode: editorMode === "state_timeline"
@@ -1509,6 +1746,7 @@ export class GraphMethods {
         .f:has(.e-y_axis),
         .overlay-row:has(#energy_date_sync),
         .overlay-row:has(#show_date_picker),
+        .f:has(#height),
         .f:has(#hours_to_show),
         label:has(#show_y2_axis),
         .overlay-row:has(#show_interval_picker),

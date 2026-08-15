@@ -235,7 +235,6 @@ DEFAULT_OPTIONS = {
     CONF_LARGE_RANGE_AUTOMATIC_DETAIL: True,
     CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS: 31,
     CONF_DEFAULT_HOURS: 24,
-    CONF_GRAPH_HEIGHT: 300,
     CONF_INCLUDE_HIDDEN: False,
     CONF_CARD_MODULE_URL: "",
     CONF_NUMERIC_CARD_OPTIONS: DEFAULT_NUMERIC_CARD_OPTIONS,
@@ -308,6 +307,9 @@ def options_with_defaults(options: Mapping[str, Any]) -> dict[str, Any]:
         for locked_key in locked:
             merged[key].pop(locked_key, None)
     merged.pop(CONF_CARD_OPTIONS, None)
+    # Retain the constant for old config entries and snapshots, but AHP charts
+    # now size themselves from the available panel space.
+    merged.pop(CONF_GRAPH_HEIGHT, None)
     return merged
 
 
