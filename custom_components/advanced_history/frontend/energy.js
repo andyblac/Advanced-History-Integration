@@ -861,7 +861,7 @@ export class EnergyMethods {
     }, delay);
   }
 
-  _refreshPanelRollingRange() {
+  _refreshPanelRollingRange(deferRefresh = false) {
     const hours = this._panelRollingHours || this._panelRollingResumeHours;
     if (!hours || !this.isConnected) return false;
     if (!this._energyCollection) {
@@ -879,7 +879,7 @@ export class EnergyMethods {
       start: start.getHours() * 60 + start.getMinutes(),
       end: end.getHours() * 60 + end.getMinutes(),
     };
-    const applied = this._applyPanelTimeRangePeriod(start, true, true);
+    const applied = this._applyPanelTimeRangePeriod(start, true, true, deferRefresh);
     this._setPanelRollingHours(hours);
     return applied;
   }
@@ -924,7 +924,12 @@ export class EnergyMethods {
     return this._applyPanelTimeRangePeriod(dayStart);
   }
 
-  _applyPanelTimeRangePeriod(dayStart, forceRefresh = false, quiet = false) {
+  _applyPanelTimeRangePeriod(
+    dayStart,
+    forceRefresh = false,
+    quiet = false,
+    deferRefresh = false,
+  ) {
     const collection = this._energyCollection;
     if (!collection || !(dayStart instanceof Date)) return false;
     const start = new Date(dayStart);
@@ -947,7 +952,7 @@ export class EnergyMethods {
       if (changed) collection.setPeriod(start, end);
       this._updateGraphHourOptionsInPlace?.();
       this._syncPanelTimeRangeControl();
-      if (changed || forceRefresh) collection.refresh?.();
+      if (!deferRefresh && (changed || forceRefresh)) collection.refresh?.();
       return true;
     }
     this._beginGraphDataSourceCycle();
@@ -1262,7 +1267,7 @@ export class EnergyMethods {
     // Move the collection to this panel's current rolling window before
     // reading or normalizing its cached period.
     const rollingPeriodApplied = this._panelRollingHours
-      ? this._refreshPanelRollingRange()
+      ? this._refreshPanelRollingRange(true)
       : false;
     // Older partial-day builds stored the selected hours directly in HA's
     // Energy collection. Convert that cached selection back to a

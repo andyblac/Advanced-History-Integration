@@ -53,11 +53,7 @@ export class StorageMethods {
       incomingSnapshot.chart = this._normalizeSnapshotChart(incomingSnapshot.chart);
       this._excludeY2Comparison = Boolean(incomingSnapshot.chart.exclude_y2_comparison);
       this._activeSnapshot = this._clone(incomingSnapshot.chart);
-      this._panelTimeRange = this._clone(incomingSnapshot.chart?.time_range) || null;
-      this._pendingPeriodRestore = this._clone(incomingSnapshot.period);
-      if (this._pendingPeriodRestore?.start) {
-        this._beginPeriodRestore(this._pendingPeriodRestore);
-      }
+      this._prepareSnapshotRangeRestore(incomingSnapshot);
       this._currentSnapshot = this._clone(incomingSnapshot);
       this._incomingTargetOverride = true;
       this._pruneHiddenTargets();
@@ -118,11 +114,7 @@ export class StorageMethods {
       this._activeSnapshot = this._clone(previous.chart);
       this._currentSnapshot.chart = this._clone(previous.chart);
       this._saveCurrentSnapshot(this._currentSnapshot);
-      this._panelTimeRange = this._clone(previous.chart?.time_range) || null;
-      this._pendingPeriodRestore = this._clone(previous.period);
-      if (this._pendingPeriodRestore?.start) {
-        this._beginPeriodRestore(this._pendingPeriodRestore);
-      }
+      this._prepareSnapshotRangeRestore(previous);
       this._hiddenTargets = this._normalizeTargets(previous.hidden_targets || {});
       this._y2Targets = this._normalizeTargets(previous.y2_targets || {});
       this._hiddenY2Targets = this._normalizeTargets(previous.hidden_y2_targets || {});
@@ -779,6 +771,40 @@ export class StorageMethods {
     this._saveCurrentSnapshot(this._currentSnapshot);
   }
 
+  _prepareSnapshotRangeRestore(snapshot, loadingSavedRange = false) {
+    const chart = snapshot?.chart || {};
+    const rollingHours = [1, 2, 4, 8, 12, 24].includes(Number(chart.rolling_hours))
+      ? Number(chart.rolling_hours)
+      : null;
+    const rollingResumeHours = !rollingHours
+      && [1, 2, 4, 8, 12, 24].includes(Number(chart.rolling_resume_hours))
+      ? Number(chart.rolling_resume_hours)
+      : null;
+    this._setPanelRollingHours?.(rollingHours);
+    this._panelRollingResumeHours = rollingResumeHours;
+    this._panelTimeRange = this._clone(chart.time_range) || null;
+
+    // Rolling presets restore their duration and comparison settings, but
+    // never their captured timestamps. The active Energy collection rebases
+    // the window to the current clock when it mounts. Fixed and deliberately
+    // paused ranges continue to restore their saved period verbatim.
+    this._pendingRollingCompareRestore = rollingHours ? {
+      compare: snapshot?.period?.compare || "",
+      choice: snapshot?.period?.compare_choice || null,
+      count: Math.max(
+        1,
+        Math.min(10, Math.trunc(Number(snapshot?.period?.compare_count)) || 1),
+      ),
+    } : null;
+    this._pendingPeriodRestore = rollingHours ? null : this._clone(snapshot?.period);
+    if (this._pendingPeriodRestore?.start) {
+      this._beginPeriodRestore(this._pendingPeriodRestore, loadingSavedRange);
+    } else {
+      this._finishPeriodRestore();
+    }
+    return rollingHours;
+  }
+
   _applySnapshot(snapshot, recordChange = true, loadingSavedRange = false) {
     if (!snapshot?.targets || !snapshot?.chart) return;
     if (
@@ -792,35 +818,8 @@ export class StorageMethods {
     snapshot.chart = this._normalizeSnapshotChart(snapshot.chart);
     this._excludeY2Comparison = Boolean(snapshot.chart.exclude_y2_comparison);
     this._activeSnapshot = this._clone(snapshot.chart);
-    const rollingHours = [1, 2, 4, 8, 12, 24].includes(Number(snapshot.chart.rolling_hours))
-      ? Number(snapshot.chart.rolling_hours)
-      : null;
-    const rollingResumeHours = !rollingHours
-      && [1, 2, 4, 8, 12, 24].includes(Number(snapshot.chart.rolling_resume_hours))
-      ? Number(snapshot.chart.rolling_resume_hours)
-      : null;
-    this._setPanelRollingHours?.(rollingHours);
-    this._panelRollingResumeHours = rollingResumeHours;
-    this._panelTimeRange = this._clone(snapshot.chart.time_range) || null;
+    const rollingHours = this._prepareSnapshotRangeRestore(snapshot, loadingSavedRange);
     if (this._activeSnapshot?.compare === undefined) delete this._activeSnapshot.compare;
-    // A saved rolling range must resume from the current time rather than
-    // restoring the timestamp captured when the panel or bookmark was saved.
-    // Keep its comparison state separately so a remounted Energy collection
-    // receives it without restoring those stale timestamps.
-    this._pendingRollingCompareRestore = rollingHours ? {
-      compare: snapshot.period?.compare || "",
-      choice: snapshot.period?.compare_choice || null,
-      count: Math.max(
-        1,
-        Math.min(10, Math.trunc(Number(snapshot.period?.compare_count)) || 1),
-      ),
-    } : null;
-    this._pendingPeriodRestore = rollingHours ? null : this._clone(snapshot.period);
-    if (this._pendingPeriodRestore?.start) {
-      this._beginPeriodRestore(this._pendingPeriodRestore, loadingSavedRange);
-    } else {
-      this._finishPeriodRestore();
-    }
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;
     // Do not let a rolling-range restore update the Energy collection that
