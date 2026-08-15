@@ -24,6 +24,7 @@ export async function openCardEditorDialog({
   leadingAction,
   allowCode = true,
   visualEditorStyles = "",
+  editorVariants = null,
 }) {
   if (activeDialogHost?.isConnected) return null;
   const dialogHost = document.createElement(DIALOG_TAG);
@@ -54,6 +55,14 @@ export async function openCardEditorDialog({
   const headerActionMarkup = leadingAction
     ? `<button class="header-action" data-action="leading">${escapeHtml(leadingAction.label)}</button>`
     : "";
+  const variants = Array.isArray(editorVariants)
+    ? editorVariants.filter((variant) => variant?.key && variant?.initialConfig)
+    : [];
+  const variantMarkup = variants.length > 1
+    ? `<nav class="editor-variants" aria-label="${escapeHtml(title)}">${variants.map((variant, index) => `
+        <button type="button" class="editor-variant${index === 0 ? " active" : ""}" data-editor-variant="${escapeHtml(variant.key)}">${escapeHtml(variant.label)}</button>
+      `).join("")}</nav>`
+    : "";
   root.innerHTML = `
     <style>
       :host { display:contents; color:var(--primary-text-color); }
@@ -66,6 +75,9 @@ export async function openCardEditorDialog({
       section { width:100%; height:100%; display:flex; flex-direction:column; overflow:hidden; }
       header { min-height:64px; padding:0 24px 0 12px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--divider-color); }
       h2 { margin:0; font-size:20px; font-weight:500; }
+      .editor-variants { display:flex; align-self:stretch; align-items:flex-end; gap:4px; margin-left:8px; }
+      .editor-variant { min-width:0; height:48px; padding:0 14px; border-radius:0; border-bottom:3px solid transparent; color:var(--secondary-text-color); }
+      .editor-variant.active { color:var(--primary-color); border-bottom-color:var(--primary-color); }
       .header-action { margin-left:auto; }
       .mode-toggle { min-width:40px; border-radius:20px; display:flex; align-items:center; gap:8px; }
       .mode-toggle ha-icon { width:20px; height:20px; }
@@ -94,7 +106,7 @@ export async function openCardEditorDialog({
     </style>
     <dialog aria-label="${escapeHtml(title)}">
       <section>
-        <header><button class="dialog-close" data-action="close-editor" title="${escapeHtml(strings.close)}" aria-label="${escapeHtml(strings.close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${escapeHtml(title)}</h2>${headerActionMarkup}</header>
+        <header><button class="dialog-close" data-action="close-editor" title="${escapeHtml(strings.close)}" aria-label="${escapeHtml(strings.close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${escapeHtml(title)}</h2>${variantMarkup}${headerActionMarkup}</header>
         <div class="note">${escapeHtml(note)}</div>
         <div class="host"><div class="loading">${escapeHtml(strings.loading)}…</div></div>
         <footer>${toggleMarkup}${resetMarkup}<span class="status"></span><button data-action="cancel">${escapeHtml(strings.cancel)}</button><button class="primary" data-action="save">${escapeHtml(strings.save)}</button></footer>
@@ -115,7 +127,15 @@ export async function openCardEditorDialog({
   const save = root.querySelector('[data-action="save"]');
   const reset = root.querySelector('[data-action="reset"]');
   const toggle = root.querySelector('[data-action="toggle-editor"]');
-  let draft = structuredClone(initialConfig || {});
+  let activeVariantKey = variants[0]?.key || null;
+  const variantDrafts = new Map(variants.map((variant) => [
+    variant.key,
+    structuredClone(variant.initialConfig),
+  ]));
+  const variantDirtyKeys = new Map(variants.map((variant) => [variant.key, new Set()]));
+  let draft = activeVariantKey
+    ? structuredClone(variantDrafts.get(activeVariantKey))
+    : structuredClone(initialConfig || {});
   let mode = "visual";
   let renderToken = 0;
 
@@ -138,19 +158,41 @@ export async function openCardEditorDialog({
     toggle.title = label;
   };
 
+  const activeVariant = () => variants.find((variant) => variant.key === activeVariantKey);
+  const currentVisualEditorStyles = () => activeVariant()?.visualEditorStyles
+    ?? visualEditorStyles;
+  const updateVariantTabs = () => {
+    for (const button of root.querySelectorAll("[data-editor-variant]")) {
+      button.classList.toggle("active", button.dataset.editorVariant === activeVariantKey);
+    }
+  };
+  const updateDraft = (nextDraft, trackChanges = true) => {
+    const next = structuredClone(nextDraft || {});
+    if (activeVariantKey && trackChanges) {
+      const dirty = variantDirtyKeys.get(activeVariantKey);
+      const keys = new Set([...Object.keys(draft || {}), ...Object.keys(next)]);
+      for (const key of keys) {
+        if (JSON.stringify(draft?.[key]) !== JSON.stringify(next[key])) dirty.add(key);
+      }
+    }
+    draft = next;
+    if (activeVariantKey) variantDrafts.set(activeVariantKey, structuredClone(next));
+  };
+
   const applyVisualEditorStyles = (editor) => {
-    if (!visualEditorStyles || !editor.shadowRoot) return;
+    const styles = currentVisualEditorStyles();
+    if (!styles || !editor.shadowRoot) return;
     const root = editor.shadowRoot;
     if (editor[VISUAL_EDITOR_STYLE_KEY]) return;
     if (typeof CSSStyleSheet === "function" && "adoptedStyleSheets" in root) {
       const sheet = new CSSStyleSheet();
-      sheet.replaceSync(visualEditorStyles);
+      sheet.replaceSync(styles);
       root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
       editor[VISUAL_EDITOR_STYLE_KEY] = sheet;
       return;
     }
     const style = document.createElement("style");
-    style.textContent = visualEditorStyles;
+    style.textContent = styles;
     root.append(style);
     editor[VISUAL_EDITOR_STYLE_KEY] = style;
   };
@@ -178,7 +220,7 @@ export async function openCardEditorDialog({
       let syncingConfig = false;
       editor.addEventListener("config-changed", (event) => {
         if (syncingConfig || !event.detail?.config) return;
-        draft = structuredClone(event.detail.config);
+        updateDraft(event.detail.config);
         if (configSyncQueued) return;
         configSyncQueued = true;
         queueMicrotask(() => {
@@ -243,7 +285,7 @@ export async function openCardEditorDialog({
         status.textContent = valid ? "" : event.detail?.errorMsg || strings.mappingError;
         save.disabled = !valid;
         toggle.disabled = !valid;
-        if (valid) draft = value;
+        if (valid) updateDraft(value);
       });
       editor.addEventListener("editor-save", () => { if (!save.disabled) save.click(); });
       editorHost.replaceChildren(editor);
@@ -262,6 +304,17 @@ export async function openCardEditorDialog({
     if (mode === "visual") renderCode();
     else renderVisual();
   });
+  for (const button of root.querySelectorAll("[data-editor-variant]")) {
+    button.addEventListener("click", () => {
+      const key = button.dataset.editorVariant;
+      if (!key || key === activeVariantKey || !variantDrafts.has(key)) return;
+      activeVariantKey = key;
+      draft = structuredClone(variantDrafts.get(key));
+      updateVariantTabs();
+      if (mode === "code") renderCode();
+      else renderVisual();
+    });
+  }
   if (reset) {
     reset.disabled = resetDisabled;
     reset.addEventListener("click", () => confirmModal.showModal());
@@ -299,7 +352,19 @@ export async function openCardEditorDialog({
     if (reset) reset.disabled = true;
     status.textContent = "";
     try {
-      await onSave(structuredClone(draft));
+      const variantState = variants.length
+        ? {
+          drafts: Object.fromEntries([...variantDrafts].map(([key, value]) => [
+            key,
+            structuredClone(value),
+          ])),
+          dirtyKeys: Object.fromEntries([...variantDirtyKeys].map(([key, value]) => [
+            key,
+            [...value],
+          ])),
+        }
+        : null;
+      await onSave(structuredClone(draft), variantState);
       close();
     } catch (error) {
       showError(error, strings.saveError);

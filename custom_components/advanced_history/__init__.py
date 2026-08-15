@@ -6,7 +6,11 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    CARD_OPTIONS_NUMERIC_ENTITIES,
+    CARD_OPTIONS_STATE_ENTITIES,
+    CONF_CARD_OPTIONS,
     CONF_MORE_INFO_CARD_OPTIONS,
+    DEFAULT_CARD_OPTIONS,
     DEFAULT_MORE_INFO_CARD_OPTIONS,
     ENTRY_TYPE_MORE_INFO,
     ENTRY_TYPE_PANEL,
@@ -23,7 +27,7 @@ from .websocket import async_register_websocket_commands
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate Advanced History config entries."""
-    if entry.version > 6:
+    if entry.version > 7:
         return False
 
     options = deepcopy(dict(entry.options))
@@ -80,7 +84,24 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             card_options.pop("hours_to_show")
         options[CONF_MORE_INFO_CARD_OPTIONS] = card_options
 
-    hass.config_entries.async_update_entry(entry, options=options, version=6)
+    if entry.version < 7 and config_entry_type(entry) == ENTRY_TYPE_PANEL:
+        configured = options.get(CONF_CARD_OPTIONS)
+        card_options = (
+            deepcopy(configured)
+            if isinstance(configured, dict)
+            else deepcopy(DEFAULT_CARD_OPTIONS)
+        )
+        legacy_entities = card_options.pop("entities", None)
+        if isinstance(legacy_entities, (dict, list)):
+            card_options.setdefault(
+                CARD_OPTIONS_NUMERIC_ENTITIES, deepcopy(legacy_entities)
+            )
+            card_options.setdefault(
+                CARD_OPTIONS_STATE_ENTITIES, deepcopy(legacy_entities)
+            )
+        options[CONF_CARD_OPTIONS] = card_options
+
+    hass.config_entries.async_update_entry(entry, options=options, version=7)
     return True
 
 

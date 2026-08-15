@@ -151,7 +151,7 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
 class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle Advanced History config entries."""
 
-    VERSION = 6
+    VERSION = 7
 
     def _configured_types(self) -> set[str]:
         """Return the service roles which are already configured."""

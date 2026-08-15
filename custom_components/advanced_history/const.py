@@ -45,6 +45,8 @@ CONF_REPLACE_MORE_INFO_HISTORY = "replace_more_info_history"
 CONF_MORE_INFO_SHOW_DATE_PICKER = "more_info_show_date_picker"
 CONF_CARD_MODULE_URL = "card_module_url"
 CONF_CARD_OPTIONS = "card_options"
+CARD_OPTIONS_NUMERIC_ENTITIES = "numeric_entities"
+CARD_OPTIONS_STATE_ENTITIES = "state_entities"
 CONF_MORE_INFO_CARD_OPTIONS = "more_info_card_options"
 CONF_ENTITY_OPTIONS = "entity_options"
 CONF_COMPARE = "compare"
@@ -77,7 +79,8 @@ DEFAULT_CARD_OPTIONS = {
     "zoom_sync_group": "advanced-history-panel",
     "tooltip_sync": True,
     "tooltip_sync_group": "advanced-history-panel",
-    "entities": DEFAULT_ENTITY_OPTIONS,
+    CARD_OPTIONS_NUMERIC_ENTITIES: DEFAULT_ENTITY_OPTIONS,
+    CARD_OPTIONS_STATE_ENTITIES: DEFAULT_ENTITY_OPTIONS,
 }
 
 DEFAULT_MORE_INFO_CARD_OPTIONS = {

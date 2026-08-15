@@ -869,7 +869,7 @@ export class GraphMethods {
     const seriesSavedOptions = attribute ? entityOptionsConfig?.[key] : null;
     const entityOptions = {
       ...automaticEntityOptions(this._hass.states[entity], mode),
-      ...this._defaultEntityOptions(cardOptionsConfig),
+      ...this._defaultEntityOptions(cardOptionsConfig, mode),
     };
     const applySavedOptions = (saved) => {
       if (!saved || typeof saved !== "object" || Array.isArray(saved)) return;
@@ -1014,18 +1014,30 @@ export class GraphMethods {
     delete options.energy_collection_key;
     delete options.height;
     delete options.hours_to_show;
+    delete options.numeric_entities;
+    delete options.state_entities;
     return options;
   }
 
-  _defaultEntityOptions(cardOptionsConfig = this._effectiveCardOptionsConfig()) {
-    const configured = cardOptionsConfig?.entities;
-    const templates = Array.isArray(configured) ? configured : configured ? [configured] : [];
+  _defaultEntityOptions(
+    cardOptionsConfig = this._effectiveCardOptionsConfig(),
+    mode = "timeline",
+  ) {
     const defaults = {};
-    for (const template of templates) {
-      if (!template || typeof template !== "object" || Array.isArray(template)) continue;
-      if (template.entity != null || template.statistic_id != null) continue;
-      Object.assign(defaults, template);
-    }
+    const applyTemplates = (configured) => {
+      const templates = Array.isArray(configured) ? configured : configured ? [configured] : [];
+      for (const template of templates) {
+        if (!template || typeof template !== "object" || Array.isArray(template)) continue;
+        if (template.entity != null || template.statistic_id != null) continue;
+        Object.assign(defaults, template);
+      }
+    };
+    applyTemplates(cardOptionsConfig?.entities);
+    applyTemplates(
+      mode === "state_timeline"
+        ? cardOptionsConfig?.state_entities
+        : cardOptionsConfig?.numeric_entities,
+    );
     return defaults;
   }
 
@@ -1188,9 +1200,15 @@ export class GraphMethods {
       // applied to generated card entities through the card's native enabled
       // option. Do not turn that transient state into an editor override.
       delete options.enabled;
+      const editorMode = editorBase?.chart_mode === "state_timeline"
+        ? "state_timeline"
+        : "timeline";
       const integrationBase = {
-        ...automaticEntityOptions(this._hass.states[entity], "timeline"),
-        ...this._defaultEntityOptions(this.config.card_options),
+        ...automaticEntityOptions(this._hass.states[entity], editorMode),
+        ...this._defaultEntityOptions(
+          this.config.card_options,
+          editorMode,
+        ),
         ...(integrationEntityDefaults?.[entity] || {}),
         ...(integrationEntityDefaults?.[seriesKey] || {}),
       };
@@ -1238,7 +1256,9 @@ export class GraphMethods {
         delete options.color;
       }
       for (const [key, value] of Object.entries(
-        editDefaults ? this._defaultEntityOptions(configuredCardOptions) : {}
+        editDefaults
+          ? this._defaultEntityOptions(configuredCardOptions, config?.chart_mode)
+          : {}
       )) {
         if (value === true && !(key in options)) options[key] = false;
       }
