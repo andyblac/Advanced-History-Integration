@@ -18,10 +18,11 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     CONF_CARD_MODULE_URL,
-    CONF_MORE_INFO_CARD_OPTIONS,
+    CONF_NUMERIC_CARD_OPTIONS,
     CONF_MORE_INFO_SHOW_DATE_PICKER,
     CONF_REDIRECT_SHOW_MORE,
     CONF_REPLACE_MORE_INFO_HISTORY,
+    CONF_STATE_CARD_OPTIONS,
     DOMAIN,
     ENTRY_TYPE_MORE_INFO,
     config_entry_type,
@@ -40,6 +41,15 @@ _MAX_BOOKMARKS = 100
 _MAX_BOOKMARK_BYTES = 2_000_000
 _MAX_MORE_INFO_ENTITY_CONFIG_BYTES = 100_000
 _MAX_MORE_INFO_ENTITY_STORE_BYTES = 2_000_000
+
+
+def _is_float(value: Any) -> bool:
+    """Return whether a state value is numeric."""
+    try:
+        float(value)
+    except (TypeError, ValueError):
+        return False
+    return True
 
 
 class BookmarkStore:
@@ -390,8 +400,22 @@ async def websocket_get_more_info_config(
         return
 
     options = more_info_options_with_defaults(entry.options)
-    card_options = deepcopy(options[CONF_MORE_INFO_CARD_OPTIONS])
     entity_id = msg.get("entity_id")
+    state = hass.states.get(entity_id) if entity_id else None
+    numeric = bool(
+        state
+        and state.state not in {"", "unknown", "unavailable"}
+        and (
+            state.attributes.get("state_class") is not None
+            or state.attributes.get("unit_of_measurement") is not None
+            or _is_float(state.state)
+        )
+    )
+    card_options = deepcopy(
+        options[
+            CONF_NUMERIC_CARD_OPTIONS if numeric else CONF_STATE_CARD_OPTIONS
+        ]
+    )
     entity_config = (
         await _more_info_entity_store(hass).async_get(entity_id)
         if entity_id
@@ -400,6 +424,10 @@ async def websocket_get_more_info_config(
     picker_mode = await _more_info_preference_store(hass).async_get(
         connection.user.id
     )
+    if picker_mode is None:
+        picker_mode = (
+            "date" if options[CONF_MORE_INFO_SHOW_DATE_PICKER] else "interval"
+        )
     connection.send_result(
         msg["id"],
         {
@@ -443,18 +471,13 @@ async def websocket_set_more_info_picker_mode(
             return
 
         options = deepcopy(dict(entry.options))
-        configured_card_options = options.get(CONF_MORE_INFO_CARD_OPTIONS)
-        card_options = (
-            deepcopy(configured_card_options)
-            if isinstance(configured_card_options, dict)
-            else deepcopy(
-                more_info_options_with_defaults({})[CONF_MORE_INFO_CARD_OPTIONS]
-            )
-        )
-        card_options["show_date_picker"] = mode == "date"
-        card_options["show_interval_picker"] = mode == "interval"
+        defaults = more_info_options_with_defaults(options)
+        for key in (CONF_NUMERIC_CARD_OPTIONS, CONF_STATE_CARD_OPTIONS):
+            card_options = deepcopy(defaults[key])
+            card_options["show_date_picker"] = mode == "date"
+            card_options["show_interval_picker"] = mode == "interval"
+            options[key] = card_options
         options[CONF_MORE_INFO_SHOW_DATE_PICKER] = mode == "date"
-        options[CONF_MORE_INFO_CARD_OPTIONS] = card_options
         hass.config_entries.async_update_entry(entry, options=options)
         await preference_store.async_clear_all()
     else:

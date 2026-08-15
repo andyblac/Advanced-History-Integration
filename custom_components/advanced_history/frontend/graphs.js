@@ -117,8 +117,8 @@ export class GraphMethods {
       return;
     }
     if (this._activeSnapshot?.single_graph) {
-      const cardOptions = this._cardOptions();
       const hasNumeric = series.some((item) => this._isNumeric(item));
+      const cardOptions = this._cardOptions(hasNumeric ? "timeline" : "state_timeline");
       const mode = hasNumeric
         ? (cardOptions.chart_mode || "timeline")
         : "state_timeline";
@@ -132,7 +132,7 @@ export class GraphMethods {
     const multipleCharts = Boolean(numeric.length && states.length);
     this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
     if (numeric.length) {
-      const numericMode = this._cardOptions().chart_mode || "timeline";
+      const numericMode = this._cardOptions("timeline").chart_mode || "timeline";
       this._createGraph(
         host,
         numeric,
@@ -169,7 +169,8 @@ export class GraphMethods {
     card.__advancedHistoryChartMode = mode;
     card.__advancedHistorySourceKey = sourceKey;
     this._guardFutureEnergySeries(card);
-    const cardOptions = { ...this._cardOptions() };
+    const cardOptionsConfig = this._effectiveCardOptionsConfig(mode);
+    const cardOptions = { ...this._cardOptions(mode, cardOptionsConfig) };
     if (cardOptions.chart_mode && cardOptions.chart_mode !== mode) {
       delete cardOptions.chart_mode;
     }
@@ -179,7 +180,11 @@ export class GraphMethods {
         ? { auto_scale_points: true }
         : { auto_scale_points: false, group_by: detail.groupBy, show_group_by_picker: true };
     const palette = customElements.get(CARD_TAG)?.PALETTE;
-    const entities = series.map((item) => this._entityCardConfig(item, mode));
+    const entities = series.map((item) => this._entityCardConfig(
+      item,
+      mode,
+      cardOptionsConfig,
+    ));
     const automaticEntityColors = entities.map((configured) => configured.color == null);
     entities.forEach((configured, index) => {
       // Keep automatically assigned colors stable when entities are toggled.
@@ -860,9 +865,10 @@ export class GraphMethods {
   _entityCardConfig(
     value,
     mode,
-    cardOptionsConfig = this._effectiveCardOptionsConfig(),
+    cardOptionsConfig = null,
     entityOptionsConfig = this._effectiveEntityOptionsConfig()
   ) {
+    cardOptionsConfig ||= this._effectiveCardOptionsConfig(mode);
     const descriptor = this._seriesDescriptor(value);
     const { entity, attribute, key } = descriptor;
     const entitySavedOptions = entityOptionsConfig?.[entity];
@@ -1006,7 +1012,7 @@ export class GraphMethods {
     return configured;
   }
 
-  _cardOptions(configured = this._effectiveCardOptionsConfig()) {
+  _cardOptions(mode = "timeline", configured = this._effectiveCardOptionsConfig(mode)) {
     if (!configured || typeof configured !== "object" || Array.isArray(configured)) return {};
     const options = { ...configured };
     delete options.entities;
@@ -1020,9 +1026,10 @@ export class GraphMethods {
   }
 
   _defaultEntityOptions(
-    cardOptionsConfig = this._effectiveCardOptionsConfig(),
+    cardOptionsConfig = null,
     mode = "timeline",
   ) {
+    cardOptionsConfig ||= this._effectiveCardOptionsConfig(mode);
     const defaults = {};
     const applyTemplates = (configured) => {
       const templates = Array.isArray(configured) ? configured : configured ? [configured] : [];
@@ -1048,7 +1055,6 @@ export class GraphMethods {
     scopedHeader = null,
   ) {
     const entityIds = this._resolvedEntityIds();
-    const cardOptionsConfig = editDefaults ? this.config.card_options : this._effectiveCardOptionsConfig();
     const entityOptionsConfig = editDefaults ? this.config.entity_options : this._effectiveEntityOptionsConfig();
     const series = this._seriesDescriptors(entityIds, entityOptionsConfig);
     const numeric = series.filter((item) => this._isNumeric(item));
@@ -1059,9 +1065,12 @@ export class GraphMethods {
         : (numeric.length ? numeric : series);
     const editorHasNumeric = editorEntities.some((item) => this._isNumeric(item));
     const editorMode = scopedMode || (editorHasNumeric ? "timeline" : "state_timeline");
+    const cardOptionsConfig = editDefaults
+      ? this._configuredCardOptions(editorMode)
+      : this._effectiveCardOptionsConfig(editorMode);
     const editorHeader = scopedHeader
       ?? this._customLocalize(editorHasNumeric ? "numeric_history" : "state_history");
-    const cardOptions = this._cardOptions(cardOptionsConfig);
+    const cardOptions = this._cardOptions(editorMode, cardOptionsConfig);
     const palette = customElements.get(CARD_TAG)?.PALETTE;
     this._editorAutoColors = new Map();
     const entities = editorEntities.map((item, index) => {
@@ -1102,9 +1111,16 @@ export class GraphMethods {
   }
 
   _splitGraphEditorConfig(config, editDefaults = false, editorBase = null) {
-    const configuredCardOptions = editDefaults ? this.config.card_options : this._effectiveCardOptionsConfig();
+    const editorMode = editorBase?.chart_mode === "state_timeline"
+      || config?.chart_mode === "state_timeline"
+      ? "state_timeline"
+      : "timeline";
+    const configuredCardOptions = editDefaults
+      ? this._configuredCardOptions(editorMode)
+      : this._effectiveCardOptionsConfig(editorMode);
     const configuredEntityOptions = editDefaults ? this.config.entity_options : this._effectiveEntityOptionsConfig();
-    const integrationCardDefaults = this._cardOptions(this.config.card_options);
+    const integrationConfiguredCardOptions = this._configuredCardOptions(editorMode);
+    const integrationCardDefaults = this._cardOptions(editorMode, integrationConfiguredCardOptions);
     const integrationEntityDefaults = this.config.entity_options || {};
     const protectedKeys = new Set([
       "type", "entities", "energy_date_sync", "energy_collection_key", "height", "hours_to_show",
@@ -1145,7 +1161,7 @@ export class GraphMethods {
       delete cardOptions.chart_mode;
     }
     for (const [key, value] of Object.entries(
-      editDefaults ? this._cardOptions(configuredCardOptions) : {}
+      editDefaults ? this._cardOptions(editorMode, configuredCardOptions) : {}
     )) {
       if (value === true && !(key in (config || {}))) cardOptions[key] = false;
     }
@@ -1200,13 +1216,10 @@ export class GraphMethods {
       // applied to generated card entities through the card's native enabled
       // option. Do not turn that transient state into an editor override.
       delete options.enabled;
-      const editorMode = editorBase?.chart_mode === "state_timeline"
-        ? "state_timeline"
-        : "timeline";
       const integrationBase = {
         ...automaticEntityOptions(this._hass.states[entity], editorMode),
         ...this._defaultEntityOptions(
-          this.config.card_options,
+          integrationConfiguredCardOptions,
           editorMode,
         ),
         ...(integrationEntityDefaults?.[entity] || {}),
@@ -1362,7 +1375,7 @@ export class GraphMethods {
       ? [
         {
           key: "numeric",
-          mode: this._cardOptions().chart_mode || "timeline",
+          mode: this._cardOptions("timeline").chart_mode || "timeline",
           header: this._customLocalize("numeric_history"),
           series: numeric,
         },

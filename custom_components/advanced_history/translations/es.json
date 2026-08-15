@@ -13,15 +13,17 @@
           "large_range_detail_threshold_days": "Umbral del detalle automático (días)",
           "graph_height": "Altura del gráfico",
           "include_hidden": "Incluir entidades ocultas",
-          "card_options": "Valores predeterminados de la tarjeta",
           "require_admin": "Solo administradores",
-          "card_module_url": "URL del módulo de la tarjeta de gráfico"
+          "card_module_url": "URL del módulo de la tarjeta de gráfico",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Usa agrupación automática para intervalos amplios, con la opción de cargar un detalle más fino desde el panel Historial.",
           "large_range_detail_threshold_days": "Usa el detalle automático cuando el intervalo seleccionado tenga al menos este número de días.",
-          "card_options": "Ajustes predeterminados de Statistics Graph Chart Card para gráficos nuevos. Edita el YAML directamente o usa el botón Abrir editor visual situado debajo.",
-          "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card."
+          "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure": {
@@ -36,14 +38,16 @@
           "graph_height": "Altura del gráfico",
           "include_hidden": "Incluir entidades ocultas",
           "card_module_url": "URL del módulo de la tarjeta de gráfico",
-          "card_options": "Valores predeterminados de la tarjeta",
-          "require_admin": "Solo administradores"
+          "require_admin": "Solo administradores",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Usa agrupación automática para intervalos amplios, con la opción de cargar un detalle más fino desde el panel Historial.",
           "large_range_detail_threshold_days": "Usa el detalle automático cuando el intervalo seleccionado tenga al menos este número de días.",
           "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
-          "card_options": "Ajustes predeterminados de Statistics Graph Chart Card para gráficos nuevos. Edita el YAML directamente o usa el botón Abrir editor visual situado debajo."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "more_info": {
@@ -54,14 +58,16 @@
           "more_info_show_date_picker": "Mostrar calendario del gráfico",
           "redirect_show_more": "Abrir Mostrar más en Advanced History",
           "card_module_url": "URL del módulo de la tarjeta de gráfico",
-          "more_info_card_options": "Valores predeterminados de Más información"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Sustituye el gráfico de Historial nativo de los diálogos de entidad por Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Muestra el selector de fechas integrado de Statistics Graph Chart Card en los diálogos de entidad.",
           "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
           "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
-          "more_info_card_options": "Ajustes independientes de Statistics Graph Chart Card para el gráfico de los diálogos de entidad. Edita el YAML directamente o usa su botón de editor visual."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure_more_info": {
@@ -72,14 +78,16 @@
           "more_info_show_date_picker": "Mostrar calendario del gráfico",
           "redirect_show_more": "Abrir Mostrar más en Advanced History",
           "card_module_url": "URL del módulo de la tarjeta de gráfico",
-          "more_info_card_options": "Valores predeterminados de Más información"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Sustituye el gráfico de Historial nativo de los diálogos de entidad por Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Muestra el selector de fechas integrado de Statistics Graph Chart Card en los diálogos de entidad.",
           "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
           "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
-          "more_info_card_options": "Ajustes independientes de Statistics Graph Chart Card para el gráfico de los diálogos de entidad. Edita el YAML directamente o usa su botón de editor visual."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     },
@@ -105,9 +113,9 @@
           "replace_more_info_history": "Usar Statistics Graph en Más información",
           "more_info_show_date_picker": "Mostrar calendario del gráfico",
           "card_module_url": "URL del módulo de la tarjeta de gráfico",
-          "card_options": "Valores predeterminados de la tarjeta",
-          "more_info_card_options": "Valores predeterminados de Más información",
-          "require_admin": "Solo administradores"
+          "require_admin": "Solo administradores",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Usa agrupación automática para intervalos amplios, con la opción de cargar un detalle más fino desde el panel Historial.",
@@ -116,8 +124,8 @@
           "replace_more_info_history": "Sustituye el gráfico de Historial nativo de los diálogos de entidad por Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Muestra el selector de fechas integrado de Statistics Graph Chart Card en los diálogos de entidad.",
           "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
-          "card_options": "Ajustes predeterminados de Statistics Graph Chart Card para gráficos nuevos. Edita el YAML directamente o usa el botón Abrir editor visual situado debajo.",
-          "more_info_card_options": "Ajustes independientes de Statistics Graph Chart Card para el gráfico de los diálogos de entidad. Edita el YAML directamente o usa su botón de editor visual."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     }

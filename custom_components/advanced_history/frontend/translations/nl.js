@@ -58,7 +58,7 @@ export default {
   "open_card_defaults_editor": "Visuele editor openen",
   "card_defaults_config_flow_note": "Hier opslaan werkt het YAML-veld Standaardwaarden van de kaart hieronder bij. Dien de configuratiestroom in om de waarden toe te passen.",
   "more_info_card_defaults": "Standaardwaarden voor Meer informatie",
-  "more_info_card_defaults_config_flow_note": "Deze instellingen gelden alleen voor Statistics Graph in entiteitsvensters. Opslaan werkt het YAML-veld voor Meer informatie bij; dien de configuratiestroom in om dit toe te passen.",
+  "more_info_card_defaults_config_flow_note": "Configureer numerieke en statusstandaarden voor entiteitsvensters afzonderlijk. Sla deze editor op en dien daarna de configuratiestroom in.",
   "more_info_entity_graph_settings": "Grafiekinstellingen van entiteit",
   "use_interval_picker": "Intervalselectie gebruiken",
   "use_date_picker": "Datumselectie gebruiken",

@@ -15,7 +15,6 @@ from homeassistant.helpers import selector
 
 from .const import (
     CONF_CARD_MODULE_URL,
-    CONF_CARD_OPTIONS,
     CONF_ENTITY_OPTIONS,
     CONF_ENTRY_TYPE,
     CONF_GRAPH_HEIGHT,
@@ -24,12 +23,13 @@ from .const import (
     CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS,
     CONF_MAX_ENTITIES,
     CONF_MAX_TABS,
-    CONF_MORE_INFO_CARD_OPTIONS,
+    CONF_NUMERIC_CARD_OPTIONS,
     CONF_MORE_INFO_SHOW_DATE_PICKER,
     CONF_REDIRECT_SHOW_MORE,
     CONF_REPLACE_MORE_INFO_HISTORY,
     CONF_REQUIRE_ADMIN,
     CONF_SIDEBAR_ICON,
+    CONF_STATE_CARD_OPTIONS,
     CONF_TITLE,
     DEFAULT_MORE_INFO_OPTIONS,
     DEFAULT_OPTIONS,
@@ -89,7 +89,12 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
                 CONF_CARD_MODULE_URL, default=values[CONF_CARD_MODULE_URL]
             ): selector.TextSelector(),
             vol.Optional(
-                CONF_CARD_OPTIONS, default=values[CONF_CARD_OPTIONS]
+                CONF_NUMERIC_CARD_OPTIONS,
+                default=values[CONF_NUMERIC_CARD_OPTIONS],
+            ): selector.ObjectSelector(),
+            vol.Optional(
+                CONF_STATE_CARD_OPTIONS,
+                default=values[CONF_STATE_CARD_OPTIONS],
             ): selector.ObjectSelector(),
             vol.Optional(
                 CONF_REQUIRE_ADMIN, default=values[CONF_REQUIRE_ADMIN]
@@ -117,8 +122,12 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
                 CONF_CARD_MODULE_URL, default=values[CONF_CARD_MODULE_URL]
             ): selector.TextSelector(),
             vol.Optional(
-                CONF_MORE_INFO_CARD_OPTIONS,
-                default=values[CONF_MORE_INFO_CARD_OPTIONS],
+                CONF_NUMERIC_CARD_OPTIONS,
+                default=values[CONF_NUMERIC_CARD_OPTIONS],
+            ): selector.ObjectSelector(),
+            vol.Optional(
+                CONF_STATE_CARD_OPTIONS,
+                default=values[CONF_STATE_CARD_OPTIONS],
             ): selector.ObjectSelector(),
         }
     )
@@ -127,7 +136,7 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
 class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle Advanced History config entries."""
 
-    VERSION = 11
+    VERSION = 13
 
     def _configured_types(self) -> set[str]:
         """Return the service roles which are already configured."""

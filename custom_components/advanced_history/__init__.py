@@ -12,14 +12,21 @@ from .const import (
     CONF_COMPARE,
     CONF_DEFAULT_HOURS,
     CONF_MORE_INFO_CARD_OPTIONS,
+    CONF_NUMERIC_CARD_OPTIONS,
     CONF_REDIRECT_SHOW_MORE,
     CONF_TITLE,
+    CONF_STATE_CARD_OPTIONS,
     DEFAULT_CARD_OPTIONS,
     DEFAULT_MORE_INFO_CARD_OPTIONS,
+    DEFAULT_MORE_INFO_NUMERIC_CARD_OPTIONS,
+    DEFAULT_MORE_INFO_STATE_CARD_OPTIONS,
+    DEFAULT_NUMERIC_CARD_OPTIONS,
+    DEFAULT_STATE_CARD_OPTIONS,
     DOMAIN,
     ENTRY_TYPE_MORE_INFO,
     ENTRY_TYPE_PANEL,
     config_entry_type,
+    split_legacy_card_options,
 )
 from .panel import (
     async_register_frontend,
@@ -32,7 +39,7 @@ from .websocket import async_register_websocket_commands
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate Advanced History config entries."""
-    if entry.version > 11:
+    if entry.version > 13:
         return False
 
     options = deepcopy(dict(entry.options))
@@ -136,10 +143,49 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                     more_info_entry, options=more_info_options
                 )
 
+    if entry.version < 12 and not is_panel:
+        configured = options.get(CONF_MORE_INFO_CARD_OPTIONS)
+        card_options = (
+            deepcopy(configured)
+            if isinstance(configured, dict)
+            else deepcopy(DEFAULT_MORE_INFO_CARD_OPTIONS)
+        )
+        legacy_entities = card_options.pop("entities", None)
+        card_options.pop("energy_date_sync", None)
+        card_options.pop("energy_collection_key", None)
+        if isinstance(legacy_entities, (dict, list)):
+            card_options.setdefault(
+                CARD_OPTIONS_NUMERIC_ENTITIES, deepcopy(legacy_entities)
+            )
+            card_options.setdefault(
+                CARD_OPTIONS_STATE_ENTITIES, deepcopy(legacy_entities)
+            )
+        options[CONF_MORE_INFO_CARD_OPTIONS] = card_options
+
+    if entry.version < 13:
+        legacy_key = CONF_CARD_OPTIONS if is_panel else CONF_MORE_INFO_CARD_OPTIONS
+        legacy = options.pop(legacy_key, {})
+        legacy = deepcopy(legacy) if isinstance(legacy, dict) else {}
+        numeric_defaults = (
+            DEFAULT_NUMERIC_CARD_OPTIONS
+            if is_panel
+            else DEFAULT_MORE_INFO_NUMERIC_CARD_OPTIONS
+        )
+        state_defaults = (
+            DEFAULT_STATE_CARD_OPTIONS
+            if is_panel
+            else DEFAULT_MORE_INFO_STATE_CARD_OPTIONS
+        )
+        numeric, state = split_legacy_card_options(
+            legacy, numeric_defaults, state_defaults
+        )
+        options.setdefault(CONF_NUMERIC_CARD_OPTIONS, numeric)
+        options.setdefault(CONF_STATE_CARD_OPTIONS, state)
+
     hass.config_entries.async_update_entry(
         entry,
         options=options,
-        version=11,
+        version=13,
         title="Advanced History" if is_panel else entry.title,
     )
     return True

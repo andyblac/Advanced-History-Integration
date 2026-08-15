@@ -58,7 +58,7 @@ export default {
   "open_card_defaults_editor": "Visuellen Editor öffnen",
   "card_defaults_config_flow_note": "Das Speichern hier aktualisiert das YAML-Feld Kartenstandards darunter. Sende den Konfigurationsablauf ab, um die Standards anzuwenden.",
   "more_info_card_defaults": "Standards für Entitätsdetails",
-  "more_info_card_defaults_config_flow_note": "Diese Einstellungen gelten nur für Statistics Graph in Entitätsdialogen. Beim Speichern wird das YAML-Feld Standards für Entitätsdetails aktualisiert; sende den Konfigurationsablauf ab, um es anzuwenden.",
+  "more_info_card_defaults_config_flow_note": "Konfiguriere numerische und Zustandsvorgaben für Entitätsdialoge getrennt. Speichere diesen Editor und sende anschließend den Konfigurationsablauf ab.",
   "more_info_entity_graph_settings": "Diagrammeinstellungen der Entität",
   "use_interval_picker": "Intervallauswahl verwenden",
   "use_date_picker": "Datumsauswahl verwenden",

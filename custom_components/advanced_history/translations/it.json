@@ -13,15 +13,17 @@
           "large_range_detail_threshold_days": "Soglia dettaglio automatico (giorni)",
           "graph_height": "Altezza del grafico",
           "include_hidden": "Includi entità nascoste",
-          "card_options": "Impostazioni predefinite della scheda",
           "require_admin": "Solo amministratori",
-          "card_module_url": "URL del modulo della scheda grafico"
+          "card_module_url": "URL del modulo della scheda grafico",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Usa il raggruppamento automatico per intervalli ampi, con la possibilità di caricare dettagli più fini dal pannello Cronologia.",
           "large_range_detail_threshold_days": "Usa il dettaglio automatico quando l’intervallo selezionato copre almeno questo numero di giorni.",
-          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante.",
-          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card."
+          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure": {
@@ -36,14 +38,16 @@
           "graph_height": "Altezza del grafico",
           "include_hidden": "Includi entità nascoste",
           "card_module_url": "URL del modulo della scheda grafico",
-          "card_options": "Impostazioni predefinite della scheda",
-          "require_admin": "Solo amministratori"
+          "require_admin": "Solo amministratori",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Usa il raggruppamento automatico per intervalli ampi, con la possibilità di caricare dettagli più fini dal pannello Cronologia.",
           "large_range_detail_threshold_days": "Usa il dettaglio automatico quando l’intervallo selezionato copre almeno questo numero di giorni.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
-          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "more_info": {
@@ -54,14 +58,16 @@
           "more_info_show_date_picker": "Mostra calendario del grafico",
           "redirect_show_more": "Apri Mostra altro in Advanced History",
           "card_module_url": "URL del modulo della scheda grafico",
-          "more_info_card_options": "Impostazioni predefinite di Ulteriori informazioni"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra il selettore di date integrato di Statistics Graph Chart Card nelle finestre delle entità.",
           "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
-          "more_info_card_options": "Impostazioni separate di Statistics Graph Chart Card per il grafico nelle finestre delle entità. Modifica il YAML direttamente oppure usa il relativo editor visuale."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure_more_info": {
@@ -72,14 +78,16 @@
           "more_info_show_date_picker": "Mostra calendario del grafico",
           "redirect_show_more": "Apri Mostra altro in Advanced History",
           "card_module_url": "URL del modulo della scheda grafico",
-          "more_info_card_options": "Impostazioni predefinite di Ulteriori informazioni"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra il selettore di date integrato di Statistics Graph Chart Card nelle finestre delle entità.",
           "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
-          "more_info_card_options": "Impostazioni separate di Statistics Graph Chart Card per il grafico nelle finestre delle entità. Modifica il YAML direttamente oppure usa il relativo editor visuale."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     },
@@ -105,9 +113,9 @@
           "replace_more_info_history": "Usa Statistics Graph in Ulteriori informazioni",
           "more_info_show_date_picker": "Mostra calendario del grafico",
           "card_module_url": "URL del modulo della scheda grafico",
-          "card_options": "Impostazioni predefinite della scheda",
-          "more_info_card_options": "Impostazioni predefinite di Ulteriori informazioni",
-          "require_admin": "Solo amministratori"
+          "require_admin": "Solo amministratori",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Usa il raggruppamento automatico per intervalli ampi, con la possibilità di caricare dettagli più fini dal pannello Cronologia.",
@@ -116,8 +124,8 @@
           "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra il selettore di date integrato di Statistics Graph Chart Card nelle finestre delle entità.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
-          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante.",
-          "more_info_card_options": "Impostazioni separate di Statistics Graph Chart Card per il grafico nelle finestre delle entità. Modifica il YAML direttamente oppure usa il relativo editor visuale."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     }

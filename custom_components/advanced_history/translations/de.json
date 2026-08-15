@@ -13,15 +13,17 @@
           "large_range_detail_threshold_days": "Schwellenwert für automatische Details (Tage)",
           "graph_height": "Diagrammhöhe",
           "include_hidden": "Ausgeblendete Entitäten einbeziehen",
-          "card_options": "Kartenstandards",
           "require_admin": "Nur Administratoren",
-          "card_module_url": "Modul-URL der Diagrammkarte"
+          "card_module_url": "Modul-URL der Diagrammkarte",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Verwendet für große Zeiträume eine automatische Gruppierung mit der Option, in der Verlaufsansicht feinere Details zu laden.",
           "large_range_detail_threshold_days": "Verwendet automatische Details, wenn der ausgewählte Zeitraum mindestens so viele Tage umfasst.",
-          "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen.",
-          "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen."
+          "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure": {
@@ -36,14 +38,16 @@
           "graph_height": "Diagrammhöhe",
           "include_hidden": "Ausgeblendete Entitäten einbeziehen",
           "card_module_url": "Modul-URL der Diagrammkarte",
-          "card_options": "Kartenstandards",
-          "require_admin": "Nur Administratoren"
+          "require_admin": "Nur Administratoren",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Verwendet für große Zeiträume eine automatische Gruppierung mit der Option, in der Verlaufsansicht feinere Details zu laden.",
           "large_range_detail_threshold_days": "Verwendet automatische Details, wenn der ausgewählte Zeitraum mindestens so viele Tage umfasst.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "more_info": {
@@ -54,14 +58,16 @@
           "more_info_show_date_picker": "Diagrammkalender anzeigen",
           "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
           "card_module_url": "Modul-URL der Diagrammkarte",
-          "more_info_card_options": "Standards für Entitätsdetails"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
           "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "more_info_card_options": "Separate Einstellungen der Statistics Graph Chart Card für das Diagramm in Entitätsdialogen. Bearbeite das YAML direkt oder verwende den zugehörigen visuellen Editor."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure_more_info": {
@@ -72,14 +78,16 @@
           "more_info_show_date_picker": "Diagrammkalender anzeigen",
           "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
           "card_module_url": "Modul-URL der Diagrammkarte",
-          "more_info_card_options": "Standards für Entitätsdetails"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
           "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "more_info_card_options": "Separate Einstellungen der Statistics Graph Chart Card für das Diagramm in Entitätsdialogen. Bearbeite das YAML direkt oder verwende den zugehörigen visuellen Editor."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     },
@@ -105,9 +113,9 @@
           "replace_more_info_history": "Statistics Graph in Entitätsdetails verwenden",
           "more_info_show_date_picker": "Diagrammkalender anzeigen",
           "card_module_url": "Modul-URL der Diagrammkarte",
-          "card_options": "Kartenstandards",
-          "more_info_card_options": "Standards für Entitätsdetails",
-          "require_admin": "Nur Administratoren"
+          "require_admin": "Nur Administratoren",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Verwendet für große Zeiträume eine automatische Gruppierung mit der Option, in der Verlaufsansicht feinere Details zu laden.",
@@ -116,8 +124,8 @@
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "card_options": "Standardeinstellungen der Statistics Graph Chart Card für neue Diagramme. Bearbeite das YAML direkt oder nutze darunter die Schaltfläche Visuellen Editor öffnen.",
-          "more_info_card_options": "Separate Einstellungen der Statistics Graph Chart Card für das Diagramm in Entitätsdialogen. Bearbeite das YAML direkt oder verwende den zugehörigen visuellen Editor."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     }

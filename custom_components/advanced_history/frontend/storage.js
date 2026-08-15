@@ -904,7 +904,7 @@ export class StorageMethods {
     // unmatched values are retained as possible intentional overrides.
     source.card_options = this._snapshotOptionOverrides(
       source.card_options,
-      this.config.card_options,
+      this._configuredCardOptions("timeline"),
     );
     const entityOverrides = {};
     const entityDefaults = this.config.entity_options || {};
@@ -928,8 +928,19 @@ export class StorageMethods {
     return source;
   }
 
-  _effectiveCardOptionsConfig() {
-    const defaults = this.config.card_options;
+  _configuredCardOptions(mode = "timeline") {
+    const configured = this.config.card_options;
+    if (!configured || typeof configured !== "object" || Array.isArray(configured)) return {};
+    if (configured.numeric || configured.state) {
+      return mode === "state_timeline"
+        ? (configured.state || {})
+        : (configured.numeric || {});
+    }
+    return configured;
+  }
+
+  _effectiveCardOptionsConfig(mode = "timeline") {
+    const defaults = this._configuredCardOptions(mode);
     const overrides = this._activeSnapshot?.card_options;
     if (!overrides || typeof overrides !== "object" || Array.isArray(overrides)) return defaults;
     return {

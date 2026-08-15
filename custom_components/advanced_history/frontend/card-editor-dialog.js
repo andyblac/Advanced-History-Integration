@@ -27,6 +27,8 @@ export async function openCardEditorDialog({
   editorVariants = null,
   initialVariantKey = null,
   shouldSyncVariantKey = null,
+  codeConfigFromDraft = null,
+  draftFromCodeConfig = null,
 }) {
   if (activeDialogHost?.isConnected) return null;
   const dialogHost = document.createElement(DIALOG_TAG);
@@ -300,7 +302,9 @@ export async function openCardEditorDialog({
       const editor = document.createElement("ha-yaml-editor");
       editor.hass = hass;
       editor.inDialog = true;
-      editor.setValue(draft);
+      editor.setValue(typeof codeConfigFromDraft === "function"
+        ? codeConfigFromDraft(structuredClone(draft), activeVariantKey)
+        : draft);
       editor.addEventListener("value-changed", (event) => {
         const value = event.detail?.value;
         const valid = event.detail?.isValid !== false
@@ -310,7 +314,11 @@ export async function openCardEditorDialog({
         status.textContent = valid ? "" : event.detail?.errorMsg || strings.mappingError;
         save.disabled = !valid;
         toggle.disabled = !valid;
-        if (valid) updateDraft(value);
+        if (valid) {
+          updateDraft(typeof draftFromCodeConfig === "function"
+            ? draftFromCodeConfig(structuredClone(value), activeVariantKey)
+            : value);
+        }
       });
       editor.addEventListener("editor-save", () => { if (!save.disabled) save.click(); });
       editorHost.replaceChildren(editor);

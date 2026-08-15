@@ -10,8 +10,10 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_CARD_MODULE_URL,
+    CONF_NUMERIC_CARD_OPTIONS,
     CONF_REQUIRE_ADMIN,
     CONF_SIDEBAR_ICON,
+    CONF_STATE_CARD_OPTIONS,
     CONF_TITLE,
     DOMAIN,
     FRONTEND_BASE_URL,
@@ -68,6 +70,12 @@ def _panel_config(entry: ConfigEntry) -> tuple[dict, dict]:
         for key, value in options.items()
         if key not in {CONF_SIDEBAR_ICON, CONF_REQUIRE_ADMIN}
     }
+    panel_config["card_options"] = {
+        "numeric": options[CONF_NUMERIC_CARD_OPTIONS],
+        "state": options[CONF_STATE_CARD_OPTIONS],
+    }
+    panel_config.pop(CONF_NUMERIC_CARD_OPTIONS, None)
+    panel_config.pop(CONF_STATE_CARD_OPTIONS, None)
     panel_config["config_entry_id"] = entry.entry_id
     panel_config["settings_path"] = f"/config/integrations/integration/{DOMAIN}"
     panel_config["integration_version"] = VERSION

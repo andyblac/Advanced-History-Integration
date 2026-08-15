@@ -13,15 +13,17 @@
           "large_range_detail_threshold_days": "Drempel automatisch detail (dagen)",
           "graph_height": "Grafiekhoogte",
           "include_hidden": "Verborgen entiteiten opnemen",
-          "card_options": "Standaardwaarden van de kaart",
           "require_admin": "Alleen beheerders",
-          "card_module_url": "Module-URL van grafiekkaart"
+          "card_module_url": "Module-URL van grafiekkaart",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Gebruikt automatische groepering voor grote datumbereiken, met de optie om fijner detail vanuit het Geschiedenispaneel te laden.",
           "large_range_detail_threshold_days": "Gebruikt automatisch detail wanneer het geselecteerde bereik ten minste dit aantal dagen beslaat.",
-          "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder.",
-          "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren."
+          "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure": {
@@ -36,14 +38,16 @@
           "graph_height": "Grafiekhoogte",
           "include_hidden": "Verborgen entiteiten opnemen",
           "card_module_url": "Module-URL van grafiekkaart",
-          "card_options": "Standaardwaarden van de kaart",
-          "require_admin": "Alleen beheerders"
+          "require_admin": "Alleen beheerders",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Gebruikt automatische groepering voor grote datumbereiken, met de optie om fijner detail vanuit het Geschiedenispaneel te laden.",
           "large_range_detail_threshold_days": "Gebruikt automatisch detail wanneer het geselecteerde bereik ten minste dit aantal dagen beslaat.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
-          "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "more_info": {
@@ -54,14 +58,16 @@
           "more_info_show_date_picker": "Grafiekkalender tonen",
           "redirect_show_more": "Meer weergeven openen in Advanced History",
           "card_module_url": "Module-URL van grafiekkaart",
-          "more_info_card_options": "Standaardwaarden voor Meer informatie"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Vervang de ingebouwde geschiedenisgrafiek in entiteitsvensters door Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Toon de ingebouwde datumkiezer van Statistics Graph Chart Card in entiteitsvensters.",
           "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
-          "more_info_card_options": "Afzonderlijke Statistics Graph Chart Card-instellingen voor de grafiek in entiteitsvensters. Bewerk de YAML rechtstreeks of gebruik de bijbehorende visuele editor."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure_more_info": {
@@ -72,14 +78,16 @@
           "more_info_show_date_picker": "Grafiekkalender tonen",
           "redirect_show_more": "Meer weergeven openen in Advanced History",
           "card_module_url": "Module-URL van grafiekkaart",
-          "more_info_card_options": "Standaardwaarden voor Meer informatie"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Vervang de ingebouwde geschiedenisgrafiek in entiteitsvensters door Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Toon de ingebouwde datumkiezer van Statistics Graph Chart Card in entiteitsvensters.",
           "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
-          "more_info_card_options": "Afzonderlijke Statistics Graph Chart Card-instellingen voor de grafiek in entiteitsvensters. Bewerk de YAML rechtstreeks of gebruik de bijbehorende visuele editor."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     },
@@ -105,9 +113,9 @@
           "replace_more_info_history": "Statistics Graph gebruiken in Meer informatie",
           "more_info_show_date_picker": "Grafiekkalender tonen",
           "card_module_url": "Module-URL van grafiekkaart",
-          "card_options": "Standaardwaarden van de kaart",
-          "more_info_card_options": "Standaardwaarden voor Meer informatie",
-          "require_admin": "Alleen beheerders"
+          "require_admin": "Alleen beheerders",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Gebruikt automatische groepering voor grote datumbereiken, met de optie om fijner detail vanuit het Geschiedenispaneel te laden.",
@@ -116,8 +124,8 @@
           "replace_more_info_history": "Vervang de ingebouwde geschiedenisgrafiek in entiteitsvensters door Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Toon de ingebouwde datumkiezer van Statistics Graph Chart Card in entiteitsvensters.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
-          "card_options": "Standaardinstellingen van Statistics Graph Chart Card voor nieuwe grafieken. Bewerk de YAML rechtstreeks of gebruik de knop Visuele editor openen eronder.",
-          "more_info_card_options": "Afzonderlijke Statistics Graph Chart Card-instellingen voor de grafiek in entiteitsvensters. Bewerk de YAML rechtstreeks of gebruik de bijbehorende visuele editor."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     }

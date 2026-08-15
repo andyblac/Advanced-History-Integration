@@ -1,4 +1,8 @@
-import { ensureCardLoaded, installConfigFlowDefaultsEditor } from "./config-flow-defaults.js";
+import {
+  ensureCardLoaded,
+  installConfigFlowDefaultsEditor,
+  moreInfoEditorStyles,
+} from "./config-flow-defaults.js";
 import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { installCardHandoffApi } from "./card-handoff.js";
 import { CARD_TAG } from "./constants.js";
@@ -31,6 +35,8 @@ const MORE_INFO_DATE_SYNC_HANDLER = "__advancedHistoryMoreInfoDateSyncHandler";
 const MORE_INFO_CONFIG_TYPE = "advanced_history/more_info/config";
 const MORE_INFO_ENTITY_CONFIG_SET_TYPE = "advanced_history/more_info/entity_config/set";
 const MORE_INFO_PICKER_MODE_SET_TYPE = "advanced_history/more_info/picker_mode/set";
+const NUMERIC_ENTITIES_KEY = "numeric_entities";
+const STATE_ENTITIES_KEY = "state_entities";
 const moreInfoConfigCache = new Map();
 const moreInfoConfigRequests = new Map();
 
@@ -74,10 +80,17 @@ async function getMoreInfoConfig(hass, entityId) {
   return request;
 }
 
-function entityTemplate(options) {
-  const configured = options?.entities;
+function firstEntityTemplate(configured) {
   const rows = Array.isArray(configured) ? configured : configured ? [configured] : [];
   return rows.find((row) => row && typeof row === "object" && !Array.isArray(row)) || {};
+}
+
+function entityTemplate(options, variant = "numeric") {
+  const shared = firstEntityTemplate(options?.entities);
+  const typed = firstEntityTemplate(
+    options?.[variant === "state" ? STATE_ENTITIES_KEY : NUMERIC_ENTITIES_KEY],
+  );
+  return { ...structuredClone(shared), ...structuredClone(typed) };
 }
 
 function entityDisplayPrecision(hass, entityId) {
@@ -197,7 +210,12 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   if (entityConfig?.card_options && typeof entityConfig.card_options === "object") {
     Object.assign(cardOptions, structuredClone(entityConfig.card_options));
   }
-  const configuredTemplate = structuredClone(entityTemplate(cardOptions));
+  delete cardOptions.energy_date_sync;
+  delete cardOptions.energy_collection_key;
+  const configuredTemplate = structuredClone(entityTemplate(
+    cardOptions,
+    numeric ? "numeric" : "state",
+  ));
   const comparisonDefaults = configuredTemplate.compare;
   delete configuredTemplate.compare;
   const template = {
@@ -211,6 +229,8 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
     Object.assign(template, structuredClone(entityConfig.entity_options));
   }
   delete cardOptions.entities;
+  delete cardOptions[NUMERIC_ENTITIES_KEY];
+  delete cardOptions[STATE_ENTITIES_KEY];
   delete template.entity;
   delete template.statistic_id;
   if (
@@ -647,8 +667,14 @@ function entityOverrideFromEditor(draft, base, numeric, comparisonDefaults) {
     base,
     new Set([
       "type", "card_header", "entities",
-      ...(numeric ? [] : ["chart_mode"]),
-      ...(numeric ? [] : ["group_by"]),
+      "energy_date_sync", "energy_collection_key",
+      "show_date_picker", "show_interval_picker",
+      "show_attribute_list", "show_y2_axis",
+      ...(numeric ? [] : [
+        "chart_mode", "group_by", "auto_scale_points", "points_per_hour",
+        "show_pph_picker", "pph_picker_position", "pph_picker_group",
+        "show_group_by_picker", "group_by_picker_position", "group_by_picker_group",
+      ]),
     ]),
   );
   const result = {};
@@ -668,7 +694,7 @@ function entityOverrideFromEditor(draft, base, numeric, comparisonDefaults) {
     const entityChanges = graphOptionChanges(
       draftEntity,
       baseEntities[0] || {},
-      new Set(["entity", "statistic_id"]),
+      new Set(["entity", "statistic_id", "attribute", "enabled", "y_axis"]),
     );
     if (Object.keys(entityChanges.configured).length) {
       result.entity_options = entityChanges.configured;
@@ -682,20 +708,18 @@ function entityOverrideFromEditor(draft, base, numeric, comparisonDefaults) {
         .filter((row) => typeof row.attribute === "string" && row.attribute)
         .map((row) => [row.attribute, row]),
     );
-    const selected = [];
     const attributeOptions = {};
     for (const configuredRow of draftEntities) {
       const row = structuredClone(configuredRow);
       const attribute = row.attribute;
       if (!baseByAttribute.has(attribute)) continue;
-      selected.push(attribute);
       if (Object.prototype.hasOwnProperty.call(row, "compare")) {
         row.compare = comparisonOverrides(row.compare, comparisonDefaults);
       }
       const changes = graphOptionChanges(
         row,
         baseByAttribute.get(attribute),
-        new Set(["entity", "statistic_id", "attribute"]),
+        new Set(["entity", "statistic_id", "attribute", "enabled", "y_axis"]),
       );
       if (Object.keys(changes.configured).length || changes.removed.length) {
         attributeOptions[attribute] = {
@@ -707,16 +731,6 @@ function entityOverrideFromEditor(draft, base, numeric, comparisonDefaults) {
             : {}),
         };
       }
-    }
-    const baseSelection = [...baseByAttribute.keys()];
-    if (
-      selected.length
-      && (
-        selected.length !== baseSelection.length
-        || selected.some((attribute, index) => attribute !== baseSelection[index])
-      )
-    ) {
-      result.attribute_selection = selected;
     }
     if (Object.keys(attributeOptions).length) {
       result.attribute_options = attributeOptions;
@@ -794,16 +808,7 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
       confirmReset: custom(hass, "more_info_entity_reset_confirm"),
     },
     ensureLoaded: () => ensureCardLoaded(hass, serviceConfig.card_module_url),
-    visualEditorStyles: `
-      ${baseConfig.entities.length === 1
-        ? `
-          #add-entity,
-          .edb[data-action="delete"],
-          .edup[data-action="duplicate"] { display: none !important; }
-        `
-        : ""}
-      ${numeric ? "" : ".f:has(#chart_mode) { display: none !important; }"}
-    `,
+    visualEditorStyles: moreInfoEditorStyles(numeric ? "numeric" : "state"),
     resetDisabled: !serviceConfig.entity_config,
     onSave: (draft) => saveMoreInfoEntityConfig(
       historyView,
@@ -812,7 +817,10 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
         draft,
         baseConfig,
         numeric,
-        entityTemplate(serviceConfig.card_options || {}).compare,
+        entityTemplate(
+          serviceConfig.card_options || {},
+          numeric ? "numeric" : "state",
+        ).compare,
       ),
     ),
     onReset: () => saveMoreInfoEntityConfig(historyView, entityId, null),

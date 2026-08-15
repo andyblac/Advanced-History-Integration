@@ -13,15 +13,17 @@
           "large_range_detail_threshold_days": "Limite do detalhe automático (dias)",
           "graph_height": "Altura do gráfico",
           "include_hidden": "Incluir entidades ocultas",
-          "card_options": "Padrões do cartão",
           "require_admin": "Somente administradores",
-          "card_module_url": "URL do módulo do cartão de gráfico"
+          "card_module_url": "URL do módulo do cartão de gráfico",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Usa agrupamento automático para períodos longos, com a opção de carregar detalhes mais finos no painel Histórico.",
           "large_range_detail_threshold_days": "Usa o detalhe automático quando o período selecionado tiver pelo menos este número de dias.",
-          "card_options": "Configurações padrão do Statistics Graph Chart Card para novos gráficos. Edite o YAML diretamente ou use o botão Abrir editor visual abaixo.",
-          "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card."
+          "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure": {
@@ -36,14 +38,16 @@
           "graph_height": "Altura do gráfico",
           "include_hidden": "Incluir entidades ocultas",
           "card_module_url": "URL do módulo do cartão de gráfico",
-          "card_options": "Padrões do cartão",
-          "require_admin": "Somente administradores"
+          "require_admin": "Somente administradores",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Usa agrupamento automático para períodos longos, com a opção de carregar detalhes mais finos no painel Histórico.",
           "large_range_detail_threshold_days": "Usa o detalhe automático quando o período selecionado tiver pelo menos este número de dias.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
-          "card_options": "Configurações padrão do Statistics Graph Chart Card para novos gráficos. Edite o YAML diretamente ou use o botão Abrir editor visual abaixo."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "more_info": {
@@ -54,14 +58,16 @@
           "more_info_show_date_picker": "Mostrar calendário do gráfico",
           "redirect_show_more": "Abrir Mostrar mais no Advanced History",
           "card_module_url": "URL do módulo do cartão de gráfico",
-          "more_info_card_options": "Padrões de Mais informações"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",
           "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
-          "more_info_card_options": "Configurações separadas do Statistics Graph Chart Card para o gráfico nos diálogos de entidade. Edite o YAML diretamente ou use o botão do editor visual correspondente."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure_more_info": {
@@ -72,14 +78,16 @@
           "more_info_show_date_picker": "Mostrar calendário do gráfico",
           "redirect_show_more": "Abrir Mostrar mais no Advanced History",
           "card_module_url": "URL do módulo do cartão de gráfico",
-          "more_info_card_options": "Padrões de Mais informações"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",
           "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
-          "more_info_card_options": "Configurações separadas do Statistics Graph Chart Card para o gráfico nos diálogos de entidade. Edite o YAML diretamente ou use o botão do editor visual correspondente."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     },
@@ -105,9 +113,9 @@
           "replace_more_info_history": "Usar Statistics Graph em Mais informações",
           "more_info_show_date_picker": "Mostrar calendário do gráfico",
           "card_module_url": "URL do módulo do cartão de gráfico",
-          "card_options": "Padrões do cartão",
-          "more_info_card_options": "Padrões de Mais informações",
-          "require_admin": "Somente administradores"
+          "require_admin": "Somente administradores",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Usa agrupamento automático para períodos longos, com a opção de carregar detalhes mais finos no painel Histórico.",
@@ -116,8 +124,8 @@
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
-          "card_options": "Configurações padrão do Statistics Graph Chart Card para novos gráficos. Edite o YAML diretamente ou use o botão Abrir editor visual abaixo.",
-          "more_info_card_options": "Configurações separadas do Statistics Graph Chart Card para o gráfico nos diálogos de entidade. Edite o YAML diretamente ou use o botão do editor visual correspondente."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     }

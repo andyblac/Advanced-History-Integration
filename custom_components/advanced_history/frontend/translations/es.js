@@ -58,7 +58,7 @@ export default {
   "open_card_defaults_editor": "Abrir editor visual",
   "card_defaults_config_flow_note": "Guardar aquí actualiza el campo YAML Valores predeterminados de la tarjeta. Envía el flujo de configuración para aplicar los valores.",
   "more_info_card_defaults": "Valores predeterminados de Más información",
-  "more_info_card_defaults_config_flow_note": "Estos ajustes solo afectan a Statistics Graph en los diálogos de entidad. Al guardar se actualiza el campo YAML de Más información; envía el flujo de configuración para aplicarlo.",
+  "more_info_card_defaults_config_flow_note": "Configura por separado los valores numéricos y de estado para los diálogos de entidad. Guarda este editor y luego envía el flujo de configuración.",
   "more_info_entity_graph_settings": "Ajustes del gráfico de la entidad",
   "use_interval_picker": "Usar selector de intervalo",
   "use_date_picker": "Usar selector de fecha",

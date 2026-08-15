@@ -58,7 +58,7 @@ export default {
   "open_card_defaults_editor": "Abrir editor visual",
   "card_defaults_config_flow_note": "Salvar aqui atualiza o campo YAML Padrões do cartão abaixo. Envie o fluxo de configuração para aplicar os padrões.",
   "more_info_card_defaults": "Padrões de Mais informações",
-  "more_info_card_defaults_config_flow_note": "Estas configurações afetam apenas o Statistics Graph nos diálogos de entidade. Salvar atualiza o campo YAML de Mais informações; envie o fluxo de configuração para aplicá-lo.",
+  "more_info_card_defaults_config_flow_note": "Configure separadamente os padrões numéricos e de estado dos diálogos de entidade. Salve este editor e depois envie o fluxo de configuração.",
   "more_info_entity_graph_settings": "Configurações do gráfico da entidade",
   "use_interval_picker": "Usar seletor de intervalo",
   "use_date_picker": "Usar seletor de data",

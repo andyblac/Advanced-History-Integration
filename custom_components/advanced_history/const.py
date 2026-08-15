@@ -48,6 +48,8 @@ CONF_CARD_OPTIONS = "card_options"
 CARD_OPTIONS_NUMERIC_ENTITIES = "numeric_entities"
 CARD_OPTIONS_STATE_ENTITIES = "state_entities"
 CONF_MORE_INFO_CARD_OPTIONS = "more_info_card_options"
+CONF_NUMERIC_CARD_OPTIONS = "numeric_card_options"
+CONF_STATE_CARD_OPTIONS = "state_card_options"
 CONF_ENTITY_OPTIONS = "entity_options"
 CONF_COMPARE = "compare"
 CONF_REQUIRE_ADMIN = "require_admin"
@@ -111,8 +113,119 @@ DEFAULT_MORE_INFO_CARD_OPTIONS = {
     "y_grid_color": "var(--divider-color)",
     "y_grid_opacity": 1,
     "y_grid_style": "solid",
-    "entities": DEFAULT_MORE_INFO_ENTITY_OPTIONS,
+    CARD_OPTIONS_NUMERIC_ENTITIES: DEFAULT_MORE_INFO_ENTITY_OPTIONS,
+    CARD_OPTIONS_STATE_ENTITIES: DEFAULT_MORE_INFO_ENTITY_OPTIONS,
 }
+
+# Numeric and state defaults are persisted independently. The combined
+# mappings above remain only for migrations from versions <= 12.
+DEFAULT_NUMERIC_CARD_OPTIONS = {
+    **{
+        key: deepcopy(value)
+        for key, value in DEFAULT_CARD_OPTIONS.items()
+        if key
+        not in {
+            CARD_OPTIONS_NUMERIC_ENTITIES,
+            CARD_OPTIONS_STATE_ENTITIES,
+            "state_timeline_label_font_size",
+        }
+    },
+    "entities": deepcopy(DEFAULT_ENTITY_OPTIONS),
+}
+DEFAULT_STATE_CARD_OPTIONS = {
+    **{
+        key: deepcopy(value)
+        for key, value in DEFAULT_CARD_OPTIONS.items()
+        if key
+        not in {
+            CARD_OPTIONS_NUMERIC_ENTITIES,
+            CARD_OPTIONS_STATE_ENTITIES,
+            "auto_scale_points",
+        }
+    },
+    "entities": deepcopy(DEFAULT_ENTITY_OPTIONS),
+}
+DEFAULT_MORE_INFO_NUMERIC_CARD_OPTIONS = {
+    **{
+        key: deepcopy(value)
+        for key, value in DEFAULT_MORE_INFO_CARD_OPTIONS.items()
+        if key
+        not in {
+            CARD_OPTIONS_NUMERIC_ENTITIES,
+            CARD_OPTIONS_STATE_ENTITIES,
+            "state_timeline_corner_radius",
+            "state_timeline_label_font_size",
+        }
+    },
+    "entities": deepcopy(DEFAULT_MORE_INFO_ENTITY_OPTIONS),
+}
+DEFAULT_MORE_INFO_STATE_CARD_OPTIONS = {
+    **{
+        key: deepcopy(value)
+        for key, value in DEFAULT_MORE_INFO_CARD_OPTIONS.items()
+        if key
+        not in {
+            CARD_OPTIONS_NUMERIC_ENTITIES,
+            CARD_OPTIONS_STATE_ENTITIES,
+            "auto_scale_points",
+            "height",
+        }
+    },
+    "entities": deepcopy(DEFAULT_MORE_INFO_ENTITY_OPTIONS),
+}
+
+STATE_LOCKED_CARD_OPTIONS = {
+    "chart_mode",
+    "auto_scale_points",
+    "points_per_hour",
+    "group_by",
+    "show_pph_picker",
+    "pph_picker_position",
+    "pph_picker_group",
+    "show_group_by_picker",
+    "group_by_picker_position",
+    "group_by_picker_group",
+    "height",
+}
+
+NUMERIC_LOCKED_CARD_OPTIONS = {
+    "state_timeline_corner_radius",
+    "state_timeline_label_font_size",
+}
+
+
+def split_legacy_card_options(
+    configured: Mapping[str, Any],
+    numeric_defaults: Mapping[str, Any],
+    state_defaults: Mapping[str, Any],
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Split every historical combined card-options layout into two configs."""
+    legacy = deepcopy(dict(configured))
+    numeric_entities = legacy.pop(CARD_OPTIONS_NUMERIC_ENTITIES, None)
+    state_entities = legacy.pop(CARD_OPTIONS_STATE_ENTITIES, None)
+    shared_entities = legacy.pop("entities", None)
+
+    numeric = deepcopy(legacy)
+    state = deepcopy(legacy)
+    resolved_numeric_entities = (
+        numeric_entities if numeric_entities is not None else shared_entities
+    )
+    resolved_state_entities = (
+        state_entities if state_entities is not None else shared_entities
+    )
+    if resolved_numeric_entities is not None:
+        numeric["entities"] = deepcopy(resolved_numeric_entities)
+    if resolved_state_entities is not None:
+        state["entities"] = deepcopy(resolved_state_entities)
+    for key in STATE_LOCKED_CARD_OPTIONS:
+        state.pop(key, None)
+    for key in NUMERIC_LOCKED_CARD_OPTIONS:
+        numeric.pop(key, None)
+
+    return (
+        _merge_new_defaults(numeric_defaults, numeric),
+        _merge_new_defaults(state_defaults, state),
+    )
 
 DEFAULT_OPTIONS = {
     CONF_TITLE: "Advanced History",
@@ -125,7 +238,8 @@ DEFAULT_OPTIONS = {
     CONF_GRAPH_HEIGHT: 300,
     CONF_INCLUDE_HIDDEN: False,
     CONF_CARD_MODULE_URL: "",
-    CONF_CARD_OPTIONS: DEFAULT_CARD_OPTIONS,
+    CONF_NUMERIC_CARD_OPTIONS: DEFAULT_NUMERIC_CARD_OPTIONS,
+    CONF_STATE_CARD_OPTIONS: DEFAULT_STATE_CARD_OPTIONS,
     CONF_ENTITY_OPTIONS: {},
     CONF_REQUIRE_ADMIN: False,
 }
@@ -135,7 +249,8 @@ DEFAULT_MORE_INFO_OPTIONS = {
     CONF_MORE_INFO_SHOW_DATE_PICKER: False,
     CONF_REDIRECT_SHOW_MORE: False,
     CONF_CARD_MODULE_URL: "",
-    CONF_MORE_INFO_CARD_OPTIONS: DEFAULT_MORE_INFO_CARD_OPTIONS,
+    CONF_NUMERIC_CARD_OPTIONS: DEFAULT_MORE_INFO_NUMERIC_CARD_OPTIONS,
+    CONF_STATE_CARD_OPTIONS: DEFAULT_MORE_INFO_STATE_CARD_OPTIONS,
 }
 
 
@@ -173,30 +288,48 @@ def _merge_new_defaults(
 def options_with_defaults(options: Mapping[str, Any]) -> dict[str, Any]:
     """Apply visible config-flow defaults without replacing explicit values."""
     merged = {**deepcopy(DEFAULT_OPTIONS), **dict(options)}
-    if CONF_CARD_OPTIONS in options:
-        configured_card = options[CONF_CARD_OPTIONS]
-        card_options = deepcopy(DEFAULT_CARD_OPTIONS)
-        if isinstance(configured_card, Mapping):
-            card_options = _merge_new_defaults(DEFAULT_CARD_OPTIONS, configured_card)
-    else:
-        card_options = deepcopy(DEFAULT_CARD_OPTIONS)
-    # These have dedicated config-flow fields and must not appear twice.
-    card_options.pop("height", None)
-    card_options.pop("hours_to_show", None)
-    merged[CONF_CARD_OPTIONS] = card_options
+    for key, defaults in (
+        (CONF_NUMERIC_CARD_OPTIONS, DEFAULT_NUMERIC_CARD_OPTIONS),
+        (CONF_STATE_CARD_OPTIONS, DEFAULT_STATE_CARD_OPTIONS),
+    ):
+        configured = options.get(key)
+        merged[key] = (
+            _merge_new_defaults(defaults, configured)
+            if isinstance(configured, Mapping)
+            else deepcopy(defaults)
+        )
+        merged[key].pop("height", None)
+        merged[key].pop("hours_to_show", None)
+        locked = (
+            NUMERIC_LOCKED_CARD_OPTIONS
+            if key == CONF_NUMERIC_CARD_OPTIONS
+            else STATE_LOCKED_CARD_OPTIONS
+        )
+        for locked_key in locked:
+            merged[key].pop(locked_key, None)
+    merged.pop(CONF_CARD_OPTIONS, None)
     return merged
 
 
 def more_info_options_with_defaults(options: Mapping[str, Any]) -> dict[str, Any]:
     """Apply defaults for the independent More-Info service entry."""
     merged = {**deepcopy(DEFAULT_MORE_INFO_OPTIONS), **dict(options)}
-    if CONF_MORE_INFO_CARD_OPTIONS in options:
-        configured = options[CONF_MORE_INFO_CARD_OPTIONS]
-        merged[CONF_MORE_INFO_CARD_OPTIONS] = deepcopy(DEFAULT_MORE_INFO_CARD_OPTIONS)
-        if isinstance(configured, Mapping):
-            merged[CONF_MORE_INFO_CARD_OPTIONS] = _merge_new_defaults(
-                DEFAULT_MORE_INFO_CARD_OPTIONS, configured
-            )
-    else:
-        merged[CONF_MORE_INFO_CARD_OPTIONS] = deepcopy(DEFAULT_MORE_INFO_CARD_OPTIONS)
+    for key, defaults in (
+        (CONF_NUMERIC_CARD_OPTIONS, DEFAULT_MORE_INFO_NUMERIC_CARD_OPTIONS),
+        (CONF_STATE_CARD_OPTIONS, DEFAULT_MORE_INFO_STATE_CARD_OPTIONS),
+    ):
+        configured = options.get(key)
+        merged[key] = (
+            _merge_new_defaults(defaults, configured)
+            if isinstance(configured, Mapping)
+            else deepcopy(defaults)
+        )
+        locked = (
+            NUMERIC_LOCKED_CARD_OPTIONS
+            if key == CONF_NUMERIC_CARD_OPTIONS
+            else STATE_LOCKED_CARD_OPTIONS
+        )
+        for locked_key in locked:
+            merged[key].pop(locked_key, None)
+    merged.pop(CONF_MORE_INFO_CARD_OPTIONS, None)
     return merged

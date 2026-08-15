@@ -61,7 +61,7 @@ export default {
   "card_defaults_config_flow_note": "Saving here updates the Card Defaults YAML field below. Submit the config flow to apply the defaults.",
   "chart_options_config_flow_note": "Saving returns these chart options to the integration form. Submit the form to apply them.",
   "more_info_card_defaults": "More Info Card Defaults",
-  "more_info_card_defaults_config_flow_note": "These settings only affect the Statistics Graph shown in entity dialogs. Saving updates the More Info Card Defaults YAML field; submit the config flow to apply it.",
+  "more_info_card_defaults_config_flow_note": "Configure numeric and state defaults separately for entity dialogs. Save this editor, then submit the config flow to apply them.",
   "more_info_entity_graph_settings": "Entity graph settings",
   "use_interval_picker": "Use interval picker",
   "use_date_picker": "Use date picker",

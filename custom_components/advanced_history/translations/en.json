@@ -13,15 +13,17 @@
           "large_range_detail_threshold_days": "Automatic detail threshold (days)",
           "graph_height": "Graph height",
           "include_hidden": "Include hidden entities",
-          "card_options": "Chart options",
           "require_admin": "Administrators only",
-          "card_module_url": "Graph card module URL"
+          "card_module_url": "Graph card module URL",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Use automatic grouping for large date ranges, with an option to load finer detail from the History panel.",
           "large_range_detail_threshold_days": "Use automatic detail when the selected range is at least this many days.",
-          "card_options": "Configure numeric and state chart defaults separately. Each visual editor also includes a code editor.",
-          "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource."
+          "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure": {
@@ -36,14 +38,16 @@
           "graph_height": "Graph height",
           "include_hidden": "Include hidden entities",
           "card_module_url": "Graph card module URL",
-          "card_options": "Chart options",
-          "require_admin": "Administrators only"
+          "require_admin": "Administrators only",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Use automatic grouping for large date ranges, with an option to load finer detail from the History panel.",
           "large_range_detail_threshold_days": "Use automatic detail when the selected range is at least this many days.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
-          "card_options": "Configure numeric and state chart defaults separately. Each visual editor also includes a code editor."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "more_info": {
@@ -54,14 +58,16 @@
           "more_info_show_date_picker": "Show chart calendar",
           "redirect_show_more": "Open Show more in Advanced History",
           "card_module_url": "Graph card module URL",
-          "more_info_card_options": "More Info Card Defaults"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Replace the native History graph in entity dialogs with Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Show the Statistics Graph Chart Card's built-in date picker in entity dialogs.",
           "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
-          "more_info_card_options": "Statistics Graph Chart Card settings used only in entity dialogs. Edit the YAML directly or use the visual editor button."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       },
       "reconfigure_more_info": {
@@ -72,14 +78,16 @@
           "more_info_show_date_picker": "Show chart calendar",
           "redirect_show_more": "Open Show more in Advanced History",
           "card_module_url": "Graph card module URL",
-          "more_info_card_options": "More Info Card Defaults"
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "replace_more_info_history": "Replace the native History graph in entity dialogs with Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Show the Statistics Graph Chart Card's built-in date picker in entity dialogs.",
           "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
-          "more_info_card_options": "Statistics Graph Chart Card settings used only in entity dialogs. Edit the YAML directly or use the visual editor button."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     },
@@ -105,9 +113,9 @@
           "replace_more_info_history": "Use Statistics Graph in More Info",
           "more_info_show_date_picker": "Show chart calendar",
           "card_module_url": "Graph card module URL",
-          "card_options": "Chart options",
-          "more_info_card_options": "More Info Card Defaults",
-          "require_admin": "Administrators only"
+          "require_admin": "Administrators only",
+          "numeric_card_options": "Numeric chart options",
+          "state_card_options": "State chart options"
         },
         "data_description": {
           "large_range_automatic_detail": "Use automatic grouping for large date ranges, with an option to load finer detail from the History panel.",
@@ -116,8 +124,8 @@
           "replace_more_info_history": "Replace the native History graph in entity dialogs with Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Show the Statistics Graph Chart Card's built-in date picker in entity dialogs.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
-          "card_options": "Configure numeric and state chart defaults separately. Each visual editor also includes a code editor.",
-          "more_info_card_options": "Separate Statistics Graph Chart Card settings for the graph shown in entity dialogs. Edit the YAML directly or use its visual editor button."
+          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
         }
       }
     }

@@ -58,7 +58,7 @@ export default {
   "open_card_defaults_editor": "Ouvrir l’éditeur visuel",
   "card_defaults_config_flow_note": "L’enregistrement ici met à jour le champ YAML Valeurs par défaut de la carte ci-dessous. Validez le flux de configuration pour appliquer les valeurs.",
   "more_info_card_defaults": "Valeurs par défaut de Plus d’informations",
-  "more_info_card_defaults_config_flow_note": "Ces paramètres concernent uniquement Statistics Graph dans les boîtes de dialogue d’entité. L’enregistrement met à jour le champ YAML de Plus d’informations ; validez le flux de configuration pour l’appliquer.",
+  "more_info_card_defaults_config_flow_note": "Configurez séparément les valeurs numériques et d’état des boîtes de dialogue d’entité. Enregistrez cet éditeur, puis validez le flux de configuration.",
   "more_info_entity_graph_settings": "Paramètres du graphique de l’entité",
   "use_interval_picker": "Utiliser le sélecteur d’intervalle",
   "use_date_picker": "Utiliser le sélecteur de date",
