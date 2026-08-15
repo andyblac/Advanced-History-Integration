@@ -121,22 +121,21 @@ export class GraphMethods {
       const mode = hasNumeric
         ? (cardOptions.chart_mode || "timeline")
         : "state_timeline";
-      const title = cardOptions.card_header
-        || this._customLocalize(mode === "state_timeline" ? "state_history" : "numeric_history");
       const graphDetail = mode === "state_timeline" ? null : detail;
       this._renderLargeRangeDetailBanner(graphDetail);
-      this._createGraph(host, series, title, mode, graphDetail);
+      this._createGraph(host, series, "", mode, graphDetail);
       return;
     }
     const numeric = series.filter((item) => this._isNumeric(item));
     const states = series.filter((item) => !this._isNumeric(item));
+    const multipleCharts = Boolean(numeric.length && states.length);
     this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
     if (numeric.length) {
       const numericMode = this._cardOptions().chart_mode || "timeline";
       this._createGraph(
         host,
         numeric,
-        this._customLocalize("numeric_history"),
+        multipleCharts ? this._customLocalize("numeric_history") : "",
         numericMode,
         detail,
       );
@@ -145,7 +144,7 @@ export class GraphMethods {
       this._createGraph(
         host,
         states,
-        this._customLocalize("state_history"),
+        multipleCharts ? this._customLocalize("state_history") : "",
         "state_timeline",
         null,
       );
@@ -1032,7 +1031,7 @@ export class GraphMethods {
     const editorHasNumeric = editorEntities.some((item) => this._isNumeric(item));
     const editorMode = scopedMode || (editorHasNumeric ? "timeline" : "state_timeline");
     const editorHeader = scopedHeader
-      || this._customLocalize(editorHasNumeric ? "numeric_history" : "state_history");
+      ?? this._customLocalize(editorHasNumeric ? "numeric_history" : "state_history");
     const cardOptions = this._cardOptions(cardOptionsConfig);
     const palette = customElements.get(CARD_TAG)?.PALETTE;
     this._editorAutoColors = new Map();
@@ -1100,9 +1099,13 @@ export class GraphMethods {
         : this._seriesDescriptor(row))
       .filter((item) => item.entity);
     const editorHasNumeric = editorSeries.some((item) => this._isNumeric(item));
-    const automaticHeader = this._customLocalize(
-      editorHasNumeric ? "numeric_history" : "state_history"
-    );
+    const allSeries = this._seriesDescriptors(this._resolvedEntityIds());
+    const hasMultipleCharts = !this._activeSnapshot?.single_graph
+      && allSeries.some((item) => this._isNumeric(item))
+      && allSeries.some((item) => !this._isNumeric(item));
+    const automaticHeader = hasMultipleCharts
+      ? this._customLocalize(editorHasNumeric ? "numeric_history" : "state_history")
+      : "";
     const automaticMode = editorHasNumeric ? "timeline" : "state_timeline";
     if (!configuredHasHeader && cardOptions.card_header === automaticHeader) {
       delete cardOptions.card_header;

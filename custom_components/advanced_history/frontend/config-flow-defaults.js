@@ -82,7 +82,7 @@ export function editorConfig(hass, defaults, profile = "panel") {
   const config = {
     ...(defaults && typeof defaults === "object" && !Array.isArray(defaults) ? defaults : {}),
     type: `custom:${CARD_TAG}`,
-    card_header: custom(hass, "numeric_history"),
+    card_header: profile === "panel" ? (defaults?.card_header ?? "") : "",
     chart_mode: defaults?.chart_mode || "timeline",
     ...(profile === "more-info"
       ? (defaults?.hours_to_show !== undefined
@@ -98,11 +98,13 @@ export function editorConfig(hass, defaults, profile = "panel") {
 
 export function defaultsFromEditor(config, profile = "panel") {
   const protectedKeys = new Set([
-    "type", "card_header", "energy_date_sync", "entities",
+    "type", "energy_date_sync", "entities",
   ]);
   if (profile === "panel") {
     protectedKeys.add("hours_to_show");
     protectedKeys.add("height");
+  } else {
+    protectedKeys.add("card_header");
   }
   const defaults = {};
   for (const [key, value] of Object.entries(config || {})) {
