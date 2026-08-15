@@ -20,6 +20,7 @@ from .const import (
     CONF_CARD_MODULE_URL,
     CONF_MORE_INFO_CARD_OPTIONS,
     CONF_MORE_INFO_SHOW_DATE_PICKER,
+    CONF_REDIRECT_SHOW_MORE,
     CONF_REPLACE_MORE_INFO_HISTORY,
     DOMAIN,
     ENTRY_TYPE_MORE_INFO,
@@ -407,6 +408,7 @@ async def websocket_get_more_info_config(
             "card_options": card_options,
             "entity_config": entity_config,
             "picker_mode": picker_mode,
+            "redirect_show_more": bool(options[CONF_REDIRECT_SHOW_MORE]),
             "can_edit_entity_config": bool(connection.user.is_admin),
         },
     )

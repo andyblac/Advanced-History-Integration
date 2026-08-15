@@ -16,8 +16,6 @@ from homeassistant.helpers import selector
 from .const import (
     CONF_CARD_MODULE_URL,
     CONF_CARD_OPTIONS,
-    CONF_COMPARE,
-    CONF_DEFAULT_HOURS,
     CONF_ENTITY_OPTIONS,
     CONF_ENTRY_TYPE,
     CONF_GRAPH_HEIGHT,
@@ -48,7 +46,6 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
     """Return the Advanced History panel form schema."""
     return vol.Schema(
         {
-            vol.Optional(CONF_TITLE, default=values[CONF_TITLE]): selector.TextSelector(),
             vol.Optional(
                 CONF_SIDEBAR_ICON, default=values[CONF_SIDEBAR_ICON]
             ): selector.IconSelector(),
@@ -79,13 +76,6 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Optional(
-                CONF_DEFAULT_HOURS, default=values[CONF_DEFAULT_HOURS]
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1, max=8760, step=1, mode=selector.NumberSelectorMode.BOX
-                )
-            ),
-            vol.Optional(
                 CONF_GRAPH_HEIGHT, default=values[CONF_GRAPH_HEIGHT]
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
@@ -96,28 +86,11 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
                 CONF_INCLUDE_HIDDEN, default=values[CONF_INCLUDE_HIDDEN]
             ): selector.BooleanSelector(),
             vol.Optional(
-                CONF_REDIRECT_SHOW_MORE, default=values[CONF_REDIRECT_SHOW_MORE]
-            ): selector.BooleanSelector(),
-            vol.Optional(
                 CONF_CARD_MODULE_URL, default=values[CONF_CARD_MODULE_URL]
             ): selector.TextSelector(),
             vol.Optional(
                 CONF_CARD_OPTIONS, default=values[CONF_CARD_OPTIONS]
             ): selector.ObjectSelector(),
-            vol.Optional(CONF_COMPARE, default=values[CONF_COMPARE]): (
-                selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[
-                            "follow_energy",
-                            "previous_period",
-                            "last_year",
-                            "disabled",
-                        ],
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                        translation_key="compare_mode",
-                    )
-                )
-            ),
             vol.Optional(
                 CONF_REQUIRE_ADMIN, default=values[CONF_REQUIRE_ADMIN]
             ): selector.BooleanSelector(),
@@ -138,6 +111,9 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
                 default=values[CONF_MORE_INFO_SHOW_DATE_PICKER],
             ): selector.BooleanSelector(),
             vol.Optional(
+                CONF_REDIRECT_SHOW_MORE, default=values[CONF_REDIRECT_SHOW_MORE]
+            ): selector.BooleanSelector(),
+            vol.Optional(
                 CONF_CARD_MODULE_URL, default=values[CONF_CARD_MODULE_URL]
             ): selector.TextSelector(),
             vol.Optional(
@@ -151,7 +127,7 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
 class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle Advanced History config entries."""
 
-    VERSION = 7
+    VERSION = 11
 
     def _configured_types(self) -> set[str]:
         """Return the service roles which are already configured."""
@@ -199,7 +175,7 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
         if user_input is not None:
             return self.async_create_entry(
-                title=user_input[CONF_TITLE],
+                title=DEFAULT_OPTIONS[CONF_TITLE],
                 data={CONF_ENTRY_TYPE: ENTRY_TYPE_PANEL},
                 options=user_input,
             )
@@ -238,7 +214,7 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
             )
             return self.async_update_reload_and_abort(
                 entry,
-                title=user_input[CONF_TITLE],
+                title=DEFAULT_OPTIONS[CONF_TITLE],
                 options=user_input,
             )
         return self.async_show_form(

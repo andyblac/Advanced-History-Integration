@@ -9,9 +9,14 @@ from .const import (
     CARD_OPTIONS_NUMERIC_ENTITIES,
     CARD_OPTIONS_STATE_ENTITIES,
     CONF_CARD_OPTIONS,
+    CONF_COMPARE,
+    CONF_DEFAULT_HOURS,
     CONF_MORE_INFO_CARD_OPTIONS,
+    CONF_REDIRECT_SHOW_MORE,
+    CONF_TITLE,
     DEFAULT_CARD_OPTIONS,
     DEFAULT_MORE_INFO_CARD_OPTIONS,
+    DOMAIN,
     ENTRY_TYPE_MORE_INFO,
     ENTRY_TYPE_PANEL,
     config_entry_type,
@@ -27,7 +32,7 @@ from .websocket import async_register_websocket_commands
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate Advanced History config entries."""
-    if entry.version > 7:
+    if entry.version > 11:
         return False
 
     options = deepcopy(dict(entry.options))
@@ -101,7 +106,42 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             )
         options[CONF_CARD_OPTIONS] = card_options
 
-    hass.config_entries.async_update_entry(entry, options=options, version=7)
+    if entry.version < 8 and config_entry_type(entry) == ENTRY_TYPE_PANEL:
+        options.pop(CONF_DEFAULT_HOURS, None)
+
+    if entry.version < 9 and config_entry_type(entry) == ENTRY_TYPE_PANEL:
+        options.pop(CONF_COMPARE, None)
+
+    is_panel = config_entry_type(entry) == ENTRY_TYPE_PANEL
+    if entry.version < 10 and is_panel:
+        options.pop(CONF_TITLE, None)
+
+    if entry.version < 11 and is_panel:
+        redirect_show_more = options.pop(CONF_REDIRECT_SHOW_MORE, None)
+        if redirect_show_more is not None:
+            more_info_entry = next(
+                (
+                    candidate
+                    for candidate in hass.config_entries.async_entries(DOMAIN)
+                    if config_entry_type(candidate) == ENTRY_TYPE_MORE_INFO
+                ),
+                None,
+            )
+            if more_info_entry is not None:
+                more_info_options = deepcopy(dict(more_info_entry.options))
+                more_info_options.setdefault(
+                    CONF_REDIRECT_SHOW_MORE, bool(redirect_show_more)
+                )
+                hass.config_entries.async_update_entry(
+                    more_info_entry, options=more_info_options
+                )
+
+    hass.config_entries.async_update_entry(
+        entry,
+        options=options,
+        version=11,
+        title="Advanced History" if is_panel else entry.title,
+    )
     return True
 
 

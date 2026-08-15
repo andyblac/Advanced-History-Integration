@@ -15,7 +15,6 @@ import { customLocalize, loadTranslations } from "./translations.js";
 // in a browser session that still has the previous module loaded.
 const SHOW_MORE_REDIRECT_INSTALL_KEY = "__advancedHistoryShowMoreRedirectInstalled";
 const PANEL_PATH = "/advanced-history";
-const PANEL_KEY = "advanced-history";
 const MORE_INFO_PATCH_KEY = "__advancedHistoryMoreInfoPatched";
 const MORE_INFO_HOST_CLASS = "advanced-history-more-info-chart";
 const MORE_INFO_HOST_BOTTOM_OFFSET =
@@ -930,6 +929,7 @@ async function replaceMoreInfoChart(historyView) {
   showMoreInfoLoading(root, nativeChart);
   try {
     const serviceConfig = await getMoreInfoConfig(historyView.hass, entityId);
+    historyView.__advancedHistoryMoreInfoServiceConfig = serviceConfig;
     if (
       historyView.__advancedHistoryMoreInfoToken !== token
       || historyView.entityId !== entityId
@@ -1031,8 +1031,10 @@ function rewriteShowMoreLink(event) {
   if (!historyView) return;
   scheduleMoreInfoReplacement(historyView);
 
-  const panelConfig = historyView.hass?.panels?.[PANEL_KEY]?.config;
-  if (!panelConfig?.redirect_show_more) return;
+  const entityId = historyView.entityId;
+  const serviceConfig = historyView.__advancedHistoryMoreInfoServiceConfig
+    || moreInfoConfigCache.get(configCacheKey(entityId))?.config;
+  if (!serviceConfig?.redirect_show_more) return;
 
   const link = path.find(
     (node) => node instanceof HTMLAnchorElement && node.hasAttribute("href")
@@ -1047,11 +1049,11 @@ function rewriteShowMoreLink(event) {
   }
   if (nativeUrl.pathname !== "/history") return;
 
-  const entityId = historyView.entityId || nativeUrl.searchParams.get("entity_id");
-  if (!entityId) return;
+  const targetEntityId = entityId || nativeUrl.searchParams.get("entity_id");
+  if (!targetEntityId) return;
 
   const target = new URL(PANEL_PATH, window.location.origin);
-  target.searchParams.set("entity_id", entityId);
+  target.searchParams.set("entity_id", targetEntityId);
   link.href = `${target.pathname}${target.search}`;
 }
 

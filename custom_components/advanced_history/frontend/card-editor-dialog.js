@@ -25,6 +25,8 @@ export async function openCardEditorDialog({
   allowCode = true,
   visualEditorStyles = "",
   editorVariants = null,
+  initialVariantKey = null,
+  shouldSyncVariantKey = null,
 }) {
   if (activeDialogHost?.isConnected) return null;
   const dialogHost = document.createElement(DIALOG_TAG);
@@ -127,7 +129,9 @@ export async function openCardEditorDialog({
   const save = root.querySelector('[data-action="save"]');
   const reset = root.querySelector('[data-action="reset"]');
   const toggle = root.querySelector('[data-action="toggle-editor"]');
-  let activeVariantKey = variants[0]?.key || null;
+  let activeVariantKey = variants.some((variant) => variant.key === initialVariantKey)
+    ? initialVariantKey
+    : variants[0]?.key || null;
   const variantDrafts = new Map(variants.map((variant) => [
     variant.key,
     structuredClone(variant.initialConfig),
@@ -168,15 +172,36 @@ export async function openCardEditorDialog({
   };
   const updateDraft = (nextDraft, trackChanges = true) => {
     const next = structuredClone(nextDraft || {});
+    const changedKeys = [];
     if (activeVariantKey && trackChanges) {
       const dirty = variantDirtyKeys.get(activeVariantKey);
       const keys = new Set([...Object.keys(draft || {}), ...Object.keys(next)]);
       for (const key of keys) {
-        if (JSON.stringify(draft?.[key]) !== JSON.stringify(next[key])) dirty.add(key);
+        if (JSON.stringify(draft?.[key]) !== JSON.stringify(next[key])) {
+          dirty.add(key);
+          changedKeys.push(key);
+        }
       }
     }
     draft = next;
-    if (activeVariantKey) variantDrafts.set(activeVariantKey, structuredClone(next));
+    if (activeVariantKey) {
+      variantDrafts.set(activeVariantKey, structuredClone(next));
+      if (trackChanges && changedKeys.length && typeof shouldSyncVariantKey === "function") {
+        for (const [variantKey, variantDraft] of variantDrafts) {
+          if (variantKey === activeVariantKey) continue;
+          const synced = structuredClone(variantDraft);
+          for (const key of changedKeys) {
+            if (!shouldSyncVariantKey(key, activeVariantKey, variantKey)) continue;
+            if (Object.prototype.hasOwnProperty.call(next, key)) {
+              synced[key] = structuredClone(next[key]);
+            } else {
+              delete synced[key];
+            }
+          }
+          variantDrafts.set(variantKey, synced);
+        }
+      }
+    }
   };
 
   const applyVisualEditorStyles = (editor) => {
@@ -373,6 +398,7 @@ export async function openCardEditorDialog({
     }
   });
 
+  updateVariantTabs();
   modal.showModal();
   await renderVisual();
   return dialogHost;

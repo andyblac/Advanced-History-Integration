@@ -6,6 +6,25 @@ const INSTALLED_KEY = "__advancedHistoryConfigFlowDefaultsInstalled";
 const INJECTED_KEY = "advancedHistoryDefaultsButton";
 const NUMERIC_ENTITIES_KEY = "numeric_entities";
 const STATE_ENTITIES_KEY = "state_entities";
+const PANEL_MANAGED_EDITOR_KEYS = new Set([
+  "energy_date_sync", "energy_collection_key",
+  "hours_to_show", "height",
+  "show_date_picker", "date_picker_position", "date_picker_nav_position",
+  "date_picker_shortcuts_position", "date_picker_group", "date_picker_modes",
+  "date_picker_default_mode", "date_picker_step",
+  "show_interval_picker", "interval_picker_position", "interval_picker_group",
+  "interval_options",
+  "show_attribute_list", "attribute_list_position",
+  "show_y2_axis",
+]);
+const STATE_MANAGED_EDITOR_KEYS = new Set([
+  "show_pph_picker", "pph_picker_position", "pph_picker_group",
+  "show_group_by_picker", "group_by_picker_position", "group_by_picker_group",
+  "points_per_hour", "group_by", "auto_scale_points",
+]);
+const PANEL_VARIANT_SPECIFIC_KEYS = new Set([
+  "entities", "chart_mode", ...STATE_MANAGED_EDITOR_KEYS,
+]);
 
 function language(hass) {
   return hass?.locale?.language || hass?.language;
@@ -159,12 +178,22 @@ function panelEditorStyles(variant) {
     .f:has(.e-statistic_id),
     .f:has(.e-attribute),
     .f:has(.e-enabled),
-    .f:has(.e-y_axis) { display: none !important; }
+    .f:has(.e-y_axis),
+    .overlay-row:has(#energy_date_sync),
+    .overlay-row:has(#show_date_picker),
+    .f:has(#hours_to_show),
+    .f:has(#height),
+    label:has(#show_y2_axis),
+    .overlay-row:has(#show_interval_picker),
+    .overlay-row:has(#show_attribute_list) { display: none !important; }
     ${variant === "state"
       ? `
         .f:has(#chart_mode),
         .f:has(#group_by),
-        label:has(#auto_scale_points) { display: none !important; }
+        label:has(#auto_scale_points),
+        .f:has(#points_per_hour),
+        .overlay-row:has(#show_pph_picker),
+        .overlay-row:has(#show_group_by_picker) { display: none !important; }
       `
       : ""}
   `;
@@ -177,7 +206,8 @@ function panelDefaultsFromEditor(current, draft, variant, dirtyKeys = []) {
   const edited = defaultsFromEditor(draft, "panel");
   for (const key of dirtyKeys) {
     if (["type", "energy_date_sync", "hours_to_show", "height"].includes(key)) continue;
-    if (variant === "state" && ["chart_mode", "group_by", "auto_scale_points"].includes(key)) {
+    if (PANEL_MANAGED_EDITOR_KEYS.has(key)) continue;
+    if (variant === "state" && (key === "chart_mode" || STATE_MANAGED_EDITOR_KEYS.has(key))) {
       continue;
     }
     if (key === "entities") {
@@ -224,11 +254,19 @@ async function openDefaultsEditor(selector, profile, variant = "numeric") {
   const title = custom(hass, isMoreInfo ? "more_info_card_defaults" : "card_defaults");
   const currentDefaults = selector.value || {};
   const initialConfig = editorConfig(hass, currentDefaults, profile, variant);
+  const panelVariants = isMoreInfo
+    ? null
+    : ["numeric", "state"].map((key) => ({
+      key,
+      label: custom(hass, key === "state" ? "state_chart_options" : "numeric_chart_options"),
+      initialConfig: editorConfig(hass, currentDefaults, profile, key),
+      visualEditorStyles: panelEditorStyles(key),
+    }));
   await openCardEditorDialog({
     hass,
     container: selector,
     initialConfig,
-    title: isMoreInfo ? title : custom(hass, variant === "state" ? "state_chart_options" : "numeric_chart_options"),
+    title,
     note: custom(
       hass,
       isMoreInfo
@@ -242,9 +280,11 @@ async function openDefaultsEditor(selector, profile, variant = "numeric") {
       loadError: custom(hass, "graph_editor_load_error"),
     },
     allowCode: true,
-    editorVariants: isMoreInfo
+    editorVariants: panelVariants,
+    initialVariantKey: isMoreInfo ? null : variant,
+    shouldSyncVariantKey: isMoreInfo
       ? null
-      : [{ key: variant, label: "", initialConfig, visualEditorStyles: panelEditorStyles(variant) }],
+      : (key) => !PANEL_VARIANT_SPECIFIC_KEYS.has(key),
     visualEditorStyles: isMoreInfo
       ? `
         #add-entity,
@@ -254,16 +294,22 @@ async function openDefaultsEditor(selector, profile, variant = "numeric") {
       : panelEditorStyles(variant),
     ensureLoaded: () => ensureCardLoaded(hass),
     onSave: (draft, variantState) => {
+      let nextDefaults = currentDefaults;
+      if (!isMoreInfo) {
+        for (const key of ["numeric", "state"]) {
+          nextDefaults = panelDefaultsFromEditor(
+            nextDefaults,
+            variantState?.drafts?.[key],
+            key,
+            variantState?.dirtyKeys?.[key],
+          );
+        }
+      }
       updateObjectSelector(
         selector,
         isMoreInfo
           ? defaultsFromEditor(draft, profile)
-          : panelDefaultsFromEditor(
-            currentDefaults,
-            draft,
-            variant,
-            variantState?.dirtyKeys?.[variant],
-          ),
+          : nextDefaults,
       );
     },
   });
@@ -287,23 +333,21 @@ function injectButton(selector, profile) {
     `;
     const sections = document.createElement("div");
     sections.className = `advanced-history-defaults-sections ${className}`;
-    for (const variant of ["numeric", "state"]) {
-      const section = document.createElement("div");
-      section.className = "advanced-history-defaults-section";
-      const heading = document.createElement("strong");
-      heading.textContent = custom(selector.hass, variant === "state" ? "state_chart_options" : "numeric_chart_options");
-      const launch = document.createElement("button");
-      launch.type = "button";
-      launch.innerHTML = `<ha-icon icon="mdi:tune-variant"></ha-icon><span>${custom(selector.hass, "open_card_defaults_editor")}</span>`;
-      launch.style.cssText = "padding:0 16px;height:40px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--primary-color);border-radius:20px;color:var(--primary-color);background:transparent;cursor:pointer;font:inherit;font-weight:500";
-      launch.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        openDefaultsEditor(selector, profile, variant);
-      });
-      section.append(heading, launch);
-      sections.append(section);
-    }
+    const section = document.createElement("div");
+    section.className = "advanced-history-defaults-section";
+    const heading = document.createElement("strong");
+    heading.textContent = custom(selector.hass, "card_defaults");
+    const launch = document.createElement("button");
+    launch.type = "button";
+    launch.innerHTML = `<ha-icon icon="mdi:tune-variant"></ha-icon><span>${custom(selector.hass, "open_card_defaults_editor")}</span>`;
+    launch.style.cssText = "padding:0 16px;height:40px;display:inline-flex;align-items:center;gap:8px;border:1px solid var(--primary-color);border-radius:20px;color:var(--primary-color);background:transparent;cursor:pointer;font:inherit;font-weight:500";
+    launch.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openDefaultsEditor(selector, profile);
+    });
+    section.append(heading, launch);
+    sections.append(section);
     selector.shadowRoot.append(style, sections);
     return true;
   }

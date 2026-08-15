@@ -1304,6 +1304,10 @@ export class GraphMethods {
       }
       Object.assign(entityOptions, editedEntityOptions);
     }
+    return this._commitGraphEditorConfig(cardOptions, entityOptions, config);
+  }
+
+  _commitGraphEditorConfig(cardOptions, entityOptions, config) {
     const defaultHours = Number(config?.hours_to_show) || this._effectiveDefaultHours();
     const graphHeight = Number(config?.height) || this._effectiveGraphHeight();
     const compare = this._activeSnapshot?.compare;
@@ -1329,17 +1333,100 @@ export class GraphMethods {
     return { cardOptions, entityOptions, defaultHours, graphHeight };
   }
 
+  _applyGraphEditorVariants(variants) {
+    const entityOptions = structuredClone(this._activeSnapshot?.entity_options || {});
+    let cardOptions = null;
+    let primaryConfig = null;
+    for (const variant of variants) {
+      const split = this._splitGraphEditorConfig(variant.config, false, variant.initialConfig);
+      if (!primaryConfig || variant.mode !== "state_timeline") {
+        primaryConfig = variant.config;
+        cardOptions = split.cardOptions;
+      }
+      for (const item of variant.series) {
+        const descriptor = this._seriesDescriptor(item);
+        delete entityOptions[descriptor.key];
+        if (!descriptor.attribute) delete entityOptions[descriptor.entity];
+      }
+      Object.assign(entityOptions, split.entityOptions);
+    }
+    return this._commitGraphEditorConfig(cardOptions || {}, entityOptions, primaryConfig || {});
+  }
+
   async _openGraphEditor(scopedSeries = null, scopedMode = null, scopedHeader = null) {
-    const initialConfig = this._graphEditorConfig(
-      false,
-      scopedSeries,
-      scopedMode,
-      scopedHeader,
-    );
+    const allSeries = this._seriesDescriptors(this._resolvedEntityIds());
+    const numeric = allSeries.filter((item) => this._isNumeric(item));
+    const states = allSeries.filter((item) => !this._isNumeric(item));
+    const combinedEditor = !this._activeSnapshot?.single_graph && numeric.length && states.length;
+    const entries = combinedEditor
+      ? [
+        {
+          key: "numeric",
+          mode: this._cardOptions().chart_mode || "timeline",
+          header: this._customLocalize("numeric_history"),
+          series: numeric,
+        },
+        {
+          key: "state",
+          mode: "state_timeline",
+          header: this._customLocalize("state_history"),
+          series: states,
+        },
+      ]
+      : [{
+        key: scopedMode === "state_timeline" ? "state" : "numeric",
+        mode: scopedMode,
+        header: scopedHeader,
+        series: scopedSeries,
+      }];
+    for (const entry of entries) {
+      entry.initialConfig = this._graphEditorConfig(
+        false,
+        entry.series,
+        entry.mode,
+        entry.header,
+      );
+      entry.styles = `
+        #add-entity,
+        .edb[data-action="delete"],
+        .edup[data-action="duplicate"],
+        .cmp-add,
+        .cmp-del,
+        .cmp-row .f:has(.cmp-period),
+        .cmp-row .f:has(.cmp-back),
+        .f:has(.e-entity),
+        .f:has(.e-statistic_id),
+        .f:has(.e-attribute),
+        .f:has(.e-enabled),
+        .f:has(.e-y_axis),
+        .overlay-row:has(#energy_date_sync),
+        .overlay-row:has(#show_date_picker),
+        .f:has(#hours_to_show),
+        label:has(#show_y2_axis),
+        .overlay-row:has(#show_interval_picker),
+        .overlay-row:has(#show_attribute_list) { display: none !important; }
+        ${entry.mode === "state_timeline"
+          ? `
+            .f:has(#chart_mode),
+            .f:has(#group_by),
+            label:has(#auto_scale_points),
+            .f:has(#points_per_hour),
+            .overlay-row:has(#show_pph_picker),
+            .overlay-row:has(#show_group_by_picker) { display: none !important; }
+          `
+          : ""}
+      `;
+    }
+    const initialEntry = entries.find((entry) => entry.mode === scopedMode) || entries[0];
+    const variantSpecificKeys = new Set([
+      "entities", "chart_mode", "group_by", "auto_scale_points", "points_per_hour",
+      "show_pph_picker", "pph_picker_position", "pph_picker_group",
+      "show_group_by_picker", "group_by_picker_position", "group_by_picker_group",
+    ]);
     await openCardEditorDialog({
       hass: this._hass,
       container: this,
-      initialConfig,
+      initialConfig: initialEntry.initialConfig,
       title: this._customLocalize("graph_settings"),
       note: this._customLocalize("graph_editor_note"),
       labels: {
@@ -1361,25 +1448,28 @@ export class GraphMethods {
         label: this._customLocalize("diagnostics"),
         onClick: () => this._openDiagnostics(),
       },
-      visualEditorStyles: `
-        #add-entity,
-        .edb[data-action="delete"],
-        .edup[data-action="duplicate"],
-        .cmp-add,
-        .cmp-del,
-        .cmp-row .f:has(.cmp-period),
-        .cmp-row .f:has(.cmp-back),
-        .f:has(.e-entity),
-        .f:has(.e-statistic_id),
-        .f:has(.e-attribute),
-        .f:has(.e-enabled),
-        .f:has(.e-y_axis) { display: none !important; }
-        ${scopedMode === "state_timeline"
-          ? ".f:has(#chart_mode) { display: none !important; }"
-          : ""}
-      `,
-      onSave: (draft) => {
-        this._applyGraphEditorConfig(draft, scopedSeries, initialConfig);
+      editorVariants: combinedEditor
+        ? entries.map((entry) => ({
+          key: entry.key,
+          label: entry.header,
+          initialConfig: entry.initialConfig,
+          visualEditorStyles: entry.styles,
+        }))
+        : null,
+      initialVariantKey: initialEntry.key,
+      shouldSyncVariantKey: combinedEditor
+        ? (key) => !variantSpecificKeys.has(key)
+        : null,
+      visualEditorStyles: initialEntry.styles,
+      onSave: (draft, variantState) => {
+        if (combinedEditor) {
+          this._applyGraphEditorVariants(entries.map((entry) => ({
+            ...entry,
+            config: variantState?.drafts?.[entry.key] || entry.initialConfig,
+          })));
+        } else {
+          this._applyGraphEditorConfig(draft, scopedSeries, initialEntry.initialConfig);
+        }
         this._render();
       },
     });

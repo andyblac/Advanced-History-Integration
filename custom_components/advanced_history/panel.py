@@ -10,7 +10,6 @@ from homeassistant.core import HomeAssistant
 
 from .const import (
     CONF_CARD_MODULE_URL,
-    CONF_COMPARE,
     CONF_REQUIRE_ADMIN,
     CONF_SIDEBAR_ICON,
     CONF_TITLE,
@@ -67,17 +66,11 @@ def _panel_config(entry: ConfigEntry) -> tuple[dict, dict]:
     panel_config = {
         key: value
         for key, value in options.items()
-        if key not in {CONF_SIDEBAR_ICON, CONF_REQUIRE_ADMIN, CONF_COMPARE}
+        if key not in {CONF_SIDEBAR_ICON, CONF_REQUIRE_ADMIN}
     }
     panel_config["config_entry_id"] = entry.entry_id
     panel_config["settings_path"] = f"/config/integrations/integration/{DOMAIN}"
     panel_config["integration_version"] = VERSION
-
-    compare = options[CONF_COMPARE]
-    if compare == "disabled":
-        panel_config[CONF_COMPARE] = False
-    elif compare != "follow_energy":
-        panel_config[CONF_COMPARE] = compare
 
     if not panel_config.get(CONF_CARD_MODULE_URL):
         panel_config.pop(CONF_CARD_MODULE_URL, None)
