@@ -140,6 +140,7 @@ export const panelStyles = `
   .charts { display:grid; gap:16px; }
   .charts[hidden] { display:none; }
   .graph-shell { position:relative; min-width:0; }
+  .graph-shell.state-controls-row { padding-top:44px; }
   .graph-shell > statistics-graph-chart-card { display:block; }
   .graph-card-editor {
     position:absolute; z-index:3; top:4px; right:44px;

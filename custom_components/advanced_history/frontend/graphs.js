@@ -251,6 +251,12 @@ export class GraphMethods {
         : {}),
       ...this._panelGraphHourOptions(),
     };
+    if (
+      mode === "state_timeline"
+      && !String(config.card_header || "").trim()
+    ) {
+      shell.classList.add("state-controls-row");
+    }
     try {
       if (detail?.automatic) {
         // Statistics Graph Chart Card persists its on-card Group By and PPH
