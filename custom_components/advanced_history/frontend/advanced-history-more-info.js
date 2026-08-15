@@ -240,7 +240,7 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
     type: `custom:${CARD_TAG}`,
     card_header: "",
     card_padding: cardOptions.card_padding ?? 0,
-    chart_mode: numeric ? "timeline" : "state_timeline",
+    chart_mode: numeric ? (cardOptions.chart_mode || "timeline") : "state_timeline",
     ...(cardOptions.hours_to_show !== undefined
       ? { hours_to_show: cardOptions.hours_to_show }
       : {}),
@@ -569,7 +569,8 @@ function entityOverrideFromEditor(draft, base, numeric) {
     draft,
     base,
     new Set([
-      "type", "card_header", "chart_mode", "entities",
+      "type", "card_header", "entities",
+      ...(numeric ? [] : ["chart_mode"]),
       ...(numeric ? [] : ["group_by"]),
     ]),
   );

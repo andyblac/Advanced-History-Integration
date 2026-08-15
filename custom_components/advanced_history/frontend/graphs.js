@@ -117,8 +117,10 @@ export class GraphMethods {
     }
     if (this._activeSnapshot?.single_graph) {
       const cardOptions = this._cardOptions();
-      const mode = cardOptions.chart_mode
-        || (series.some((item) => this._isNumeric(item)) ? "timeline" : "state_timeline");
+      const hasNumeric = series.some((item) => this._isNumeric(item));
+      const mode = hasNumeric
+        ? (cardOptions.chart_mode || "timeline")
+        : "state_timeline";
       const title = cardOptions.card_header
         || this._customLocalize(mode === "state_timeline" ? "state_history" : "numeric_history");
       const graphDetail = mode === "state_timeline" ? null : detail;
@@ -130,11 +132,12 @@ export class GraphMethods {
     const states = series.filter((item) => !this._isNumeric(item));
     this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
     if (numeric.length) {
+      const numericMode = this._cardOptions().chart_mode || "timeline";
       this._createGraph(
         host,
         numeric,
         this._customLocalize("numeric_history"),
-        "timeline",
+        numericMode,
         detail,
       );
     }
