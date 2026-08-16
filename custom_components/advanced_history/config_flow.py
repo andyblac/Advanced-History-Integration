@@ -43,6 +43,11 @@ from .const import (
 
 def _panel_schema(values: dict[str, Any]) -> vol.Schema:
     """Return the Advanced History panel form schema."""
+    numeric_card_options = dict(values[CONF_NUMERIC_CARD_OPTIONS])
+    numeric_card_options.setdefault(
+        "auto_scale_points",
+        values[CONF_LARGE_RANGE_AUTOMATIC_DETAIL] is not False,
+    )
     return vol.Schema(
         {
             vol.Optional(
@@ -79,7 +84,7 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
             ): selector.BooleanSelector(),
             vol.Optional(
                 CONF_NUMERIC_CARD_OPTIONS,
-                default=values[CONF_NUMERIC_CARD_OPTIONS],
+                default=numeric_card_options,
             ): selector.ObjectSelector(),
             vol.Optional(
                 CONF_STATE_CARD_OPTIONS,
@@ -93,6 +98,30 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
             ): selector.TextSelector(),
         }
     )
+
+
+def _panel_options_from_input(
+    user_input: dict[str, Any], existing: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Keep the switch-derived point-scaling value as an inherited default."""
+    result = dict(user_input)
+    numeric = result.get(CONF_NUMERIC_CARD_OPTIONS)
+    if not isinstance(numeric, dict):
+        return result
+
+    configured = (existing or {}).get(CONF_NUMERIC_CARD_OPTIONS)
+    configured = configured if isinstance(configured, dict) else {}
+    if "auto_scale_points" not in configured:
+        previous_automatic_detail = (existing or {}).get(
+            CONF_LARGE_RANGE_AUTOMATIC_DETAIL, True
+        )
+        if numeric.get("auto_scale_points") == (
+            previous_automatic_detail is not False
+        ):
+            numeric = dict(numeric)
+            numeric.pop("auto_scale_points", None)
+            result[CONF_NUMERIC_CARD_OPTIONS] = numeric
+    return result
 
 
 def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
@@ -128,7 +157,7 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
 class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle Advanced History config entries."""
 
-    VERSION = 13
+    VERSION = 14
 
     def _configured_types(self) -> set[str]:
         """Return the service roles which are already configured."""
@@ -178,7 +207,7 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title=DEFAULT_OPTIONS[CONF_TITLE],
                 data={CONF_ENTRY_TYPE: ENTRY_TYPE_PANEL},
-                options=user_input,
+                options=_panel_options_from_input(user_input),
             )
         return self.async_show_form(
             step_id="user", data_schema=_panel_schema(DEFAULT_OPTIONS)
@@ -210,6 +239,7 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_reconfigure_more_info(user_input)
 
         if user_input is not None:
+            user_input = _panel_options_from_input(user_input, dict(entry.options))
             user_input[CONF_ENTITY_OPTIONS] = entry.options.get(
                 CONF_ENTITY_OPTIONS, {}
             )
@@ -265,6 +295,9 @@ class AdvancedHistoryOptionsFlow(OptionsFlowWithReload):
             )
 
         if user_input is not None:
+            user_input = _panel_options_from_input(
+                user_input, dict(self.config_entry.options)
+            )
             user_input[CONF_ENTITY_OPTIONS] = self.config_entry.options.get(
                 CONF_ENTITY_OPTIONS, {}
             )

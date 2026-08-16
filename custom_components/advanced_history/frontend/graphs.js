@@ -379,6 +379,46 @@ export class GraphMethods {
     schedule();
   }
 
+  _detailCardOptions(detail = null) {
+    if (!detail) {
+      const configured = this._effectiveCardOptionsConfig("timeline");
+      const hasManualResolution = (
+        ["points_per_hour", "group_by"].some(
+          (key) => Object.prototype.hasOwnProperty.call(configured || {}, key),
+        )
+        || configured?.show_pph_picker === true
+        || configured?.show_group_by_picker === true
+      );
+      return {
+        auto_scale_points: hasManualResolution
+          ? false
+          : this.config.large_range_automatic_detail !== false,
+      };
+    }
+    if (detail.automatic) return { auto_scale_points: true };
+    return {
+      auto_scale_points: false,
+      group_by: detail.groupBy,
+      show_group_by_picker: true,
+    };
+  }
+
+  _hasDetailResolutionOverride() {
+    const configured = this._effectiveCardOptionsConfig("timeline");
+    const configuredResolution = ["auto_scale_points", "points_per_hour", "group_by"].some(
+      (key) => Object.prototype.hasOwnProperty.call(configured || {}, key),
+    );
+    return configuredResolution
+      || configured?.show_pph_picker === true
+      || configured?.show_group_by_picker === true;
+  }
+
+  _resolvedDetailCardOptions(detail = null, cardOptions = {}) {
+    // Automatic detail supplies inherited defaults. Explicit integration or
+    // chart options are always applied afterwards and therefore win.
+    return { ...this._detailCardOptions(detail), ...cardOptions };
+  }
+
   _createGraph(host, series, title, mode, detail = null) {
     const shell = document.createElement("div");
     shell.className = "graph-shell";
@@ -402,11 +442,7 @@ export class GraphMethods {
     if (cardOptions.chart_mode && cardOptions.chart_mode !== mode) {
       delete cardOptions.chart_mode;
     }
-    const detailOptions = !detail
-      ? {}
-      : detail.automatic
-        ? { auto_scale_points: true }
-        : { auto_scale_points: false, group_by: detail.groupBy, show_group_by_picker: true };
+    const resolvedCardOptions = this._resolvedDetailCardOptions(detail, cardOptions);
     const palette = customElements.get(CARD_TAG)?.PALETTE;
     const entities = series.map((item) => this._entityCardConfig(
       item,
@@ -466,13 +502,12 @@ export class GraphMethods {
       type: `custom:${CARD_TAG}`, card_header: title,
       entities,
       hours_to_show: this._effectiveDefaultHours(),
-      ...cardOptions,
+      ...resolvedCardOptions,
       height: mode === "state_timeline" ? "auto" : (cardOptions.height ?? "auto"),
       chart_mode: mode === "state_timeline"
         ? "state_timeline"
         : (cardOptions.chart_mode ?? mode),
       show_y2_axis: hasSecondaryAxis,
-      ...detailOptions,
       ...(mode === "state_timeline"
         ? { auto_scale_points: false, group_by: "raw" }
         : {}),
@@ -583,6 +618,7 @@ export class GraphMethods {
 
   _largeRangeDetailProfile() {
     if (this.config.large_range_automatic_detail === false) return null;
+    if (this._hasDetailResolutionOverride()) return null;
     const period = this._largeRangePeriod();
     const thresholdDays = Math.max(7, Number(this.config.large_range_detail_threshold_days) || 31);
     if (!period) return null;
@@ -1342,6 +1378,10 @@ export class GraphMethods {
     return {
       hours_to_show: editDefaults ? Number(this.config.default_hours) || 24 : this._effectiveDefaultHours(),
       ...cardOptions,
+      auto_scale_points: editorMode === "state_timeline"
+        ? false
+        : (cardOptions.auto_scale_points
+          ?? (this.config.large_range_automatic_detail !== false)),
       height: editorMode === "state_timeline" ? "auto" : (cardOptions.height ?? "auto"),
       type: `custom:${CARD_TAG}`,
       card_header: cardOptions.card_header ?? editorHeader,
@@ -1367,6 +1407,13 @@ export class GraphMethods {
     const configuredEntityOptions = editDefaults ? this.config.entity_options : this._effectiveEntityOptionsConfig();
     const integrationConfiguredCardOptions = this._configuredCardOptions(editorMode);
     const integrationCardDefaults = this._cardOptions(editorMode, integrationConfiguredCardOptions);
+    if (
+      editorMode !== "state_timeline"
+      && integrationCardDefaults.auto_scale_points == null
+    ) {
+      integrationCardDefaults.auto_scale_points =
+        this.config.large_range_automatic_detail !== false;
+    }
     const integrationEntityDefaults = this.config.entity_options || {};
     const configuredRemovals = this._activeSnapshot?.remove_card_options;
     const typedRemovals = configuredRemovals
@@ -1674,6 +1721,7 @@ export class GraphMethods {
       this._activeSnapshot.attribute_selection = attributeSelection;
     }
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
+    if (this._hasDetailResolutionOverride()) this._largeRangeFineDetail = false;
     this._recordChange(null, true);
     return { cardOptions, entityOptions, defaultHours };
   }
@@ -1761,7 +1809,6 @@ export class GraphMethods {
             .f:has(#chart_mode),
             .f:has(#height),
             .f:has(#group_by),
-            label:has(#auto_scale_points),
             .f:has(#points_per_hour),
             .overlay-row:has(#show_pph_picker),
             .overlay-row:has(#show_group_by_picker) { display: none !important; }
@@ -1823,6 +1870,7 @@ export class GraphMethods {
         snapshot.entity_options = {};
         delete snapshot.remove_card_options;
         this._activeSnapshot = snapshot;
+        this._largeRangeFineDetail = false;
         this._recordChange(null, true);
         this._render();
       },

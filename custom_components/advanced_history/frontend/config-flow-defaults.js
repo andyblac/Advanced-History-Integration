@@ -82,10 +82,9 @@ function integrationDefaults(profile, variant) {
   return {
     ...structuredClone(defaults),
     ...(variant === "numeric"
-      ? {
-          auto_scale_points: true,
-          height: profile === "more-info" ? 240 : "auto",
-        }
+      ? profile === "more-info"
+        ? { auto_scale_points: true, height: 240 }
+        : { height: "auto" }
       : {}),
     ...(variant === "state"
       ? {
@@ -307,7 +306,6 @@ function panelEditorStyles(variant) {
         .f:has(#chart_mode),
         .f:has(#height),
         .f:has(#group_by),
-        label:has(#auto_scale_points),
         .f:has(#points_per_hour),
         .overlay-row:has(#show_pph_picker),
         .overlay-row:has(#show_group_by_picker) { display: none !important; }

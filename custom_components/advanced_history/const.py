@@ -127,6 +127,7 @@ DEFAULT_NUMERIC_CARD_OPTIONS = {
         not in {
             CARD_OPTIONS_NUMERIC_ENTITIES,
             CARD_OPTIONS_STATE_ENTITIES,
+            "auto_scale_points",
             "state_timeline_label_font_size",
         }
     },

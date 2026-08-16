@@ -39,7 +39,7 @@ from .websocket import async_register_websocket_commands
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate Advanced History config entries."""
-    if entry.version > 13:
+    if entry.version > 14:
         return False
 
     options = deepcopy(dict(entry.options))
@@ -182,10 +182,21 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         options.setdefault(CONF_NUMERIC_CARD_OPTIONS, numeric)
         options.setdefault(CONF_STATE_CARD_OPTIONS, state)
 
+    if entry.version < 14 and is_panel:
+        configured_numeric = options.get(CONF_NUMERIC_CARD_OPTIONS)
+        if isinstance(configured_numeric, dict):
+            numeric = deepcopy(configured_numeric)
+            # Until v14, true was written into every panel's numeric defaults.
+            # Remove that inherited value so Automatic detail can supply the
+            # new default. Explicit false values remain untouched.
+            if numeric.get("auto_scale_points") is True:
+                numeric.pop("auto_scale_points")
+            options[CONF_NUMERIC_CARD_OPTIONS] = numeric
+
     hass.config_entries.async_update_entry(
         entry,
         options=options,
-        version=13,
+        version=14,
         title="Advanced History" if is_panel else entry.title,
     )
     return True

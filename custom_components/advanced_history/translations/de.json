@@ -9,7 +9,7 @@
           "sidebar_icon": "Seitenleistensymbol",
           "max_entities": "Maximale Anzahl Entitäten",
           "max_tabs": "Maximale Anzahl Tabs",
-          "large_range_automatic_detail": "Automatische Details für große Zeiträume",
+          "large_range_automatic_detail": "Automatische Details",
           "large_range_detail_threshold_days": "Schwellenwert für automatische Details (Tage)",
           "graph_height": "Diagrammhöhe",
           "include_hidden": "Ausgeblendete Entitäten einbeziehen",
@@ -19,7 +19,7 @@
           "state_card_options": "State chart options"
         },
         "data_description": {
-          "large_range_automatic_detail": "Verwendet für große Zeiträume eine automatische Gruppierung mit der Option, in der Verlaufsansicht feinere Details zu laden.",
+          "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische Diagramme als Standard fest; Diagrammoptionen können sie überschreiben. Für große Zeiträume bietet die Verlaufsansicht zusätzlich feinere Details.",
           "large_range_detail_threshold_days": "Verwendet automatische Details, wenn der ausgewählte Zeitraum mindestens so viele Tage umfasst.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
@@ -33,7 +33,7 @@
           "sidebar_icon": "Seitenleistensymbol",
           "max_entities": "Maximale Anzahl Entitäten",
           "max_tabs": "Maximale Anzahl Tabs",
-          "large_range_automatic_detail": "Automatische Details für große Zeiträume",
+          "large_range_automatic_detail": "Automatische Details",
           "large_range_detail_threshold_days": "Schwellenwert für automatische Details (Tage)",
           "graph_height": "Diagrammhöhe",
           "include_hidden": "Ausgeblendete Entitäten einbeziehen",
@@ -43,7 +43,7 @@
           "state_card_options": "State chart options"
         },
         "data_description": {
-          "large_range_automatic_detail": "Verwendet für große Zeiträume eine automatische Gruppierung mit der Option, in der Verlaufsansicht feinere Details zu laden.",
+          "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische Diagramme als Standard fest; Diagrammoptionen können sie überschreiben. Für große Zeiträume bietet die Verlaufsansicht zusätzlich feinere Details.",
           "large_range_detail_threshold_days": "Verwendet automatische Details, wenn der ausgewählte Zeitraum mindestens so viele Tage umfasst.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
@@ -105,7 +105,7 @@
           "sidebar_icon": "Seitenleistensymbol",
           "max_entities": "Maximale Anzahl Entitäten",
           "max_tabs": "Maximale Anzahl Tabs",
-          "large_range_automatic_detail": "Automatische Details für große Zeiträume",
+          "large_range_automatic_detail": "Automatische Details",
           "large_range_detail_threshold_days": "Schwellenwert für automatische Details (Tage)",
           "graph_height": "Diagrammhöhe",
           "include_hidden": "Ausgeblendete Entitäten einbeziehen",
@@ -118,7 +118,7 @@
           "state_card_options": "State chart options"
         },
         "data_description": {
-          "large_range_automatic_detail": "Verwendet für große Zeiträume eine automatische Gruppierung mit der Option, in der Verlaufsansicht feinere Details zu laden.",
+          "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische Diagramme als Standard fest; Diagrammoptionen können sie überschreiben. Für große Zeiträume bietet die Verlaufsansicht zusätzlich feinere Details.",
           "large_range_detail_threshold_days": "Verwendet automatische Details, wenn der ausgewählte Zeitraum mindestens so viele Tage umfasst.",
           "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
