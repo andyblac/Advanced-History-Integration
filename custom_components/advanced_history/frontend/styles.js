@@ -147,7 +147,7 @@ export const panelStyles = `
   .graph-shell > statistics-graph-chart-card { display:block; }
   .charts.dynamic-numeric .graph-shell.numeric-graph > statistics-graph-chart-card { height:100%; }
   .graph-card-editor {
-    position:absolute; z-index:3; top:4px; right:44px;
+    position:absolute; z-index:3; top:4px; right:8px;
   }
   .graph-shell.has-card-editor .data-source-indicator { right:88px; }
   .data-source-indicator {
