@@ -1091,26 +1091,34 @@ export class EnergyMethods {
       if (typeof window.loadCardHelpers !== "function") throw new Error("Home Assistant card helpers are unavailable");
       const helpers = await window.loadCardHelpers();
       if (this._energyRenderToken !== token || !host.isConnected) return;
+      const collectionKey = this._panelEnergyCollectionKey();
+      // Home Assistant lazy-loads the Energy period selector. Mount a hidden
+      // instance first so this panel can initialise its own collection even
+      // when no Energy card has previously been used on another dashboard.
+      const bootstrapController = helpers.createCardElement({
+        type: "energy-date-selection",
+        ...(collectionKey ? { collection_key: collectionKey } : {}),
+      });
+      bootstrapController.classList.add("energy-date-bootstrap");
+      bootstrapController.setAttribute("aria-hidden", "true");
+      bootstrapController.hass = this._hass;
       const controller = helpers.createCardElement({
         type: "energy-date-selection",
-        ...(this._panelEnergyCollectionKey()
-          ? { collection_key: this._panelEnergyCollectionKey() }
-          : {}),
+        ...(collectionKey ? { collection_key: collectionKey } : {}),
         vertical_opening_direction: "up",
         opening_direction: "center",
       });
       controller.classList.add("energy-date-controller");
       controller.hass = this._hass;
-      host.replaceChildren(controller);
-      this._cards.push(controller);
+      host.replaceChildren(bootstrapController, controller);
+      this._cards.push(bootstrapController, controller);
       this._replaceEnergyDownloadAction(controller);
-      this._makeEnergySelectorFixed(controller, token);
+      await this._makeEnergySelectorFixed(controller, token);
+      if (this._energyRenderToken !== token || !controller.isConnected) return;
 
       const compareCard = helpers.createCardElement({
         type: "energy-compare",
-        ...(this._panelEnergyCollectionKey()
-          ? { collection_key: this._panelEnergyCollectionKey() }
-          : {}),
+        ...(collectionKey ? { collection_key: collectionKey } : {}),
       });
       const syncCompareVisibility = () => {
         compareHost.hidden = this._periodRestoreLoading
@@ -1244,7 +1252,11 @@ export class EnergyMethods {
         ? `_energy_${this._hass.panelUrl}`
         : "_energy";
     let collection;
-    for (let attempt = 0; attempt < 30; attempt++) {
+    // On a cold dashboard load the native Energy card and its data module are
+    // imported asynchronously. Allow that import to finish without waiting
+    // forever when Home Assistant cannot provide the collection.
+    const collectionDeadline = performance.now() + 10000;
+    while (performance.now() < collectionDeadline) {
       if (this._energyRenderToken !== token || !compareCard.isConnected) return;
       collection = this._hass.connection?.[connectionKey];
       if (collection) break;

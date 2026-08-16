@@ -92,6 +92,7 @@ export const panelStyles = `
     display:block; width:100%; height:56px !important; min-height:0; max-height:56px;
     --ha-card-border-radius:28px;
   }
+  .energy-nav-floating > .energy-date-bootstrap { display:none !important; }
   .panel-time-range {
     position:absolute; z-index:2; top:8px; left:50%; transform:translateX(-50%);
     height:40px; padding:0 9px; display:flex; align-items:center; gap:5px;
