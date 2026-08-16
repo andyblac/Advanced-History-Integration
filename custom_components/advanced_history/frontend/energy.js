@@ -1091,10 +1091,11 @@ export class EnergyMethods {
       if (typeof window.loadCardHelpers !== "function") throw new Error("Home Assistant card helpers are unavailable");
       const helpers = await window.loadCardHelpers();
       if (this._energyRenderToken !== token || !host.isConnected) return;
+      await this._loadNativeEnergyCards(helpers);
+      if (this._energyRenderToken !== token || !host.isConnected) return;
       const collectionKey = this._panelEnergyCollectionKey();
-      // Home Assistant lazy-loads the Energy period selector. Mount a hidden
-      // instance first so this panel can initialise its own collection even
-      // when no Energy card has previously been used on another dashboard.
+      // Mount a hidden instance first so this panel can initialise its own
+      // collection even when no Energy card is used on another dashboard.
       const bootstrapController = helpers.createCardElement({
         type: "energy-date-selection",
         ...(collectionKey ? { collection_key: collectionKey } : {}),
@@ -1141,6 +1142,40 @@ export class EnergyMethods {
       if (this._energyRenderToken !== token || !host.isConnected) return;
       console.error("Advanced History: Energy date selector failed to load", error);
       host.innerHTML = `<div class="error" style="padding:10px">${this._escape(this._customLocalize("energy_selector_error"))}</div>`;
+    }
+  }
+
+  async _loadNativeEnergyCards(helpers) {
+    const definitions = [
+      ["energy-date-selection", "hui-energy-date-selection-card"],
+      ["energy-compare", "hui-energy-compare-card"],
+    ];
+    const waits = definitions.map(([type, tag]) => {
+      if (!customElements.get(tag)) {
+        // Creating a temporary card asks Home Assistant's card helper to
+        // import the lazy module. Do not use this placeholder: properties set
+        // before its custom-element upgrade can shadow the real card setters.
+        helpers.createCardElement({ type });
+      }
+      return this._waitForCustomElement(tag);
+    });
+    await Promise.all(waits);
+  }
+
+  async _waitForCustomElement(tag, timeout = 10000) {
+    if (customElements.get(tag)) return;
+    let timeoutId;
+    try {
+      await Promise.race([
+        customElements.whenDefined(tag),
+        new Promise((_, reject) => {
+          timeoutId = window.setTimeout(() => {
+            reject(new Error(`Home Assistant card ${tag} did not load`));
+          }, timeout);
+        }),
+      ]);
+    } finally {
+      if (timeoutId) window.clearTimeout(timeoutId);
     }
   }
 
