@@ -299,17 +299,7 @@ class AdvancedHistoryOptionsFlow(OptionsFlowWithReload):
     ) -> ConfigFlowResult:
         """Edit the selected service entry's options."""
         if config_entry_type(self.config_entry) == ENTRY_TYPE_MORE_INFO:
-            if user_input is not None:
-                user_input = _automatic_detail_options_from_input(
-                    user_input, dict(self.config_entry.options)
-                )
-                return self.async_create_entry(title="", data=user_input)
-            return self.async_show_form(
-                step_id="init",
-                data_schema=_more_info_schema(
-                    more_info_options_with_defaults(self.config_entry.options)
-                ),
-            )
+            return await self.async_step_more_info(user_input)
 
         if user_input is not None:
             user_input = _automatic_detail_options_from_input(
@@ -322,4 +312,20 @@ class AdvancedHistoryOptionsFlow(OptionsFlowWithReload):
         return self.async_show_form(
             step_id="init",
             data_schema=_panel_schema(options_with_defaults(self.config_entry.options)),
+        )
+
+    async def async_step_more_info(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Edit the independent More Info service options."""
+        if user_input is not None:
+            user_input = _automatic_detail_options_from_input(
+                user_input, dict(self.config_entry.options)
+            )
+            return self.async_create_entry(title="", data=user_input)
+        return self.async_show_form(
+            step_id="more_info",
+            data_schema=_more_info_schema(
+                more_info_options_with_defaults(self.config_entry.options)
+            ),
         )
