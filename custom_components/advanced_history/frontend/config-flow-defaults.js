@@ -83,7 +83,7 @@ function integrationDefaults(profile, variant) {
     ...structuredClone(defaults),
     ...(variant === "numeric"
       ? profile === "more-info"
-        ? { auto_scale_points: true, height: 240 }
+        ? { height: 240 }
         : { height: "auto" }
       : {}),
     ...(variant === "state"
@@ -306,6 +306,7 @@ function panelEditorStyles(variant) {
         .f:has(#chart_mode),
         .f:has(#height),
         .f:has(#group_by),
+        label:has(#auto_scale_points),
         .f:has(#points_per_hour),
         .overlay-row:has(#show_pph_picker),
         .overlay-row:has(#show_group_by_picker) { display: none !important; }
@@ -325,10 +326,22 @@ export function moreInfoEditorStyles(variant) {
     .f:has(.e-enabled),
     .f:has(.e-y_axis),
     .f:has(#card_header),
+    .f:has(#card_icon),
+    .f:has(#card_icon_image),
+    .f:has(#card_icon_color),
+    .f:has(#card_icon_size),
+    .f:has(#card_icon_position),
+    .f:has(#align_header),
     .overlay-row:has(#energy_date_sync),
     .overlay-row:has(#show_date_picker),
     .overlay-row:has(#show_interval_picker),
     .overlay-row:has(#show_attribute_list),
+    .f:has(#attribute_list_position),
+    .f:has(#min_bound_range_secondary),
+    .f:has(#lower_bound_secondary),
+    .f:has(#upper_bound_secondary),
+    .f:has(#y2_axis_label),
+    .f:has(#y2_axis_format),
     label:has(#show_y2_axis) { display: none !important; }
     ${variant === "numeric"
       ? `

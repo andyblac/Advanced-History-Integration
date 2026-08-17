@@ -59,7 +59,8 @@
           "redirect_show_more": "Abrir Mostrar más en Advanced History",
           "card_module_url": "URL del módulo de la tarjeta de gráfico",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Detalle automático"
         },
         "data_description": {
           "replace_more_info_history": "Sustituye el gráfico de Historial nativo de los diálogos de entidad por Statistics Graph Chart Card.",
@@ -67,7 +68,8 @@
           "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
           "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Establece el escalado automático de puntos predeterminado para los gráficos numéricos de Más información; las opciones del gráfico y de la entidad pueden anularlo."
         }
       },
       "reconfigure_more_info": {
@@ -79,7 +81,8 @@
           "redirect_show_more": "Abrir Mostrar más en Advanced History",
           "card_module_url": "URL del módulo de la tarjeta de gráfico",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Detalle automático"
         },
         "data_description": {
           "replace_more_info_history": "Sustituye el gráfico de Historial nativo de los diálogos de entidad por Statistics Graph Chart Card.",
@@ -87,7 +90,8 @@
           "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
           "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Establece el escalado automático de puntos predeterminado para los gráficos numéricos de Más información; las opciones del gráfico y de la entidad pueden anularlo."
         }
       }
     },

@@ -59,7 +59,8 @@
           "redirect_show_more": "Meer weergeven openen in Advanced History",
           "card_module_url": "Module-URL van grafiekkaart",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Automatisch detail"
         },
         "data_description": {
           "replace_more_info_history": "Vervang de ingebouwde geschiedenisgrafiek in entiteitsvensters door Statistics Graph Chart Card.",
@@ -67,7 +68,8 @@
           "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Stelt automatische puntschaal in als standaard voor numerieke Meer-info-grafieken; grafiek- en entiteitsopties kunnen dit overschrijven."
         }
       },
       "reconfigure_more_info": {
@@ -79,7 +81,8 @@
           "redirect_show_more": "Meer weergeven openen in Advanced History",
           "card_module_url": "Module-URL van grafiekkaart",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Automatisch detail"
         },
         "data_description": {
           "replace_more_info_history": "Vervang de ingebouwde geschiedenisgrafiek in entiteitsvensters door Statistics Graph Chart Card.",
@@ -87,7 +90,8 @@
           "redirect_show_more": "Leid de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters om naar Advanced History en vervang alle bestaande doelen door die entiteit.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Stelt automatische puntschaal in als standaard voor numerieke Meer-info-grafieken; grafiek- en entiteitsopties kunnen dit overschrijven."
         }
       }
     },

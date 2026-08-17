@@ -18,6 +18,7 @@ from homeassistant.helpers.storage import Store
 
 from .const import (
     CONF_CARD_MODULE_URL,
+    CONF_LARGE_RANGE_AUTOMATIC_DETAIL,
     CONF_NUMERIC_CARD_OPTIONS,
     CONF_MORE_INFO_SHOW_DATE_PICKER,
     CONF_REDIRECT_SHOW_MORE,
@@ -473,6 +474,9 @@ async def websocket_get_more_info_config(
             "entity_config": entity_config,
             "picker_mode": picker_mode,
             "redirect_show_more": bool(options[CONF_REDIRECT_SHOW_MORE]),
+            "automatic_detail": bool(
+                options[CONF_LARGE_RANGE_AUTOMATIC_DETAIL]
+            ),
             "can_edit_entity_config": bool(connection.user.is_admin),
         },
     )

@@ -192,7 +192,13 @@ function mergeComparisonDefaults(active, defaults) {
     : mergeOne(configuredActive);
 }
 
-function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
+function moreInfoCardConfig(
+  historyView,
+  nativeChart,
+  options,
+  entityConfig,
+  automaticDetail = true,
+) {
   const entityId = historyView.entityId;
   const availableNativeAttributes = nativeMoreInfoAttributes(historyView);
   const configuredAttributes = entityConfig?.attribute_selection;
@@ -209,6 +215,23 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   }
   if (entityConfig?.card_options && typeof entityConfig.card_options === "object") {
     Object.assign(cardOptions, structuredClone(entityConfig.card_options));
+  }
+  // Match AHP's automatic-detail precedence: manual resolution controls
+  // disable the inherited auto scale, then an explicit chart option wins.
+  const hasManualResolution = (
+    ["points_per_hour", "group_by"].some(
+      (key) => Object.prototype.hasOwnProperty.call(cardOptions, key),
+    )
+    || cardOptions.show_pph_picker === true
+    || cardOptions.show_group_by_picker === true
+  );
+  if (
+    numeric
+    && !Object.prototype.hasOwnProperty.call(cardOptions, "auto_scale_points")
+  ) {
+    cardOptions.auto_scale_points = hasManualResolution
+      ? false
+      : automaticDetail !== false;
   }
   delete cardOptions.energy_date_sync;
   delete cardOptions.energy_collection_key;
@@ -303,7 +326,9 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
       }
       return [row];
     })();
-  const configuredHeight = Number(cardOptions.height) || 240;
+  const configuredHeight = cardOptions.height === "auto"
+    ? "auto"
+    : (Number(cardOptions.height) || 240);
   const datePickerGroup = cardOptions.date_picker_group
     || `advanced-history-more-info:${entityId}`;
   return {
@@ -317,7 +342,10 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
       : {}),
     height: numeric
       ? configuredHeight
-      : Math.min(configuredHeight, MORE_INFO_STATE_TIMELINE_HEIGHT),
+      : Math.min(
+        Number(configuredHeight) || 240,
+        MORE_INFO_STATE_TIMELINE_HEIGHT,
+      ),
     time_zone: cardOptions.time_zone ?? resolvedTimeZone(historyView.hass),
     ...(numeric ? {} : { auto_scale_points: false, group_by: "raw" }),
     ...(cardOptions.show_date_picker ? { date_picker_group: datePickerGroup } : {}),
@@ -768,6 +796,7 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
       nativeChart,
       serviceConfig.card_options || {},
       null,
+      serviceConfig.automatic_detail,
     ),
     serviceConfig.picker_mode,
   );
@@ -781,6 +810,7 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
         nativeChart,
         serviceConfig.card_options || {},
         serviceConfig.entity_config,
+        serviceConfig.automatic_detail,
       ),
       serviceConfig.picker_mode,
     ),
@@ -965,6 +995,7 @@ async function replaceMoreInfoChart(historyView) {
         nativeChart,
         options,
         serviceConfig.entity_config,
+        serviceConfig.automatic_detail,
       ),
       serviceConfig.picker_mode,
     );

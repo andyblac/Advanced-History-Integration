@@ -59,7 +59,8 @@
           "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
           "card_module_url": "URL du module de la carte graphique",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Détail automatique"
         },
         "data_description": {
           "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
@@ -67,7 +68,8 @@
           "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Définit par défaut la mise à l’échelle automatique des points des graphiques numériques Plus d’informations ; les options du graphique et de l’entité peuvent la remplacer."
         }
       },
       "reconfigure_more_info": {
@@ -79,7 +81,8 @@
           "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
           "card_module_url": "URL du module de la carte graphique",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Détail automatique"
         },
         "data_description": {
           "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
@@ -87,7 +90,8 @@
           "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Définit par défaut la mise à l’échelle automatique des points des graphiques numériques Plus d’informations ; les options du graphique et de l’entité peuvent la remplacer."
         }
       }
     },

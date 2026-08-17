@@ -59,7 +59,8 @@
           "redirect_show_more": "Open Show more in Advanced History",
           "card_module_url": "Graph card module URL",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Automatic detail"
         },
         "data_description": {
           "replace_more_info_history": "Replace the native History graph in entity dialogs with Statistics Graph Chart Card.",
@@ -67,7 +68,8 @@
           "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Sets the default automatic point scaling for numeric More Info charts; chart and entity options can override it."
         }
       },
       "reconfigure_more_info": {
@@ -79,7 +81,8 @@
           "redirect_show_more": "Open Show more in Advanced History",
           "card_module_url": "Graph card module URL",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Automatic detail"
         },
         "data_description": {
           "replace_more_info_history": "Replace the native History graph in entity dialogs with Statistics Graph Chart Card.",
@@ -87,7 +90,8 @@
           "redirect_show_more": "Redirect the History section's Show more link in entity dialogs to Advanced History, replacing all existing targets with that entity.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Sets the default automatic point scaling for numeric More Info charts; chart and entity options can override it."
         }
       }
     },

@@ -59,7 +59,8 @@
           "redirect_show_more": "Apri Mostra altro in Advanced History",
           "card_module_url": "URL del modulo della scheda grafico",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Dettaglio automatico"
         },
         "data_description": {
           "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
@@ -67,7 +68,8 @@
           "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Imposta il ridimensionamento automatico dei punti predefinito per i grafici numerici Altre informazioni; le opzioni del grafico e dell’entità possono sostituirlo."
         }
       },
       "reconfigure_more_info": {
@@ -79,7 +81,8 @@
           "redirect_show_more": "Apri Mostra altro in Advanced History",
           "card_module_url": "URL del modulo della scheda grafico",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Dettaglio automatico"
         },
         "data_description": {
           "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
@@ -87,7 +90,8 @@
           "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Imposta il ridimensionamento automatico dei punti predefinito per i grafici numerici Altre informazioni; le opzioni del grafico e dell’entità possono sostituirlo."
         }
       }
     },

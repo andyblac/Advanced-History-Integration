@@ -100,7 +100,7 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
     )
 
 
-def _panel_options_from_input(
+def _automatic_detail_options_from_input(
     user_input: dict[str, Any], existing: dict[str, Any] | None = None
 ) -> dict[str, Any]:
     """Keep the switch-derived point-scaling value as an inherited default."""
@@ -126,6 +126,11 @@ def _panel_options_from_input(
 
 def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
     """Return the independent More-Info service form schema."""
+    numeric_card_options = dict(values[CONF_NUMERIC_CARD_OPTIONS])
+    numeric_card_options.setdefault(
+        "auto_scale_points",
+        values[CONF_LARGE_RANGE_AUTOMATIC_DETAIL] is not False,
+    )
     return vol.Schema(
         {
             vol.Optional(
@@ -140,8 +145,12 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
                 CONF_REDIRECT_SHOW_MORE, default=values[CONF_REDIRECT_SHOW_MORE]
             ): selector.BooleanSelector(),
             vol.Optional(
+                CONF_LARGE_RANGE_AUTOMATIC_DETAIL,
+                default=values[CONF_LARGE_RANGE_AUTOMATIC_DETAIL],
+            ): selector.BooleanSelector(),
+            vol.Optional(
                 CONF_NUMERIC_CARD_OPTIONS,
-                default=values[CONF_NUMERIC_CARD_OPTIONS],
+                default=numeric_card_options,
             ): selector.ObjectSelector(),
             vol.Optional(
                 CONF_STATE_CARD_OPTIONS,
@@ -157,7 +166,7 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
 class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle Advanced History config entries."""
 
-    VERSION = 14
+    VERSION = 15
 
     def _configured_types(self) -> set[str]:
         """Return the service roles which are already configured."""
@@ -207,7 +216,7 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title=DEFAULT_OPTIONS[CONF_TITLE],
                 data={CONF_ENTRY_TYPE: ENTRY_TYPE_PANEL},
-                options=_panel_options_from_input(user_input),
+                options=_automatic_detail_options_from_input(user_input),
             )
         return self.async_show_form(
             step_id="user", data_schema=_panel_schema(DEFAULT_OPTIONS)
@@ -223,7 +232,7 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title="More-Info",
                 data={CONF_ENTRY_TYPE: ENTRY_TYPE_MORE_INFO},
-                options=user_input,
+                options=_automatic_detail_options_from_input(user_input),
             )
         return self.async_show_form(
             step_id="more_info",
@@ -239,7 +248,9 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_reconfigure_more_info(user_input)
 
         if user_input is not None:
-            user_input = _panel_options_from_input(user_input, dict(entry.options))
+            user_input = _automatic_detail_options_from_input(
+                user_input, dict(entry.options)
+            )
             user_input[CONF_ENTITY_OPTIONS] = entry.options.get(
                 CONF_ENTITY_OPTIONS, {}
             )
@@ -259,6 +270,9 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
         """Reconfigure the independent More-Info service entry."""
         entry = self._get_reconfigure_entry()
         if user_input is not None:
+            user_input = _automatic_detail_options_from_input(
+                user_input, dict(entry.options)
+            )
             return self.async_update_reload_and_abort(
                 entry,
                 title="More-Info",
@@ -286,6 +300,9 @@ class AdvancedHistoryOptionsFlow(OptionsFlowWithReload):
         """Edit the selected service entry's options."""
         if config_entry_type(self.config_entry) == ENTRY_TYPE_MORE_INFO:
             if user_input is not None:
+                user_input = _automatic_detail_options_from_input(
+                    user_input, dict(self.config_entry.options)
+                )
                 return self.async_create_entry(title="", data=user_input)
             return self.async_show_form(
                 step_id="init",
@@ -295,7 +312,7 @@ class AdvancedHistoryOptionsFlow(OptionsFlowWithReload):
             )
 
         if user_input is not None:
-            user_input = _panel_options_from_input(
+            user_input = _automatic_detail_options_from_input(
                 user_input, dict(self.config_entry.options)
             )
             user_input[CONF_ENTITY_OPTIONS] = self.config_entry.options.get(

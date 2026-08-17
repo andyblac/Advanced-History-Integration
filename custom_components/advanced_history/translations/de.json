@@ -59,7 +59,8 @@
           "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
           "card_module_url": "Modul-URL der Diagrammkarte",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Automatische Details"
         },
         "data_description": {
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
@@ -67,7 +68,8 @@
           "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische More-Info-Diagramme als Standard fest; Diagramm- und Entitätsoptionen können sie überschreiben."
         }
       },
       "reconfigure_more_info": {
@@ -79,7 +81,8 @@
           "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
           "card_module_url": "Modul-URL der Diagrammkarte",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Automatische Details"
         },
         "data_description": {
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
@@ -87,7 +90,8 @@
           "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische More-Info-Diagramme als Standard fest; Diagramm- und Entitätsoptionen können sie überschreiben."
         }
       }
     },

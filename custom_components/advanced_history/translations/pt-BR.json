@@ -59,7 +59,8 @@
           "redirect_show_more": "Abrir Mostrar mais no Advanced History",
           "card_module_url": "URL do módulo do cartão de gráfico",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Detalhe automático"
         },
         "data_description": {
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
@@ -67,7 +68,8 @@
           "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Define o dimensionamento automático de pontos padrão para gráficos numéricos de Mais informações; as opções do gráfico e da entidade podem substituí-lo."
         }
       },
       "reconfigure_more_info": {
@@ -79,7 +81,8 @@
           "redirect_show_more": "Abrir Mostrar mais no Advanced History",
           "card_module_url": "URL do módulo do cartão de gráfico",
           "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "state_card_options": "State chart options",
+          "large_range_automatic_detail": "Detalhe automático"
         },
         "data_description": {
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
@@ -87,7 +90,8 @@
           "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "large_range_automatic_detail": "Define o dimensionamento automático de pontos padrão para gráficos numéricos de Mais informações; as opções do gráfico e da entidade podem substituí-lo."
         }
       }
     },
