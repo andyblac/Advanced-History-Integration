@@ -15,15 +15,15 @@
           "include_hidden": "Ausgeblendete Entitäten einbeziehen",
           "require_admin": "Nur Administratoren",
           "card_module_url": "Modul-URL der Diagrammkarte",
-          "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "numeric_card_options": "Optionen für numerische Diagramme",
+          "state_card_options": "Optionen für Zustandsdiagramme"
         },
         "data_description": {
           "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische Diagramme als Standard fest; Diagrammoptionen können sie überschreiben. Für große Zeiträume bietet die Verlaufsansicht zusätzlich feinere Details.",
           "large_range_detail_threshold_days": "Verwendet automatische Details, wenn der ausgewählte Zeitraum mindestens so viele Tage umfasst.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "numeric_card_options": "Standardeinstellungen, die nur für numerische Diagramme verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
+          "state_card_options": "Standardeinstellungen, die nur für Zustandszeitachsen verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt."
         }
       },
       "reconfigure": {
@@ -39,15 +39,15 @@
           "include_hidden": "Ausgeblendete Entitäten einbeziehen",
           "card_module_url": "Modul-URL der Diagrammkarte",
           "require_admin": "Nur Administratoren",
-          "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "numeric_card_options": "Optionen für numerische Diagramme",
+          "state_card_options": "Optionen für Zustandsdiagramme"
         },
         "data_description": {
           "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische Diagramme als Standard fest; Diagrammoptionen können sie überschreiben. Für große Zeiträume bietet die Verlaufsansicht zusätzlich feinere Details.",
           "large_range_detail_threshold_days": "Verwendet automatische Details, wenn der ausgewählte Zeitraum mindestens so viele Tage umfasst.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "numeric_card_options": "Standardeinstellungen, die nur für numerische Diagramme verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
+          "state_card_options": "Standardeinstellungen, die nur für Zustandszeitachsen verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt."
         }
       },
       "more_info": {
@@ -58,8 +58,8 @@
           "more_info_show_date_picker": "Diagrammkalender anzeigen",
           "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
           "card_module_url": "Modul-URL der Diagrammkarte",
-          "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options",
+          "numeric_card_options": "Optionen für numerische Diagramme",
+          "state_card_options": "Optionen für Zustandsdiagramme",
           "large_range_automatic_detail": "Automatische Details"
         },
         "data_description": {
@@ -67,8 +67,8 @@
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
           "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "numeric_card_options": "Standardeinstellungen, die nur für numerische Diagramme verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
+          "state_card_options": "Standardeinstellungen, die nur für Zustandszeitachsen verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
           "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische More-Info-Diagramme als Standard fest; Diagramm- und Entitätsoptionen können sie überschreiben."
         }
       },
@@ -80,8 +80,8 @@
           "more_info_show_date_picker": "Diagrammkalender anzeigen",
           "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
           "card_module_url": "Modul-URL der Diagrammkarte",
-          "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options",
+          "numeric_card_options": "Optionen für numerische Diagramme",
+          "state_card_options": "Optionen für Zustandsdiagramme",
           "large_range_automatic_detail": "Automatische Details"
         },
         "data_description": {
@@ -89,8 +89,8 @@
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
           "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "numeric_card_options": "Standardeinstellungen, die nur für numerische Diagramme verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
+          "state_card_options": "Standardeinstellungen, die nur für Zustandszeitachsen verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
           "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische More-Info-Diagramme als Standard fest; Diagramm- und Entitätsoptionen können sie überschreiben."
         }
       }
@@ -118,8 +118,8 @@
           "more_info_show_date_picker": "Diagrammkalender anzeigen",
           "card_module_url": "Modul-URL der Diagrammkarte",
           "require_admin": "Nur Administratoren",
-          "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options"
+          "numeric_card_options": "Optionen für numerische Diagramme",
+          "state_card_options": "Optionen für Zustandsdiagramme"
         },
         "data_description": {
           "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische Diagramme als Standard fest; Diagrammoptionen können sie überschreiben. Für große Zeiträume bietet die Verlaufsansicht zusätzlich feinere Details.",
@@ -128,8 +128,8 @@
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
+          "numeric_card_options": "Standardeinstellungen, die nur für numerische Diagramme verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
+          "state_card_options": "Standardeinstellungen, die nur für Zustandszeitachsen verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt."
         }
       },
       "more_info": {
@@ -140,8 +140,8 @@
           "more_info_show_date_picker": "Diagrammkalender anzeigen",
           "redirect_show_more": "„Mehr anzeigen“ in Advanced History öffnen",
           "card_module_url": "Modul-URL der Diagrammkarte",
-          "numeric_card_options": "Numeric chart options",
-          "state_card_options": "State chart options",
+          "numeric_card_options": "Optionen für numerische Diagramme",
+          "state_card_options": "Optionen für Zustandsdiagramme",
           "large_range_automatic_detail": "Automatische Details"
         },
         "data_description": {
@@ -149,8 +149,8 @@
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
           "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
-          "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
-          "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly.",
+          "numeric_card_options": "Standardeinstellungen, die nur für numerische Diagramme verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
+          "state_card_options": "Standardeinstellungen, die nur für Zustandszeitachsen verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
           "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische More-Info-Diagramme als Standard fest; Diagramm- und Entitätsoptionen können sie überschreiben."
         }
       }
