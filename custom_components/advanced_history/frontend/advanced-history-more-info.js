@@ -32,6 +32,7 @@ const MORE_INFO_EDITOR_LINK_CLASS = "advanced-history-more-info-editor-link";
 const MORE_INFO_EDITOR_ACTIONS_CLASS = "advanced-history-more-info-editor-actions";
 const MORE_INFO_EDITOR_RESIZE_OBSERVER = "__advancedHistoryMoreInfoEditorResizeObserver";
 const MORE_INFO_DATE_SYNC_HANDLER = "__advancedHistoryMoreInfoDateSyncHandler";
+const MORE_INFO_STATE_COLOR_REFRESH = "__advancedHistoryMoreInfoStateColorRefresh";
 const MORE_INFO_CONFIG_TYPE = "advanced_history/more_info/config";
 const MORE_INFO_ENTITY_CONFIG_SET_TYPE = "advanced_history/more_info/entity_config/set";
 const MORE_INFO_PICKER_MODE_SET_TYPE = "advanced_history/more_info/picker_mode/set";
@@ -297,6 +298,7 @@ function moreInfoCardConfig(
         historyView.hass,
         entityId,
         nativeTimelineStates(nativeChart, entityId),
+        nativeActivityStateColors(historyView, entityId),
       ),
       template.state_map
     );
@@ -417,6 +419,79 @@ function moreInfoLogbook(historyView) {
   return root.host?.shadowRoot?.querySelector("ha-more-info-logbook") || null;
 }
 
+function nativeActivityStateColors(historyView, entityId) {
+  const logbook = moreInfoLogbook(historyView);
+  if (!logbook) return new Map();
+
+  const entries = [];
+  const roots = [logbook, logbook.shadowRoot].filter(Boolean);
+  while (roots.length) {
+    const root = roots.pop();
+    for (const element of root.querySelectorAll?.("*") || []) {
+      if (element.localName === "ha-logbook-entry") entries.push(element);
+      if (element.shadowRoot) roots.push(element.shadowRoot);
+    }
+  }
+
+  const colors = new Map();
+  for (const entry of entries) {
+    const item = entry.item;
+    const entryEntityId = item?.entity_id || item?.entityId;
+    if (entryEntityId && entryEntityId !== entityId) continue;
+    const state = item?.state;
+    if (typeof state !== "string" || colors.has(state)) continue;
+    const node = entry.shadowRoot?.querySelector(".dot, .node-glyph");
+    if (!node) continue;
+    const style = getComputedStyle(node);
+    const color = node.style.getPropertyValue("--node-color").trim()
+      || style.getPropertyValue("--node-color").trim()
+      || style.backgroundColor;
+    if (color) colors.set(state, color);
+  }
+  return colors;
+}
+
+function stateColorSignature(colors) {
+  return JSON.stringify([...colors.entries()].sort(([left], [right]) => (
+    left.localeCompare(right)
+  )));
+}
+
+function clearMoreInfoStateColorRefresh(historyView) {
+  const refresh = historyView[MORE_INFO_STATE_COLOR_REFRESH];
+  if (refresh?.timer) clearTimeout(refresh.timer);
+  historyView[MORE_INFO_STATE_COLOR_REFRESH] = null;
+}
+
+function scheduleMoreInfoStateColorRefresh(historyView, host, entityId) {
+  clearMoreInfoStateColorRefresh(historyView);
+  const refresh = { attempt: 0, timer: null };
+  historyView[MORE_INFO_STATE_COLOR_REFRESH] = refresh;
+  const check = () => {
+    if (
+      historyView[MORE_INFO_STATE_COLOR_REFRESH] !== refresh
+      || !historyView.isConnected
+      || historyView.entityId !== entityId
+      || historyView.shadowRoot?.querySelector(`.${MORE_INFO_HOST_CLASS}`) !== host
+    ) return;
+    const signature = stateColorSignature(
+      nativeActivityStateColors(historyView, entityId),
+    );
+    if (signature !== "[]" && signature !== host.dataset.activityStateColors) {
+      historyView[MORE_INFO_STATE_COLOR_REFRESH] = null;
+      scheduleMoreInfoReplacement(historyView);
+      return;
+    }
+    refresh.attempt += 1;
+    if (refresh.attempt < 4) {
+      refresh.timer = setTimeout(check, refresh.attempt * 250);
+    } else {
+      historyView[MORE_INFO_STATE_COLOR_REFRESH] = null;
+    }
+  };
+  refresh.timer = setTimeout(check, 100);
+}
+
 function sameLogbookTime(left, right) {
   if (!left || !right) return false;
   if ("recent" in right) return left.recent === right.recent;
@@ -510,6 +585,7 @@ function installMoreInfoDateSync(historyView, card, config) {
 function restoreNativeChart(historyView) {
   const root = historyView.shadowRoot;
   removeMoreInfoDateSync(historyView, true);
+  clearMoreInfoStateColorRefresh(historyView);
   historyView[MORE_INFO_EDITOR_RESIZE_OBSERVER]?.disconnect();
   historyView[MORE_INFO_EDITOR_RESIZE_OBSERVER] = null;
   resetMoreInfoContainerLayout(historyView);
@@ -1017,6 +1093,8 @@ async function replaceMoreInfoChart(historyView) {
       ),
       serviceConfig.picker_mode,
     );
+    const activityStateColors = nativeActivityStateColors(historyView, entityId);
+    const activityStateColorSignature = stateColorSignature(activityStateColors);
     ensureMoreInfoActionButtons(historyView, serviceConfig, config);
     const configKey = JSON.stringify({ entityId: historyView.entityId, config });
     let host = root.querySelector(`.${MORE_INFO_HOST_CLASS}`);
@@ -1032,12 +1110,14 @@ async function replaceMoreInfoChart(historyView) {
       host.append(card);
       nativeChart.before(host);
     }
+    host.dataset.activityStateColors = activityStateColorSignature;
     applyMoreInfoHostLayout(historyView, host);
     card.hass = historyView.hass;
     installMoreInfoDateSync(historyView, card, config);
     nativeChart.style.display = "none";
     historyView.removeAttribute(MORE_INFO_REPLACING_ATTRIBUTE);
     observeMoreInfoEditorAlignment(historyView, host);
+    scheduleMoreInfoStateColorRefresh(historyView, host, entityId);
   } catch (error) {
     console.warn("Advanced History: unable to replace the More Info history graph", error);
     restoreNativeChart(historyView);
@@ -1076,6 +1156,7 @@ async function installMoreInfoReplacement() {
   };
   prototype.disconnectedCallback = function (...args) {
     removeMoreInfoDateSync(this);
+    clearMoreInfoStateColorRefresh(this);
     return originalDisconnected?.apply(this, args);
   };
 }
