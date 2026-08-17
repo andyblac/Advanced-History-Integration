@@ -1088,8 +1088,7 @@ export class EnergyMethods {
     const loading = this._localize("ui.common.loading", "Loading");
     host.innerHTML = `<div class="target-picker" style="cursor:default"><span class="target-label">${this._escape(dateRange)}</span><span style="padding:3px 4px;color:var(--secondary-text-color)">${this._escape(loading)}…</span></div>`;
     try {
-      if (typeof window.loadCardHelpers !== "function") throw new Error("Home Assistant card helpers are unavailable");
-      const helpers = await window.loadCardHelpers();
+      const helpers = await this._loadCardHelpers();
       if (this._energyRenderToken !== token || !host.isConnected) return;
       await this._loadNativeEnergyCards(helpers);
       if (this._energyRenderToken !== token || !host.isConnected) return;
@@ -1143,6 +1142,44 @@ export class EnergyMethods {
       console.error("Advanced History: Energy date selector failed to load", error);
       host.innerHTML = `<div class="error" style="padding:10px">${this._escape(this._customLocalize("energy_selector_error"))}</div>`;
     }
+  }
+
+  async _loadCardHelpers() {
+    if (typeof window.loadCardHelpers === "function") {
+      return window.loadCardHelpers();
+    }
+    if (!this._cardHelpersLoader) {
+      this._cardHelpersLoader = (async () => {
+        await customElements.whenDefined("partial-panel-resolver");
+        const resolver = document.createElement("partial-panel-resolver");
+        resolver.hass = this._hass;
+        const panel = {
+          component_name: "lovelace",
+          url_path: "advanced-history-lovelace-loader",
+        };
+        let routes;
+        if (typeof resolver._getRoutes === "function") {
+          routes = resolver._getRoutes({ [panel.url_path]: panel });
+        } else if (typeof resolver.getRoutes === "function") {
+          // Compatibility with Home Assistant versions that exposed the
+          // resolver's route builder publicly and accepted a panel array.
+          routes = resolver.getRoutes([panel]);
+        }
+        const route = routes?.routes?.[panel.url_path];
+        if (typeof route?.load !== "function") {
+          throw new Error("Home Assistant Lovelace loader is unavailable");
+        }
+        await route.load();
+        if (typeof window.loadCardHelpers !== "function") {
+          throw new Error("Home Assistant card helpers are unavailable");
+        }
+      })().catch((error) => {
+        this._cardHelpersLoader = null;
+        throw error;
+      });
+    }
+    await this._cardHelpersLoader;
+    return window.loadCardHelpers();
   }
 
   async _loadNativeEnergyCards(helpers) {
