@@ -1093,15 +1093,6 @@ export class EnergyMethods {
       await this._loadNativeEnergyCards(helpers);
       if (this._energyRenderToken !== token || !host.isConnected) return;
       const collectionKey = this._panelEnergyCollectionKey();
-      // Mount a hidden instance first so this panel can initialise its own
-      // collection even when no Energy card is used on another dashboard.
-      const bootstrapController = helpers.createCardElement({
-        type: "energy-date-selection",
-        ...(collectionKey ? { collection_key: collectionKey } : {}),
-      });
-      bootstrapController.classList.add("energy-date-bootstrap");
-      bootstrapController.setAttribute("aria-hidden", "true");
-      bootstrapController.hass = this._hass;
       const controller = helpers.createCardElement({
         type: "energy-date-selection",
         ...(collectionKey ? { collection_key: collectionKey } : {}),
@@ -1110,8 +1101,8 @@ export class EnergyMethods {
       });
       controller.classList.add("energy-date-controller");
       controller.hass = this._hass;
-      host.replaceChildren(bootstrapController, controller);
-      this._cards.push(bootstrapController, controller);
+      host.replaceChildren(controller);
+      this._cards.push(controller);
       this._replaceEnergyDownloadAction(controller);
       await this._makeEnergySelectorFixed(controller, token);
       if (this._energyRenderToken !== token || !controller.isConnected) return;
