@@ -113,7 +113,7 @@ export function nativeStateColor(domain, deviceClass, state) {
   return cssVariableChain(properties);
 }
 
-export function nativeStateMap(hass, entityId) {
+export function nativeStateMap(hass, entityId, observedStates = []) {
   const stateObj = hass?.states?.[entityId];
   if (!stateObj) return undefined;
   const domain = entityId?.split(".", 1)[0];
@@ -133,6 +133,12 @@ export function nativeStateMap(hass, entityId) {
     && (stateObj.state === "off" || stateObj.state === "on")
   ) {
     values = ["off", "on"];
+    paletteValues = values;
+  } else if (domain === "sensor" && observedStates.length) {
+    // Activity assigns arbitrary sensor states graph colours in the order it
+    // encounters them. More Info supplies its native timeline newest-first so
+    // the replacement chart can use the same categorical ordering.
+    values = [...new Set([stateObj.state, ...observedStates].filter(Boolean))];
     paletteValues = values;
   }
   if (!Array.isArray(values)) return undefined;

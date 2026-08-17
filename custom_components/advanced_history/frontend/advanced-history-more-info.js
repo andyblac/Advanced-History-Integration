@@ -146,6 +146,20 @@ function nativeMoreInfoAttributes(historyView) {
   return nativeHistoryAttributes(entityId, historyView.hass?.states?.[entityId]);
 }
 
+function nativeTimelineStates(nativeChart, entityId) {
+  const timeline = nativeChart?.historyData?.timeline;
+  if (!Array.isArray(timeline)) return [];
+  const entityTimeline = timeline.find((entry) => entry?.entity_id === entityId);
+  if (!Array.isArray(entityTimeline?.data)) return [];
+  return [...new Set(
+    entityTimeline.data
+      .slice()
+      .reverse()
+      .map((entry) => entry?.state)
+      .filter(Boolean),
+  )];
+}
+
 function optionKeysToRemove(config, scope) {
   const configured = config?.[scope];
   return Array.isArray(configured)
@@ -279,7 +293,11 @@ function moreInfoCardConfig(
     && !Object.prototype.hasOwnProperty.call(template, "color")
   ) {
     const stateMap = mergeStateMaps(
-      nativeStateMap(historyView.hass, entityId),
+      nativeStateMap(
+        historyView.hass,
+        entityId,
+        nativeTimelineStates(nativeChart, entityId),
+      ),
       template.state_map
     );
     if (stateMap) template.state_map = stateMap;
