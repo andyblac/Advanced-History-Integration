@@ -6,52 +6,48 @@
         "title": "Configura Advanced History",
         "description": "Crea un pannello laterale Cronologia configurabile basato su Statistics Graph Chart Card.",
         "data": {
-          "title": "Titolo del pannello",
           "sidebar_icon": "Icona della barra laterale",
           "max_entities": "Numero massimo di entità",
-          "large_range_automatic_detail": "Dettaglio automatico per intervalli di date ampi",
+          "max_tabs": "Numero massimo di schede",
+          "large_range_automatic_detail": "Dettaglio automatico",
           "large_range_detail_threshold_days": "Soglia dettaglio automatico (giorni)",
-          "default_hours": "Ore predefinite",
           "graph_height": "Altezza del grafico",
           "include_hidden": "Includi entità nascoste",
-          "redirect_show_more": "Apri Mostra altro in Advanced History",
-          "card_options": "Impostazioni predefinite della scheda",
-          "compare": "Confronto predefinito",
           "require_admin": "Solo amministratori",
-          "card_module_url": "URL del modulo della scheda grafico"
+          "card_module_url": "URL del modulo della scheda grafico",
+          "numeric_card_options": "Opzioni dei grafici numerici",
+          "state_card_options": "Opzioni dei grafici di stato"
         },
         "data_description": {
-          "large_range_automatic_detail": "Usa il raggruppamento automatico per intervalli ampi, con la possibilità di caricare dettagli più fini dal pannello Cronologia.",
+          "large_range_automatic_detail": "Imposta il ridimensionamento automatico dei punti predefinito per i grafici numerici; le opzioni del grafico possono sostituirlo. Per intervalli ampi offre anche il dettaglio fine nel pannello Cronologia.",
           "large_range_detail_threshold_days": "Usa il dettaglio automatico quando l’intervallo selezionato copre almeno questo numero di giorni.",
-          "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
-          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante.",
-          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card."
+          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
+          "numeric_card_options": "Valori predefiniti usati solo dai grafici numerici. Apri l’editor visuale o modifica direttamente il codice.",
+          "state_card_options": "Valori predefiniti usati solo dai grafici della cronologia degli stati. Apri l’editor visuale o modifica direttamente il codice."
         }
       },
       "reconfigure": {
         "title": "Riconfigura Advanced History",
         "description": "Aggiorna il pannello laterale e le impostazioni predefinite del grafico. Il salvataggio ricarica automaticamente Advanced History.",
         "data": {
-          "title": "Titolo del pannello",
           "sidebar_icon": "Icona della barra laterale",
           "max_entities": "Numero massimo di entità",
-          "large_range_automatic_detail": "Dettaglio automatico per intervalli di date ampi",
+          "max_tabs": "Numero massimo di schede",
+          "large_range_automatic_detail": "Dettaglio automatico",
           "large_range_detail_threshold_days": "Soglia dettaglio automatico (giorni)",
-          "default_hours": "Ore predefinite",
           "graph_height": "Altezza del grafico",
           "include_hidden": "Includi entità nascoste",
-          "redirect_show_more": "Apri Mostra altro in Advanced History",
           "card_module_url": "URL del modulo della scheda grafico",
-          "card_options": "Impostazioni predefinite della scheda",
-          "compare": "Confronto predefinito",
-          "require_admin": "Solo amministratori"
+          "require_admin": "Solo amministratori",
+          "numeric_card_options": "Opzioni dei grafici numerici",
+          "state_card_options": "Opzioni dei grafici di stato"
         },
         "data_description": {
-          "large_range_automatic_detail": "Usa il raggruppamento automatico per intervalli ampi, con la possibilità di caricare dettagli più fini dal pannello Cronologia.",
+          "large_range_automatic_detail": "Imposta il ridimensionamento automatico dei punti predefinito per i grafici numerici; le opzioni del grafico possono sostituirlo. Per intervalli ampi offre anche il dettaglio fine nel pannello Cronologia.",
           "large_range_detail_threshold_days": "Usa il dettaglio automatico quando l’intervallo selezionato copre almeno questo numero di giorni.",
-          "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
-          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante."
+          "numeric_card_options": "Valori predefiniti usati solo dai grafici numerici. Apri l’editor visuale o modifica direttamente il codice.",
+          "state_card_options": "Valori predefiniti usati solo dai grafici della cronologia degli stati. Apri l’editor visuale o modifica direttamente il codice."
         }
       },
       "more_info": {
@@ -60,14 +56,20 @@
         "data": {
           "replace_more_info_history": "Usa Statistics Graph in Ulteriori informazioni",
           "more_info_show_date_picker": "Mostra calendario del grafico",
+          "redirect_show_more": "Apri Mostra altro in Advanced History",
           "card_module_url": "URL del modulo della scheda grafico",
-          "more_info_card_options": "Impostazioni predefinite di Ulteriori informazioni"
+          "numeric_card_options": "Opzioni dei grafici numerici",
+          "state_card_options": "Opzioni dei grafici di stato",
+          "large_range_automatic_detail": "Dettaglio automatico"
         },
         "data_description": {
           "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra il selettore di date integrato di Statistics Graph Chart Card nelle finestre delle entità.",
+          "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
-          "more_info_card_options": "Impostazioni separate di Statistics Graph Chart Card per il grafico nelle finestre delle entità. Modifica il YAML direttamente oppure usa il relativo editor visuale."
+          "numeric_card_options": "Valori predefiniti usati solo dai grafici numerici. Apri l’editor visuale o modifica direttamente il codice.",
+          "state_card_options": "Valori predefiniti usati solo dai grafici della cronologia degli stati. Apri l’editor visuale o modifica direttamente il codice.",
+          "large_range_automatic_detail": "Imposta il ridimensionamento automatico dei punti predefinito per i grafici numerici Altre informazioni; le opzioni del grafico e dell’entità possono sostituirlo."
         }
       },
       "reconfigure_more_info": {
@@ -76,14 +78,20 @@
         "data": {
           "replace_more_info_history": "Usa Statistics Graph in Ulteriori informazioni",
           "more_info_show_date_picker": "Mostra calendario del grafico",
+          "redirect_show_more": "Apri Mostra altro in Advanced History",
           "card_module_url": "URL del modulo della scheda grafico",
-          "more_info_card_options": "Impostazioni predefinite di Ulteriori informazioni"
+          "numeric_card_options": "Opzioni dei grafici numerici",
+          "state_card_options": "Opzioni dei grafici di stato",
+          "large_range_automatic_detail": "Dettaglio automatico"
         },
         "data_description": {
           "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra il selettore di date integrato di Statistics Graph Chart Card nelle finestre delle entità.",
+          "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
-          "more_info_card_options": "Impostazioni separate di Statistics Graph Chart Card per il grafico nelle finestre delle entità. Modifica il YAML direttamente oppure usa il relativo editor visuale."
+          "numeric_card_options": "Valori predefiniti usati solo dai grafici numerici. Apri l’editor visuale o modifica direttamente il codice.",
+          "state_card_options": "Valori predefiniti usati solo dai grafici della cronologia degli stati. Apri l’editor visuale o modifica direttamente il codice.",
+          "large_range_automatic_detail": "Imposta il ridimensionamento automatico dei punti predefinito per i grafici numerici Altre informazioni; le opzioni del grafico e dell’entità possono sostituirlo."
         }
       }
     },
@@ -98,43 +106,53 @@
         "title": "Impostazioni di Advanced History",
         "description": "Il salvataggio ricarica automaticamente il pannello; non è necessario riavviare Home Assistant.",
         "data": {
-          "title": "Titolo del pannello",
           "sidebar_icon": "Icona della barra laterale",
           "max_entities": "Numero massimo di entità",
-          "large_range_automatic_detail": "Dettaglio automatico per intervalli di date ampi",
+          "max_tabs": "Numero massimo di schede",
+          "large_range_automatic_detail": "Dettaglio automatico",
           "large_range_detail_threshold_days": "Soglia dettaglio automatico (giorni)",
-          "default_hours": "Ore predefinite",
           "graph_height": "Altezza del grafico",
           "include_hidden": "Includi entità nascoste",
           "redirect_show_more": "Apri Mostra altro in Advanced History",
           "replace_more_info_history": "Usa Statistics Graph in Ulteriori informazioni",
           "more_info_show_date_picker": "Mostra calendario del grafico",
           "card_module_url": "URL del modulo della scheda grafico",
-          "card_options": "Impostazioni predefinite della scheda",
-          "more_info_card_options": "Impostazioni predefinite di Ulteriori informazioni",
-          "compare": "Confronto predefinito",
-          "require_admin": "Solo amministratori"
+          "require_admin": "Solo amministratori",
+          "numeric_card_options": "Opzioni dei grafici numerici",
+          "state_card_options": "Opzioni dei grafici di stato"
         },
         "data_description": {
-          "large_range_automatic_detail": "Usa il raggruppamento automatico per intervalli ampi, con la possibilità di caricare dettagli più fini dal pannello Cronologia.",
+          "large_range_automatic_detail": "Imposta il ridimensionamento automatico dei punti predefinito per i grafici numerici; le opzioni del grafico possono sostituirlo. Per intervalli ampi offre anche il dettaglio fine nel pannello Cronologia.",
           "large_range_detail_threshold_days": "Usa il dettaglio automatico quando l’intervallo selezionato copre almeno questo numero di giorni.",
           "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
           "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra il selettore di date integrato di Statistics Graph Chart Card nelle finestre delle entità.",
           "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
-          "card_options": "Impostazioni predefinite di Statistics Graph Chart Card per i nuovi grafici. Modifica direttamente lo YAML oppure usa il pulsante Apri editor visuale sottostante.",
-          "more_info_card_options": "Impostazioni separate di Statistics Graph Chart Card per il grafico nelle finestre delle entità. Modifica il YAML direttamente oppure usa il relativo editor visuale."
+          "numeric_card_options": "Valori predefiniti usati solo dai grafici numerici. Apri l’editor visuale o modifica direttamente il codice.",
+          "state_card_options": "Valori predefiniti usati solo dai grafici della cronologia degli stati. Apri l’editor visuale o modifica direttamente il codice."
         }
-      }
-    }
-  },
-  "selector": {
-    "compare_mode": {
-      "options": {
-        "follow_energy": "Segui il selettore Energia",
-        "previous_period": "Periodo precedente",
-        "last_year": "Anno precedente",
-        "disabled": "Disabilitato"
+      },
+      "more_info": {
+        "title": "Impostazioni di More-Info",
+        "description": "Il salvataggio ricarica automaticamente More-Info; non è necessario riavviare Home Assistant.",
+        "data": {
+          "replace_more_info_history": "Usa Statistics Graph in Ulteriori informazioni",
+          "more_info_show_date_picker": "Mostra calendario del grafico",
+          "redirect_show_more": "Apri Mostra altro in Advanced History",
+          "card_module_url": "URL del modulo della scheda grafico",
+          "numeric_card_options": "Opzioni dei grafici numerici",
+          "state_card_options": "Opzioni dei grafici di stato",
+          "large_range_automatic_detail": "Dettaglio automatico"
+        },
+        "data_description": {
+          "replace_more_info_history": "Sostituisce il grafico Cronologia nativo nelle finestre delle entità con Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Mostra il selettore di date integrato di Statistics Graph Chart Card nelle finestre delle entità.",
+          "redirect_show_more": "Reindirizza il collegamento Mostra altro della sezione Cronologia nelle finestre delle entità ad Advanced History, sostituendo tutti gli obiettivi esistenti con tale entità.",
+          "card_module_url": "Lascia vuoto per rilevare automaticamente la risorsa HACS di Statistics Graph Chart Card.",
+          "numeric_card_options": "Valori predefiniti usati solo dai grafici numerici. Apri l’editor visuale o modifica direttamente il codice.",
+          "state_card_options": "Valori predefiniti usati solo dai grafici della cronologia degli stati. Apri l’editor visuale o modifica direttamente il codice.",
+          "large_range_automatic_detail": "Imposta il ridimensionamento automatico dei punti predefinito per i grafici numerici Altre informazioni; le opzioni del grafico e dell’entità possono sostituirlo."
+        }
       }
     }
   }

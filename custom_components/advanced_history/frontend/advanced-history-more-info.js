@@ -1,4 +1,8 @@
-import { ensureCardLoaded, installConfigFlowDefaultsEditor } from "./config-flow-defaults.js";
+import {
+  ensureCardLoaded,
+  installConfigFlowDefaultsEditor,
+  moreInfoEditorStyles,
+} from "./config-flow-defaults.js";
 import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { installCardHandoffApi } from "./card-handoff.js";
 import { CARD_TAG } from "./constants.js";
@@ -9,13 +13,12 @@ import {
   nativeHistoryAttributes,
 } from "./history-series.js";
 import { mergeStateMaps, nativeStateMap } from "./state-colors.js";
-import { customLocalize } from "./translations.js";
+import { customLocalize, loadTranslations } from "./translations.js";
 
 // Keep the legacy global value so an update cannot install duplicate listeners
 // in a browser session that still has the previous module loaded.
 const SHOW_MORE_REDIRECT_INSTALL_KEY = "__advancedHistoryShowMoreRedirectInstalled";
 const PANEL_PATH = "/advanced-history";
-const PANEL_KEY = "advanced-history";
 const MORE_INFO_PATCH_KEY = "__advancedHistoryMoreInfoPatched";
 const MORE_INFO_HOST_CLASS = "advanced-history-more-info-chart";
 const MORE_INFO_HOST_BOTTOM_OFFSET =
@@ -24,12 +27,17 @@ const MORE_INFO_STATE_TIMELINE_HEIGHT = 90;
 const MORE_INFO_REPLACING_ATTRIBUTE = "advanced-history-replacing-chart";
 const MORE_INFO_STYLE_CLASS = "advanced-history-more-info-style";
 const MORE_INFO_EDITOR_BUTTON_CLASS = "advanced-history-more-info-editor-button";
+const MORE_INFO_PICKER_BUTTON_CLASS = "advanced-history-more-info-picker-button";
 const MORE_INFO_EDITOR_LINK_CLASS = "advanced-history-more-info-editor-link";
 const MORE_INFO_EDITOR_ACTIONS_CLASS = "advanced-history-more-info-editor-actions";
 const MORE_INFO_EDITOR_RESIZE_OBSERVER = "__advancedHistoryMoreInfoEditorResizeObserver";
 const MORE_INFO_DATE_SYNC_HANDLER = "__advancedHistoryMoreInfoDateSyncHandler";
+const MORE_INFO_STATE_COLOR_REFRESH = "__advancedHistoryMoreInfoStateColorRefresh";
 const MORE_INFO_CONFIG_TYPE = "advanced_history/more_info/config";
 const MORE_INFO_ENTITY_CONFIG_SET_TYPE = "advanced_history/more_info/entity_config/set";
+const MORE_INFO_PICKER_MODE_SET_TYPE = "advanced_history/more_info/picker_mode/set";
+const NUMERIC_ENTITIES_KEY = "numeric_entities";
+const STATE_ENTITIES_KEY = "state_entities";
 const moreInfoConfigCache = new Map();
 const moreInfoConfigRequests = new Map();
 
@@ -73,10 +81,17 @@ async function getMoreInfoConfig(hass, entityId) {
   return request;
 }
 
-function entityTemplate(options) {
-  const configured = options?.entities;
+function firstEntityTemplate(configured) {
   const rows = Array.isArray(configured) ? configured : configured ? [configured] : [];
   return rows.find((row) => row && typeof row === "object" && !Array.isArray(row)) || {};
+}
+
+function entityTemplate(options, variant = "numeric") {
+  const shared = firstEntityTemplate(options?.entities);
+  const typed = firstEntityTemplate(
+    options?.[variant === "state" ? STATE_ENTITIES_KEY : NUMERIC_ENTITIES_KEY],
+  );
+  return { ...structuredClone(shared), ...structuredClone(typed) };
 }
 
 function entityDisplayPrecision(hass, entityId) {
@@ -132,6 +147,20 @@ function nativeMoreInfoAttributes(historyView) {
   return nativeHistoryAttributes(entityId, historyView.hass?.states?.[entityId]);
 }
 
+function nativeTimelineStates(nativeChart, entityId) {
+  const timeline = nativeChart?.historyData?.timeline;
+  if (!Array.isArray(timeline)) return [];
+  const entityTimeline = timeline.find((entry) => entry?.entity_id === entityId);
+  if (!Array.isArray(entityTimeline?.data)) return [];
+  return [...new Set(
+    entityTimeline.data
+      .slice()
+      .reverse()
+      .map((entry) => entry?.state)
+      .filter(Boolean),
+  )];
+}
+
 function optionKeysToRemove(config, scope) {
   const configured = config?.[scope];
   return Array.isArray(configured)
@@ -139,7 +168,52 @@ function optionKeysToRemove(config, scope) {
     : [];
 }
 
-function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
+function activeComparisons(configured) {
+  const active = (comparison) => {
+    if (typeof comparison === "string") return comparison ? comparison : null;
+    if (!comparison || typeof comparison !== "object" || Array.isArray(comparison)) return null;
+    return typeof comparison.period === "string" && comparison.period
+      ? comparison
+      : null;
+  };
+  if (Array.isArray(configured)) {
+    const rows = configured.map(active).filter(Boolean);
+    return rows.length ? rows : undefined;
+  }
+  return active(configured) || undefined;
+}
+
+function mergeComparisonDefaults(active, defaults) {
+  const configuredActive = activeComparisons(active);
+  if (configuredActive == null || defaults == null) return configuredActive;
+  const defaultRows = Array.isArray(defaults) ? defaults : null;
+  const mergeOne = (configured, index = 0) => {
+    const fallback = defaultRows
+      ? defaultRows.length === 1
+        ? defaultRows[0]
+        : defaultRows[index]
+      : defaults;
+    const options = fallback && typeof fallback === "object" && !Array.isArray(fallback)
+      ? fallback
+      : {};
+    if (configured === true) return { ...options };
+    if (configured && typeof configured === "object" && !Array.isArray(configured)) {
+      return { ...structuredClone(options), ...configured };
+    }
+    return { ...structuredClone(options), period: configured };
+  };
+  return Array.isArray(configuredActive)
+    ? configuredActive.map((configured, index) => mergeOne(configured, index))
+    : mergeOne(configuredActive);
+}
+
+function moreInfoCardConfig(
+  historyView,
+  nativeChart,
+  options,
+  entityConfig,
+  automaticDetail = true,
+) {
   const entityId = historyView.entityId;
   const availableNativeAttributes = nativeMoreInfoAttributes(historyView);
   const configuredAttributes = entityConfig?.attribute_selection;
@@ -157,9 +231,34 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
   if (entityConfig?.card_options && typeof entityConfig.card_options === "object") {
     Object.assign(cardOptions, structuredClone(entityConfig.card_options));
   }
+  // Match AHP's automatic-detail precedence: manual resolution controls
+  // disable the inherited auto scale, then an explicit chart option wins.
+  const hasManualResolution = (
+    ["points_per_hour", "group_by"].some(
+      (key) => Object.prototype.hasOwnProperty.call(cardOptions, key),
+    )
+    || cardOptions.show_pph_picker === true
+    || cardOptions.show_group_by_picker === true
+  );
+  if (
+    numeric
+    && !Object.prototype.hasOwnProperty.call(cardOptions, "auto_scale_points")
+  ) {
+    cardOptions.auto_scale_points = hasManualResolution
+      ? false
+      : automaticDetail !== false;
+  }
+  delete cardOptions.energy_date_sync;
+  delete cardOptions.energy_collection_key;
+  const configuredTemplate = structuredClone(entityTemplate(
+    cardOptions,
+    numeric ? "numeric" : "state",
+  ));
+  const comparisonDefaults = configuredTemplate.compare;
+  delete configuredTemplate.compare;
   const template = {
     ...automaticEntityOptions(historyView.hass?.states?.[entityId], numeric ? "timeline" : "state_timeline"),
-    ...structuredClone(entityTemplate(cardOptions)),
+    ...configuredTemplate,
   };
   for (const key of optionKeysToRemove(entityConfig, "remove_entity_options")) {
     delete template[key];
@@ -168,9 +267,10 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
     Object.assign(template, structuredClone(entityConfig.entity_options));
   }
   delete cardOptions.entities;
+  delete cardOptions[NUMERIC_ENTITIES_KEY];
+  delete cardOptions[STATE_ENTITIES_KEY];
   delete template.entity;
   delete template.statistic_id;
-  delete template.compare;
   if (
     numeric
     && nativeAttributes.length === 0
@@ -194,7 +294,12 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
     && !Object.prototype.hasOwnProperty.call(template, "color")
   ) {
     const stateMap = mergeStateMaps(
-      nativeStateMap(historyView.hass, entityId),
+      nativeStateMap(
+        historyView.hass,
+        entityId,
+        nativeTimelineStates(nativeChart, entityId),
+        nativeActivityStateColors(historyView, entityId),
+      ),
       template.state_map
     );
     if (stateMap) template.state_map = stateMap;
@@ -208,6 +313,10 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
       for (const key of attributeConfig?.remove_options || []) delete row[key];
       if (attributeOptions && typeof attributeOptions === "object") {
         Object.assign(row, structuredClone(attributeOptions));
+      }
+      if (Object.prototype.hasOwnProperty.call(row, "compare")) {
+        row.compare = mergeComparisonDefaults(row.compare, comparisonDefaults);
+        if (row.compare === undefined) delete row.compare;
       }
       if (!Object.prototype.hasOwnProperty.call(row, "color")) {
         const color = nativeGraphColor(
@@ -229,8 +338,17 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
         ...(row.unit == null && unit != null ? { unit } : {}),
       };
     })
-    : [{ ...template, entity: entityId }];
-  const configuredHeight = Number(cardOptions.height) || 240;
+    : (() => {
+      const row = { ...template, entity: entityId };
+      if (Object.prototype.hasOwnProperty.call(row, "compare")) {
+        row.compare = mergeComparisonDefaults(row.compare, comparisonDefaults);
+        if (row.compare === undefined) delete row.compare;
+      }
+      return [row];
+    })();
+  const configuredHeight = cardOptions.height === "auto"
+    ? "auto"
+    : (Number(cardOptions.height) || 240);
   const datePickerGroup = cardOptions.date_picker_group
     || `advanced-history-more-info:${entityId}`;
   return {
@@ -238,18 +356,48 @@ function moreInfoCardConfig(historyView, nativeChart, options, entityConfig) {
     type: `custom:${CARD_TAG}`,
     card_header: "",
     card_padding: cardOptions.card_padding ?? 0,
-    chart_mode: numeric ? "timeline" : "state_timeline",
+    chart_mode: numeric ? (cardOptions.chart_mode || "timeline") : "state_timeline",
     ...(cardOptions.hours_to_show !== undefined
       ? { hours_to_show: cardOptions.hours_to_show }
       : {}),
     height: numeric
       ? configuredHeight
-      : Math.min(configuredHeight, MORE_INFO_STATE_TIMELINE_HEIGHT),
+      : Math.min(
+        Number(configuredHeight) || 240,
+        MORE_INFO_STATE_TIMELINE_HEIGHT,
+      ),
     time_zone: cardOptions.time_zone ?? resolvedTimeZone(historyView.hass),
     ...(numeric ? {} : { auto_scale_points: false, group_by: "raw" }),
     ...(cardOptions.show_date_picker ? { date_picker_group: datePickerGroup } : {}),
     entities: entityRows,
   };
+}
+
+function pickerMode(historyView, config, preferredMode = null) {
+  const selection = historyView.__advancedHistoryMoreInfoPickerSelection;
+  if (selection?.entityId === historyView.entityId) {
+    return selection.mode;
+  }
+  if (preferredMode === "date" || preferredMode === "interval") {
+    return preferredMode;
+  }
+  return config.show_date_picker ? "date" : "interval";
+}
+
+function applyPickerMode(historyView, config, preferredMode = null) {
+  const mode = pickerMode(historyView, config, preferredMode);
+  const resolved = {
+    ...config,
+    show_date_picker: mode === "date",
+    show_interval_picker: mode === "interval",
+  };
+  if (mode === "date") {
+    resolved.date_picker_group = config.date_picker_group
+      || `advanced-history-more-info:${historyView.entityId}`;
+  } else {
+    delete resolved.date_picker_group;
+  }
+  return resolved;
 }
 
 function moreInfoLogbook(historyView) {
@@ -269,6 +417,79 @@ function moreInfoLogbook(historyView) {
   if (nested) return nested;
 
   return root.host?.shadowRoot?.querySelector("ha-more-info-logbook") || null;
+}
+
+function nativeActivityStateColors(historyView, entityId) {
+  const logbook = moreInfoLogbook(historyView);
+  if (!logbook) return new Map();
+
+  const entries = [];
+  const roots = [logbook, logbook.shadowRoot].filter(Boolean);
+  while (roots.length) {
+    const root = roots.pop();
+    for (const element of root.querySelectorAll?.("*") || []) {
+      if (element.localName === "ha-logbook-entry") entries.push(element);
+      if (element.shadowRoot) roots.push(element.shadowRoot);
+    }
+  }
+
+  const colors = new Map();
+  for (const entry of entries) {
+    const item = entry.item;
+    const entryEntityId = item?.entity_id || item?.entityId;
+    if (entryEntityId && entryEntityId !== entityId) continue;
+    const state = item?.state;
+    if (typeof state !== "string" || colors.has(state)) continue;
+    const node = entry.shadowRoot?.querySelector(".dot, .node-glyph");
+    if (!node) continue;
+    const style = getComputedStyle(node);
+    const color = node.style.getPropertyValue("--node-color").trim()
+      || style.getPropertyValue("--node-color").trim()
+      || style.backgroundColor;
+    if (color) colors.set(state, color);
+  }
+  return colors;
+}
+
+function stateColorSignature(colors) {
+  return JSON.stringify([...colors.entries()].sort(([left], [right]) => (
+    left.localeCompare(right)
+  )));
+}
+
+function clearMoreInfoStateColorRefresh(historyView) {
+  const refresh = historyView[MORE_INFO_STATE_COLOR_REFRESH];
+  if (refresh?.timer) clearTimeout(refresh.timer);
+  historyView[MORE_INFO_STATE_COLOR_REFRESH] = null;
+}
+
+function scheduleMoreInfoStateColorRefresh(historyView, host, entityId) {
+  clearMoreInfoStateColorRefresh(historyView);
+  const refresh = { attempt: 0, timer: null };
+  historyView[MORE_INFO_STATE_COLOR_REFRESH] = refresh;
+  const check = () => {
+    if (
+      historyView[MORE_INFO_STATE_COLOR_REFRESH] !== refresh
+      || !historyView.isConnected
+      || historyView.entityId !== entityId
+      || historyView.shadowRoot?.querySelector(`.${MORE_INFO_HOST_CLASS}`) !== host
+    ) return;
+    const signature = stateColorSignature(
+      nativeActivityStateColors(historyView, entityId),
+    );
+    if (signature !== "[]" && signature !== host.dataset.activityStateColors) {
+      historyView[MORE_INFO_STATE_COLOR_REFRESH] = null;
+      scheduleMoreInfoReplacement(historyView);
+      return;
+    }
+    refresh.attempt += 1;
+    if (refresh.attempt < 4) {
+      refresh.timer = setTimeout(check, refresh.attempt * 250);
+    } else {
+      historyView[MORE_INFO_STATE_COLOR_REFRESH] = null;
+    }
+  };
+  refresh.timer = setTimeout(check, 100);
 }
 
 function sameLogbookTime(left, right) {
@@ -364,6 +585,7 @@ function installMoreInfoDateSync(historyView, card, config) {
 function restoreNativeChart(historyView) {
   const root = historyView.shadowRoot;
   removeMoreInfoDateSync(historyView, true);
+  clearMoreInfoStateColorRefresh(historyView);
   historyView[MORE_INFO_EDITOR_RESIZE_OBSERVER]?.disconnect();
   historyView[MORE_INFO_EDITOR_RESIZE_OBSERVER] = null;
   resetMoreInfoContainerLayout(historyView);
@@ -377,6 +599,7 @@ function restoreNativeChart(historyView) {
   }
   actions?.remove();
   root?.querySelector(`.${MORE_INFO_EDITOR_BUTTON_CLASS}`)?.remove();
+  root?.querySelector(`.${MORE_INFO_PICKER_BUTTON_CLASS}`)?.remove();
   for (const chart of root?.querySelectorAll("statistics-chart, state-history-charts") || []) {
     chart.style.removeProperty("display");
   }
@@ -534,13 +757,46 @@ function graphOptionChanges(draft, base, protectedKeys) {
   return { configured, removed: removed.sort() };
 }
 
-function entityOverrideFromEditor(draft, base, numeric) {
+function comparisonOverrides(active, defaults) {
+  const configuredActive = activeComparisons(active);
+  if (configuredActive == null || defaults == null) return configuredActive;
+  const defaultRows = Array.isArray(defaults) ? defaults : null;
+  const stripOne = (configured, index = 0) => {
+    if (!configured || typeof configured !== "object" || Array.isArray(configured)) {
+      return configured;
+    }
+    const fallback = defaultRows
+      ? defaultRows.length === 1
+        ? defaultRows[0]
+        : defaultRows[index]
+      : defaults;
+    const result = structuredClone(configured);
+    if (fallback && typeof fallback === "object" && !Array.isArray(fallback)) {
+      for (const [key, value] of Object.entries(fallback)) {
+        if (sameGraphOption(result[key], value)) delete result[key];
+      }
+    }
+    return Object.keys(result).length ? result : true;
+  };
+  return Array.isArray(configuredActive)
+    ? configuredActive.map((configured, index) => stripOne(configured, index))
+    : stripOne(configuredActive);
+}
+
+function entityOverrideFromEditor(draft, base, numeric, comparisonDefaults) {
   const cardChanges = graphOptionChanges(
     draft,
     base,
     new Set([
-      "type", "card_header", "chart_mode", "entities",
-      ...(numeric ? [] : ["group_by"]),
+      "type", "card_header", "entities",
+      "energy_date_sync", "energy_collection_key",
+      "show_date_picker", "show_interval_picker",
+      "show_attribute_list", "show_y2_axis",
+      ...(numeric ? [] : [
+        "chart_mode", "group_by", "auto_scale_points", "points_per_hour",
+        "show_pph_picker", "pph_picker_position", "pph_picker_group",
+        "show_group_by_picker", "group_by_picker_position", "group_by_picker_group",
+      ]),
     ]),
   );
   const result = {};
@@ -553,10 +809,14 @@ function entityOverrideFromEditor(draft, base, numeric) {
     ? base.entities.filter((row) => row && typeof row === "object" && !Array.isArray(row))
     : [];
   if (baseEntities.length < 2) {
+    const draftEntity = structuredClone(draftEntities[0] || {});
+    if (Object.prototype.hasOwnProperty.call(draftEntity, "compare")) {
+      draftEntity.compare = comparisonOverrides(draftEntity.compare, comparisonDefaults);
+    }
     const entityChanges = graphOptionChanges(
-      draftEntities[0] || {},
+      draftEntity,
       baseEntities[0] || {},
-      new Set(["entity", "statistic_id", "compare"]),
+      new Set(["entity", "statistic_id", "attribute", "enabled", "y_axis"]),
     );
     if (Object.keys(entityChanges.configured).length) {
       result.entity_options = entityChanges.configured;
@@ -570,16 +830,18 @@ function entityOverrideFromEditor(draft, base, numeric) {
         .filter((row) => typeof row.attribute === "string" && row.attribute)
         .map((row) => [row.attribute, row]),
     );
-    const selected = [];
     const attributeOptions = {};
-    for (const row of draftEntities) {
+    for (const configuredRow of draftEntities) {
+      const row = structuredClone(configuredRow);
       const attribute = row.attribute;
       if (!baseByAttribute.has(attribute)) continue;
-      selected.push(attribute);
+      if (Object.prototype.hasOwnProperty.call(row, "compare")) {
+        row.compare = comparisonOverrides(row.compare, comparisonDefaults);
+      }
       const changes = graphOptionChanges(
         row,
         baseByAttribute.get(attribute),
-        new Set(["entity", "statistic_id", "attribute", "compare"]),
+        new Set(["entity", "statistic_id", "attribute", "enabled", "y_axis"]),
       );
       if (Object.keys(changes.configured).length || changes.removed.length) {
         attributeOptions[attribute] = {
@@ -591,16 +853,6 @@ function entityOverrideFromEditor(draft, base, numeric) {
             : {}),
         };
       }
-    }
-    const baseSelection = [...baseByAttribute.keys()];
-    if (
-      selected.length
-      && (
-        selected.length !== baseSelection.length
-        || selected.some((attribute, index) => attribute !== baseSelection[index])
-      )
-    ) {
-      result.attribute_selection = selected;
     }
     if (Object.keys(attributeOptions).length) {
       result.attribute_options = attributeOptions;
@@ -631,15 +883,30 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
   const entityId = historyView.entityId;
   const numeric = nativeMoreInfoAttributes(historyView).length > 0
     || isNumericMoreInfoHistory(historyView, nativeChart);
-  const baseConfig = moreInfoCardConfig(historyView, nativeChart, serviceConfig.card_options || {}, null);
-  await openCardEditorDialog({
-    hass,
-    container: historyView,
-    initialConfig: moreInfoCardConfig(
+  const baseConfig = applyPickerMode(
+    historyView,
+    moreInfoCardConfig(
       historyView,
       nativeChart,
       serviceConfig.card_options || {},
-      serviceConfig.entity_config,
+      null,
+      serviceConfig.automatic_detail,
+    ),
+    serviceConfig.picker_mode,
+  );
+  await openCardEditorDialog({
+    hass,
+    container: historyView,
+    initialConfig: applyPickerMode(
+      historyView,
+      moreInfoCardConfig(
+        historyView,
+        nativeChart,
+        serviceConfig.card_options || {},
+        serviceConfig.entity_config,
+        serviceConfig.automatic_detail,
+      ),
+      serviceConfig.picker_mode,
     ),
     title: custom(hass, "more_info_entity_graph_settings"),
     note: custom(hass, "more_info_entity_editor_note"),
@@ -665,31 +932,28 @@ async function openMoreInfoEntityEditor(historyView, serviceConfig) {
       confirmReset: custom(hass, "more_info_entity_reset_confirm"),
     },
     ensureLoaded: () => ensureCardLoaded(hass, serviceConfig.card_module_url),
+    visualEditorStyles: moreInfoEditorStyles(numeric ? "numeric" : "state"),
     resetDisabled: !serviceConfig.entity_config,
     onSave: (draft) => saveMoreInfoEntityConfig(
       historyView,
       entityId,
-      entityOverrideFromEditor(draft, baseConfig, numeric),
+      entityOverrideFromEditor(
+        draft,
+        baseConfig,
+        numeric,
+        entityTemplate(
+          serviceConfig.card_options || {},
+          numeric ? "numeric" : "state",
+        ).compare,
+      ),
     ),
     onReset: () => saveMoreInfoEntityConfig(historyView, entityId, null),
   });
 }
 
-function ensureMoreInfoEditorButton(historyView, serviceConfig) {
+function ensureMoreInfoActionButtons(historyView, serviceConfig, cardConfig) {
   const root = historyView.shadowRoot;
   if (!root) return;
-  let button = root.querySelector(`.${MORE_INFO_EDITOR_BUTTON_CLASS}`);
-  if (!serviceConfig?.enabled || !serviceConfig?.can_edit_entity_config) {
-    const actions = root.querySelector(`.${MORE_INFO_EDITOR_ACTIONS_CLASS}`);
-    const editorLink = actions?.querySelector(`.${MORE_INFO_EDITOR_LINK_CLASS}`);
-    if (actions && editorLink) {
-      editorLink.classList.remove(MORE_INFO_EDITOR_LINK_CLASS);
-      actions.before(editorLink);
-    }
-    actions?.remove();
-    button?.remove();
-    return;
-  }
   const showMore = [...root.querySelectorAll("a[href]")].find((link) => {
     try {
       return new URL(link.href, window.location.origin).pathname === "/history";
@@ -697,34 +961,89 @@ function ensureMoreInfoEditorButton(historyView, serviceConfig) {
       return false;
     }
   });
-  if (!showMore) return;
-  showMore.classList.add(MORE_INFO_EDITOR_LINK_CLASS);
   let actions = root.querySelector(`.${MORE_INFO_EDITOR_ACTIONS_CLASS}`);
   if (!actions) {
+    const header = root.querySelector(".header");
+    if (!showMore && !header) return;
     actions = document.createElement("span");
     actions.className = MORE_INFO_EDITOR_ACTIONS_CLASS;
-    showMore.before(actions);
+    if (showMore) showMore.before(actions);
+    else header.append(actions);
   }
-  if (showMore.parentElement !== actions) actions.append(showMore);
-  if (!button) {
-    button = document.createElement("button");
-    button.type = "button";
-    button.className = MORE_INFO_EDITOR_BUTTON_CLASS;
-    button.title = custom(historyView.hass, "more_info_entity_graph_settings");
-    button.setAttribute("aria-label", button.title);
-    button.style.cssText = "width:40px;height:40px;padding:8px;border:0;border-radius:50%;display:inline-grid;place-items:center;cursor:pointer;color:var(--primary-color);background:transparent";
-    button.innerHTML = '<ha-icon icon="mdi:cog-outline"></ha-icon>';
-    button.addEventListener("click", (event) => {
+  if (showMore) {
+    showMore.classList.add(MORE_INFO_EDITOR_LINK_CLASS);
+    if (showMore.parentElement !== actions) actions.append(showMore);
+  }
+  let pickerButton = root.querySelector(`.${MORE_INFO_PICKER_BUTTON_CLASS}`);
+  if (!pickerButton) {
+    pickerButton = document.createElement("button");
+    pickerButton.type = "button";
+    pickerButton.className = MORE_INFO_PICKER_BUTTON_CLASS;
+    pickerButton.style.cssText = "width:40px;height:40px;padding:8px;border:0;border-radius:50%;display:inline-grid;place-items:center;cursor:pointer;color:var(--primary-color);background:transparent";
+    pickerButton.addEventListener("click", async (event) => {
       event.preventDefault();
       event.stopPropagation();
-      openMoreInfoEntityEditor(historyView, button.__advancedHistoryServiceConfig);
+      const current = pickerMode(historyView, pickerButton.__advancedHistoryCardConfig || {});
+      const mode = current === "date" ? "interval" : "date";
+      pickerButton.disabled = true;
+      try {
+        await historyView.hass.callWS({
+          type: MORE_INFO_PICKER_MODE_SET_TYPE,
+          mode,
+        });
+        historyView.__advancedHistoryMoreInfoPickerSelection = serviceConfig?.can_edit_entity_config
+          ? null
+          : {
+            entityId: historyView.entityId,
+            mode,
+          };
+        invalidateMoreInfoConfig(historyView.entityId);
+        scheduleMoreInfoReplacement(historyView);
+      } catch (error) {
+        console.warn("Advanced History: unable to save More Info picker preference", error);
+      } finally {
+        pickerButton.disabled = false;
+      }
     });
   }
-  button.__advancedHistoryServiceConfig = serviceConfig;
-  if (button.parentElement !== actions) actions.append(button);
+  pickerButton.__advancedHistoryCardConfig = cardConfig;
+  const currentMode = pickerMode(historyView, cardConfig || {});
+  const pickerLabel = custom(
+    historyView.hass,
+    currentMode === "date" ? "use_interval_picker" : "use_date_picker",
+  );
+  pickerButton.title = pickerLabel;
+  pickerButton.setAttribute("aria-label", pickerLabel);
+  pickerButton.innerHTML = currentMode === "date"
+    ? '<ha-icon icon="mdi:clock-outline"></ha-icon>'
+    : '<ha-icon icon="mdi:calendar-outline"></ha-icon>';
+  if (pickerButton.parentElement !== actions) actions.append(pickerButton);
+
+  let editorButton = root.querySelector(`.${MORE_INFO_EDITOR_BUTTON_CLASS}`);
+  if (!serviceConfig?.can_edit_entity_config) {
+    editorButton?.remove();
+    return;
+  }
+  if (!editorButton) {
+    editorButton = document.createElement("button");
+    editorButton.type = "button";
+    editorButton.className = MORE_INFO_EDITOR_BUTTON_CLASS;
+    editorButton.title = custom(historyView.hass, "more_info_entity_graph_settings");
+    editorButton.setAttribute("aria-label", editorButton.title);
+    editorButton.style.cssText = "width:40px;height:40px;padding:8px;border:0;border-radius:50%;display:inline-grid;place-items:center;cursor:pointer;color:var(--primary-color);background:transparent";
+    editorButton.innerHTML = '<ha-icon icon="mdi:cog-outline"></ha-icon>';
+    editorButton.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openMoreInfoEntityEditor(historyView, editorButton.__advancedHistoryServiceConfig);
+    });
+  }
+  editorButton.__advancedHistoryServiceConfig = serviceConfig;
+  if (editorButton.parentElement !== actions) actions.append(editorButton);
 }
 
 async function replaceMoreInfoChart(historyView) {
+  await loadTranslations(language(historyView.hass));
   const token = (historyView.__advancedHistoryMoreInfoToken || 0) + 1;
   historyView.__advancedHistoryMoreInfoToken = token;
   const entityId = historyView.entityId;
@@ -742,6 +1061,7 @@ async function replaceMoreInfoChart(historyView) {
   showMoreInfoLoading(root, nativeChart);
   try {
     const serviceConfig = await getMoreInfoConfig(historyView.hass, entityId);
+    historyView.__advancedHistoryMoreInfoServiceConfig = serviceConfig;
     if (
       historyView.__advancedHistoryMoreInfoToken !== token
       || historyView.entityId !== entityId
@@ -751,18 +1071,31 @@ async function replaceMoreInfoChart(historyView) {
       restoreNativeChart(historyView);
       return;
     }
-    ensureMoreInfoEditorButton(historyView, serviceConfig);
+    if (
+      historyView.__advancedHistoryMoreInfoPickerSelection?.mode
+      === serviceConfig.picker_mode
+    ) {
+      historyView.__advancedHistoryMoreInfoPickerSelection = null;
+    }
     await ensureCardLoaded(historyView.hass, serviceConfig.card_module_url);
     if (historyView.__advancedHistoryMoreInfoToken !== token || !historyView.isConnected) return;
     nativeChart = root.querySelector("statistics-chart, state-history-charts");
     if (!nativeChart) return;
     const options = serviceConfig.card_options || {};
-    const config = moreInfoCardConfig(
+    const config = applyPickerMode(
       historyView,
-      nativeChart,
-      options,
-      serviceConfig.entity_config,
+      moreInfoCardConfig(
+        historyView,
+        nativeChart,
+        options,
+        serviceConfig.entity_config,
+        serviceConfig.automatic_detail,
+      ),
+      serviceConfig.picker_mode,
     );
+    const activityStateColors = nativeActivityStateColors(historyView, entityId);
+    const activityStateColorSignature = stateColorSignature(activityStateColors);
+    ensureMoreInfoActionButtons(historyView, serviceConfig, config);
     const configKey = JSON.stringify({ entityId: historyView.entityId, config });
     let host = root.querySelector(`.${MORE_INFO_HOST_CLASS}`);
     let card = host?.querySelector(CARD_TAG);
@@ -777,12 +1110,14 @@ async function replaceMoreInfoChart(historyView) {
       host.append(card);
       nativeChart.before(host);
     }
+    host.dataset.activityStateColors = activityStateColorSignature;
     applyMoreInfoHostLayout(historyView, host);
     card.hass = historyView.hass;
     installMoreInfoDateSync(historyView, card, config);
     nativeChart.style.display = "none";
     historyView.removeAttribute(MORE_INFO_REPLACING_ATTRIBUTE);
     observeMoreInfoEditorAlignment(historyView, host);
+    scheduleMoreInfoStateColorRefresh(historyView, host, entityId);
   } catch (error) {
     console.warn("Advanced History: unable to replace the More Info history graph", error);
     restoreNativeChart(historyView);
@@ -821,6 +1156,7 @@ async function installMoreInfoReplacement() {
   };
   prototype.disconnectedCallback = function (...args) {
     removeMoreInfoDateSync(this);
+    clearMoreInfoStateColorRefresh(this);
     return originalDisconnected?.apply(this, args);
   };
 }
@@ -833,8 +1169,10 @@ function rewriteShowMoreLink(event) {
   if (!historyView) return;
   scheduleMoreInfoReplacement(historyView);
 
-  const panelConfig = historyView.hass?.panels?.[PANEL_KEY]?.config;
-  if (!panelConfig?.redirect_show_more) return;
+  const entityId = historyView.entityId;
+  const serviceConfig = historyView.__advancedHistoryMoreInfoServiceConfig
+    || moreInfoConfigCache.get(configCacheKey(entityId))?.config;
+  if (!serviceConfig?.redirect_show_more) return;
 
   const link = path.find(
     (node) => node instanceof HTMLAnchorElement && node.hasAttribute("href")
@@ -849,16 +1187,20 @@ function rewriteShowMoreLink(event) {
   }
   if (nativeUrl.pathname !== "/history") return;
 
-  const entityId = historyView.entityId || nativeUrl.searchParams.get("entity_id");
-  if (!entityId) return;
+  const targetEntityId = entityId || nativeUrl.searchParams.get("entity_id");
+  if (!targetEntityId) return;
 
   const target = new URL(PANEL_PATH, window.location.origin);
-  target.searchParams.set("entity_id", entityId);
+  target.searchParams.set("entity_id", targetEntityId);
   link.href = `${target.pathname}${target.search}`;
 }
 
 if (!window[SHOW_MORE_REDIRECT_INSTALL_KEY]) {
   window[SHOW_MORE_REDIRECT_INSTALL_KEY] = true;
+  // Config-entry options are edited on a separate Home Assistant route. Clear
+  // cached More Info configs when navigating away so the next entity dialog
+  // immediately fetches newly submitted defaults instead of reusing them.
+  window.addEventListener("location-changed", () => moreInfoConfigCache.clear());
   // Rewriting the real anchor preserves Home Assistant's normal navigation,
   // including dialog closure, modifier keys, new tabs, and browser history.
   document.addEventListener("click", rewriteShowMoreLink, true);

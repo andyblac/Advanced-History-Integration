@@ -1,4 +1,15 @@
 export class TargetPickerMethods {
+  _secondaryAxisEditable() {
+    if (this._narrow) return false;
+    return typeof globalThis.matchMedia !== "function"
+      || globalThis.matchMedia("(min-width: 769px)").matches;
+  }
+
+  _secondaryAxisVisible() {
+    return this._secondaryAxisEditable()
+      || Boolean(this._loadedBookmarkId || this._loadedExternalBookmark);
+  }
+
   async _loadNativeHistoryPicker() {
     if (customElements.get("ha-target-picker")) return;
 
@@ -72,24 +83,28 @@ export class TargetPickerMethods {
     await customElements.whenDefined("ha-target-picker");
   }
 
-  async _renderNativeTargetPicker() {
-    const host = this.shadowRoot.getElementById("target-picker-host");
+  async _renderNativeTargetPicker(axis = "primary") {
+    const secondary = axis === "secondary";
+    const host = this.shadowRoot.getElementById(
+      secondary ? "y2-target-picker-host" : "target-picker-host"
+    );
     if (!host) return;
     try {
       await this._loadNativeHistoryPicker();
       if (!host.isConnected) return;
       const picker = document.createElement("ha-target-picker");
       picker.hass = this._targetPickerHass();
-      picker.value = structuredClone(this._targets);
+      picker.value = structuredClone(secondary ? this._y2Targets : this._targets);
       picker.narrow = this._narrow;
       picker.setAttribute("add-on-top", "");
       picker.setAttribute("compact", "");
-      picker.addEventListener("value-changed", (event) => this._nativeTargetsChanged(event));
-      picker.addEventListener("click", (event) => this._nativeTargetChipClicked(event));
+      picker.addEventListener("value-changed", (event) => this._nativeTargetsChanged(event, axis));
+      picker.addEventListener("click", (event) => this._nativeTargetChipClicked(event, axis));
       host.replaceChildren(picker);
-      this._nativeTargetPicker = picker;
+      if (secondary) this._nativeY2TargetPicker = picker;
+      else this._nativeTargetPicker = picker;
       await picker.updateComplete;
-      this._syncNativeTargetVisibility();
+      this._syncNativeTargetVisibility(axis);
     } catch (error) {
       console.error("Advanced History: native target picker could not be loaded", error);
       if (host.isConnected) {
@@ -99,33 +114,63 @@ export class TargetPickerMethods {
     }
   }
 
-  _nativeTargetsChanged(event) {
+  _nativeTargetsChanged(event, axis = "primary") {
+    const secondary = axis === "secondary";
+    const currentTargets = secondary ? this._y2Targets : this._targets;
+    const otherTargets = secondary ? this._targets : this._y2Targets;
+    const picker = secondary ? this._nativeY2TargetPicker : this._nativeTargetPicker;
+    const otherPicker = secondary ? this._nativeTargetPicker : this._nativeY2TargetPicker;
     const nextTargets = this._normalizeTargets(event.detail?.value || {});
-    const clearedAll = Boolean(this._targetCount(this._targets) && !this._targetCount(nextTargets));
-    if (clearedAll) {
-      if (this._nativeTargetPicker) {
-        this._nativeTargetPicker.value = structuredClone(this._targets);
-        this._nativeTargetPicker.requestUpdate?.();
+    const clearedAxis = Boolean(this._targetCount(currentTargets) && !this._targetCount(nextTargets));
+    const clearedChart = clearedAxis && !this._targetCount(otherTargets);
+    if (clearedChart) {
+      if (picker) {
+        picker.value = structuredClone(currentTargets);
+        picker.requestUpdate?.();
       }
       this._requestClearCurrentChart();
       return;
     }
-    this._targets = nextTargets;
+
+    // A target belongs to one axis. Selecting it in the other picker moves it.
+    for (const kind of ["area_id", "device_id", "entity_id"]) {
+      otherTargets[kind] = otherTargets[kind].filter((id) => !nextTargets[kind].includes(id));
+    }
+    if (secondary) this._y2Targets = nextTargets;
+    else this._targets = nextTargets;
     this._pruneHiddenTargets();
     if (!this._targetCount()) this._resetEnergySelection();
-    if (this._nativeTargetPicker) {
-      this._nativeTargetPicker.value = structuredClone(this._targets);
-      this._nativeTargetPicker.requestUpdate?.();
+    if (picker) {
+      picker.value = structuredClone(nextTargets);
+      picker.requestUpdate?.();
+    }
+    if (otherPicker) {
+      otherPicker.value = structuredClone(otherTargets);
+      otherPicker.requestUpdate?.();
     }
     this._saveTargets();
     this._recordChange(null, true);
-    if (clearedAll) this._clearChartSessionHistory();
     this._notice = "";
     const removeAll = this.shadowRoot.getElementById("remove-all");
     if (removeAll) removeAll.hidden = !this._targetCount();
-    this._syncNativeTargetVisibility();
+    this._syncAxisTargetLayout();
+    this._syncNativeTargetVisibility(axis);
+    this._syncNativeTargetVisibility(secondary ? "primary" : "secondary");
     this.shadowRoot.querySelector(".notice")?.remove();
     this._renderGraphs();
+  }
+
+  _syncAxisTargetLayout() {
+    const hasY1Targets = Boolean(this._targetCount(this._targets));
+    const hasY2Targets = Boolean(this._targetCount(this._y2Targets));
+    this.shadowRoot.querySelector(".axis-target-primary")?.classList.toggle(
+      "axis-target-compact",
+      !hasY1Targets && hasY2Targets,
+    );
+    this.shadowRoot.querySelector(".axis-target-secondary")?.classList.toggle(
+      "axis-target-compact",
+      !hasY2Targets && hasY1Targets,
+    );
   }
 
   _targetPickerHass() {
@@ -170,7 +215,7 @@ export class TargetPickerMethods {
     return { ...hass, states };
   }
 
-  _nativeTargetChipClicked(event) {
+  _nativeTargetChipClicked(event, axis = "primary") {
     const path = event.composedPath();
     const chipIndex = path.findIndex(
       (node) => node?.localName === "ha-target-picker-value-chip"
@@ -186,35 +231,69 @@ export class TargetPickerMethods {
     const chip = path[chipIndex];
     if (!chip?.type || !chip.itemId) return;
     const kind = `${chip.type}_id`;
-    if (!this._targets[kind]) return;
-    this._toggleTargetVisibility(kind, chip.itemId);
+    const targets = axis === "secondary" ? this._y2Targets : this._targets;
+    if (!targets[kind]) return;
+    this._toggleTargetVisibility(axis, kind, chip.itemId);
   }
 
-  _syncNativeTargetVisibility() {
-    const picker = this._nativeTargetPicker;
+  _syncNativeTargetVisibility(axis = "primary") {
+    const secondary = axis === "secondary";
+    const picker = secondary ? this._nativeY2TargetPicker : this._nativeTargetPicker;
+    const targets = secondary ? this._y2Targets : this._targets;
+    const hiddenTargets = secondary ? this._hiddenY2Targets : this._hiddenTargets;
     if (!picker) return;
-    const syncId = (this._nativeTargetSyncId || 0) + 1;
-    this._nativeTargetSyncId = syncId;
+    const syncKey = secondary ? "_nativeY2TargetSyncId" : "_nativeTargetSyncId";
+    const pickerKey = secondary ? "_nativeY2TargetPicker" : "_nativeTargetPicker";
+    const syncId = (this[syncKey] || 0) + 1;
+    this[syncKey] = syncId;
     const apply = async () => {
       await picker.updateComplete;
       await new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(resolve))
       );
       if (
-        picker !== this._nativeTargetPicker ||
-        syncId !== this._nativeTargetSyncId ||
+        picker !== this[pickerKey] ||
+        syncId !== this[syncKey] ||
         !picker.shadowRoot
       ) return;
+      let axisStyle = picker.shadowRoot.querySelector("style[data-advanced-history-axis]");
+      if (!axisStyle) {
+        axisStyle = document.createElement("style");
+        axisStyle.dataset.advancedHistoryAxis = axis;
+        picker.shadowRoot.append(axisStyle);
+      }
+      axisStyle.textContent = [
+        "ha-generic-picker{--ha-generic-picker-width:min(800px,calc(100vw - 32px));--ha-generic-picker-max-width:calc(100vw - 32px)}",
+        secondary ? ".add-target-wrapper,.items{justify-content:flex-end}" : "",
+      ].join("");
+      const genericPicker = picker.shadowRoot.querySelector("ha-generic-picker");
+      if (genericPicker) {
+        await genericPicker.updateComplete;
+        if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
+        let buttonStyle = genericPicker.shadowRoot?.querySelector(
+          "style[data-advanced-history-axis]"
+        );
+        if (secondary && genericPicker.shadowRoot && !buttonStyle) {
+          buttonStyle = document.createElement("style");
+          buttonStyle.dataset.advancedHistoryAxis = axis;
+          genericPicker.shadowRoot.append(buttonStyle);
+        }
+        if (buttonStyle) {
+          buttonStyle.textContent = secondary
+            ? "#picker{display:flex;justify-content:flex-end}"
+            : "";
+        }
+      }
       const chips = [
         ...picker.shadowRoot.querySelectorAll("ha-target-picker-value-chip"),
       ];
-      const entityIds = new Set(this._targets.entity_id || []);
+      const entityIds = new Set(targets.entity_id || []);
       picker.shadowRoot
         .querySelectorAll("[data-advanced-history-series]")
         .forEach((button) => button.remove());
       chips.forEach((chip) => {
         const kind = `${chip.type}_id`;
-        const hidden = Boolean(this._hiddenTargets[kind]?.includes(chip.itemId));
+        const hidden = Boolean(hiddenTargets[kind]?.includes(chip.itemId));
         const name = kind === "area_id"
           ? this._areaName(chip.itemId)
           : kind === "device_id"
@@ -226,6 +305,18 @@ export class TargetPickerMethods {
         chip.setAttribute("role", "button");
         chip.setAttribute("aria-pressed", hidden ? "true" : "false");
         chip.setAttribute("title", this._customLocalize(hidden ? "show_target" : "hide_target", { target: name }));
+        if (secondary) {
+          const applyAxisColor = async () => {
+            await chip.updateComplete;
+            if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
+            const tag = chip.shadowRoot?.querySelector("wa-tag");
+            if (!tag) return;
+            const axisColor = "var(--primary-color)";
+            tag.style.borderColor = axisColor;
+            tag.style.setProperty("--background-color", axisColor);
+          };
+          void applyAxisColor();
+        }
         if (
           kind === "entity_id"
           && entityIds.has(chip.itemId)
@@ -397,10 +488,11 @@ export class TargetPickerMethods {
     const choices = this._seriesChoices(entity);
     const cancel = this._localize("ui.common.cancel", "Cancel");
     const apply = this._localize("ui.common.apply", "Apply");
+    const close = this._localize("ui.common.close", "Close");
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop series-backdrop";
     backdrop.innerHTML = `<section class="dialog series-dialog" role="dialog" aria-modal="true" aria-label="${this._escape(this._customLocalize("attributes_settings", { target: name }))}">
-      <header class="dialog-title"><h2>${this._escape(this._customLocalize("attributes_settings", { target: name }))}</h2></header>
+      <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${this._escape(this._customLocalize("attributes_settings", { target: name }))}</h2></header>
       <p class="series-note">${this._escape(this._customLocalize("attributes_settings_note"))}</p>
       <div class="target-list series-list">
         ${choices.map((choice) => `<div class="series-choice">
@@ -444,6 +536,7 @@ export class TargetPickerMethods {
       if (event.target === backdrop) backdrop.remove();
     });
     backdrop.querySelector('[data-action="cancel"]').addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector('[data-action="close-dialog"]').addEventListener("click", () => backdrop.remove());
     applyButton.addEventListener("click", () => {
       const selection = [...backdrop.querySelectorAll("[data-series]:checked")]
         .map((checkbox) => checkbox.dataset.series);
@@ -506,54 +599,85 @@ export class TargetPickerMethods {
     this.shadowRoot.append(backdrop);
   }
 
-  _toggleTargetVisibility(kind, id) {
-    if (!this._targets[kind]?.includes(id)) return;
-    const hidden = new Set(this._hiddenTargets[kind] || []);
+  _toggleTargetVisibility(axis, kind, id) {
+    const secondary = axis === "secondary";
+    const targets = secondary ? this._y2Targets : this._targets;
+    const hiddenTargets = secondary ? this._hiddenY2Targets : this._hiddenTargets;
+    if (!targets[kind]?.includes(id)) return;
+    const hidden = new Set(hiddenTargets[kind] || []);
     if (hidden.has(id)) hidden.delete(id);
     else hidden.add(id);
-    this._hiddenTargets[kind] = [...hidden];
+    hiddenTargets[kind] = [...hidden];
     this._recordChange(null, true);
-    this._syncNativeTargetVisibility();
+    this._syncNativeTargetVisibility(axis);
     this._renderGraphs();
   }
 
   _pruneHiddenTargets() {
-    const hidden = this._normalizeTargets(this._hiddenTargets || {});
-    for (const kind of ["area_id", "device_id", "entity_id"]) {
-      hidden[kind] = hidden[kind].filter((id) => this._targets[kind].includes(id));
+    for (const [targetsKey, hiddenKey] of [
+      ["_targets", "_hiddenTargets"],
+      ["_y2Targets", "_hiddenY2Targets"],
+    ]) {
+      const hidden = this._normalizeTargets(this[hiddenKey] || {});
+      for (const kind of ["area_id", "device_id", "entity_id"]) {
+        hidden[kind] = hidden[kind].filter((id) => this[targetsKey][kind].includes(id));
+      }
+      this[hiddenKey] = hidden;
     }
-    this._hiddenTargets = hidden;
   }
 
-  _targetCount(targets = this._targets) { return targets.area_id.length + targets.device_id.length + targets.entity_id.length; }
+  _targetCount(targets) {
+    const count = (value) => value.area_id.length + value.device_id.length + value.entity_id.length;
+    return targets
+      ? count(targets)
+      : count(this._targets) + (this._secondaryAxisVisible() ? count(this._y2Targets) : 0);
+  }
+
+  _snapshotTargetCount(snapshot) {
+    return this._targetCount(this._normalizeTargets(snapshot?.targets || {}))
+      + this._targetCount(this._normalizeTargets(snapshot?.y2_targets || {}));
+  }
 
   _resolvedEntityIds() {
-    const hidden = this._normalizeTargets(this._hiddenTargets || {});
-    const ids = new Set(this._targets.entity_id);
-    const enabled = new Set(
-      this._targets.entity_id.filter((id) => !hidden.entity_id.includes(id))
-    );
-    const selectedDevices = new Set(this._targets.device_id);
-    const selectedAreas = new Set(this._targets.area_id);
-    const enabledDevices = new Set(
-      this._targets.device_id.filter((id) => !hidden.device_id.includes(id))
-    );
-    const enabledAreas = new Set(
-      this._targets.area_id.filter((id) => !hidden.area_id.includes(id))
-    );
     const deviceById = new Map(this._devices.map((device) => [device.id, device]));
-    for (const entity of this._entities) {
-      if (entity.disabled_by || (!this.config.include_hidden && entity.hidden_by)) continue;
-      const device = entity.device_id ? deviceById.get(entity.device_id) : null;
-      const areaId = entity.area_id || device?.area_id;
-      if (selectedDevices.has(entity.device_id) || selectedAreas.has(areaId)) ids.add(entity.entity_id);
-      if (enabledDevices.has(entity.device_id) || enabledAreas.has(areaId)) enabled.add(entity.entity_id);
-    }
-    const available = [...ids].filter((id) => this._hass.states[id]);
-    this._enabledResolvedEntityIds = enabled;
+    const resolve = (targets, hiddenTargets) => {
+      const hidden = this._normalizeTargets(hiddenTargets || {});
+      const ids = new Set(targets.entity_id);
+      const enabled = new Set(
+        targets.entity_id.filter((id) => !hidden.entity_id.includes(id))
+      );
+      const selectedDevices = new Set(targets.device_id);
+      const selectedAreas = new Set(targets.area_id);
+      const enabledDevices = new Set(
+        targets.device_id.filter((id) => !hidden.device_id.includes(id))
+      );
+      const enabledAreas = new Set(
+        targets.area_id.filter((id) => !hidden.area_id.includes(id))
+      );
+      for (const entity of this._entities) {
+        if (entity.disabled_by || (!this.config.include_hidden && entity.hidden_by)) continue;
+        const device = entity.device_id ? deviceById.get(entity.device_id) : null;
+        const areaId = entity.area_id || device?.area_id;
+        if (selectedDevices.has(entity.device_id) || selectedAreas.has(areaId)) ids.add(entity.entity_id);
+        if (enabledDevices.has(entity.device_id) || enabledAreas.has(areaId)) enabled.add(entity.entity_id);
+      }
+      return { ids, enabled };
+    };
+    const primary = resolve(this._targets, this._hiddenTargets);
+    const secondary = this._secondaryAxisVisible()
+      ? resolve(this._y2Targets, this._hiddenY2Targets)
+      : { ids: new Set(), enabled: new Set() };
+    const available = [...new Set([...primary.ids, ...secondary.ids])]
+      .filter((id) => this._hass.states[id]);
+    this._enabledResolvedEntityIds = new Set([...primary.enabled, ...secondary.enabled]);
+    this._y2ResolvedEntityIds = new Set(
+      [...secondary.ids].filter((id) => this._hass.states[id])
+    );
     if (available.length > this.maxEntities) {
       this._notice = this._customLocalize("entity_limit", { count: available.length, max: this.maxEntities });
-      return available.slice(0, this.maxEntities);
+      const limited = available.slice(0, this.maxEntities);
+      this._y2ResolvedEntityIds = new Set(limited.filter((id) => this._y2ResolvedEntityIds.has(id)));
+      return limited;
     }
     return available;
   }
@@ -571,6 +695,7 @@ export class TargetPickerMethods {
     const addTarget = this._localize("ui.components.target-picker.add_target", "Add target");
     const cancel = this._localize("ui.common.cancel", "Cancel");
     const apply = this._localize("ui.common.apply", "Apply");
+    const close = this._localize("ui.common.close", "Close");
     const targetTypes = {
       area_id: this._localize("ui.components.target-picker.type.areas", "Areas"),
       device_id: this._localize("ui.components.target-picker.type.devices", "Devices"),
@@ -579,7 +704,7 @@ export class TargetPickerMethods {
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop";
     backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${this._escape(addTarget)}">
-      <header class="dialog-title"><h2>${this._escape(addTarget)}</h2><span class="count">${this._escape(this._localize("ui.panel.config.entities.picker.selected", `${this._targetCount(this._draftTargets)} selected`, { number: this._targetCount(this._draftTargets) }))}</span></header>
+      <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${this._escape(addTarget)}</h2><span class="count">${this._escape(this._localize("ui.panel.config.entities.picker.selected", `${this._targetCount(this._draftTargets)} selected`, { number: this._targetCount(this._draftTargets) }))}</span></header>
       <nav class="tabs">${Object.entries(targetTypes).map(([key,label]) => `<button class="tab ${key === this._activeTab ? "active" : ""}" data-tab="${key}">${this._escape(label)}</button>`).join("")}</nav>
       <div class="search-wrap"><input class="search" type="search" placeholder="${this._escape(this._localize("ui.common.search", "Search"))}" value="${this._escape(this._dialogSearch)}"></div>
       <div class="target-list">${this._dialogRows()}</div>
@@ -590,6 +715,7 @@ export class TargetPickerMethods {
     const search = backdrop.querySelector(".search");
     search.addEventListener("input", () => { this._dialogSearch = search.value; backdrop.querySelector(".target-list").innerHTML = this._dialogRows(); this._bindDialogRows(backdrop); });
     backdrop.querySelector('[data-action="cancel"]').addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector('[data-action="close-dialog"]').addEventListener("click", () => backdrop.remove());
     backdrop.querySelector('[data-action="apply"]').addEventListener("click", () => {
       const nextTargets = this._normalizeTargets(this._draftTargets);
       const clearedAll = Boolean(

@@ -6,52 +6,48 @@
         "title": "Configurer Advanced History",
         "description": "Crée un panneau latéral Historique configurable basé sur Statistics Graph Chart Card.",
         "data": {
-          "title": "Titre du panneau",
           "sidebar_icon": "Icône de la barre latérale",
           "max_entities": "Nombre maximal d’entités",
-          "large_range_automatic_detail": "Détail automatique pour les longues périodes",
+          "max_tabs": "Nombre maximal d’onglets",
+          "large_range_automatic_detail": "Détail automatique",
           "large_range_detail_threshold_days": "Seuil du détail automatique (jours)",
-          "default_hours": "Nombre d’heures par défaut",
           "graph_height": "Hauteur du graphique",
           "include_hidden": "Inclure les entités masquées",
-          "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
-          "card_options": "Valeurs par défaut de la carte",
-          "compare": "Comparaison par défaut",
           "require_admin": "Administrateurs uniquement",
-          "card_module_url": "URL du module de la carte graphique"
+          "card_module_url": "URL du module de la carte graphique",
+          "numeric_card_options": "Options des graphiques numériques",
+          "state_card_options": "Options des graphiques d’état"
         },
         "data_description": {
-          "large_range_automatic_detail": "Utilise un regroupement automatique pour les longues périodes, avec la possibilité de charger un détail plus fin depuis le panneau Historique.",
+          "large_range_automatic_detail": "Définit par défaut la mise à l’échelle automatique des points des graphiques numériques ; les options du graphique peuvent la remplacer. Pour les longues périodes, propose aussi le détail fin dans le panneau Historique.",
           "large_range_detail_threshold_days": "Utilise le détail automatique lorsque la période sélectionnée couvre au moins ce nombre de jours.",
-          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
-          "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous.",
-          "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card."
+          "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
+          "numeric_card_options": "Valeurs par défaut utilisées uniquement par les graphiques numériques. Ouvrez l’éditeur visuel ou modifiez directement le code.",
+          "state_card_options": "Valeurs par défaut utilisées uniquement par les graphiques de chronologie d’état. Ouvrez l’éditeur visuel ou modifiez directement le code."
         }
       },
       "reconfigure": {
         "title": "Reconfigurer Advanced History",
         "description": "Met à jour le panneau latéral et les valeurs par défaut du graphique. L’enregistrement recharge automatiquement Advanced History.",
         "data": {
-          "title": "Titre du panneau",
           "sidebar_icon": "Icône de la barre latérale",
           "max_entities": "Nombre maximal d’entités",
-          "large_range_automatic_detail": "Détail automatique pour les longues périodes",
+          "max_tabs": "Nombre maximal d’onglets",
+          "large_range_automatic_detail": "Détail automatique",
           "large_range_detail_threshold_days": "Seuil du détail automatique (jours)",
-          "default_hours": "Nombre d’heures par défaut",
           "graph_height": "Hauteur du graphique",
           "include_hidden": "Inclure les entités masquées",
-          "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
           "card_module_url": "URL du module de la carte graphique",
-          "card_options": "Valeurs par défaut de la carte",
-          "compare": "Comparaison par défaut",
-          "require_admin": "Administrateurs uniquement"
+          "require_admin": "Administrateurs uniquement",
+          "numeric_card_options": "Options des graphiques numériques",
+          "state_card_options": "Options des graphiques d’état"
         },
         "data_description": {
-          "large_range_automatic_detail": "Utilise un regroupement automatique pour les longues périodes, avec la possibilité de charger un détail plus fin depuis le panneau Historique.",
+          "large_range_automatic_detail": "Définit par défaut la mise à l’échelle automatique des points des graphiques numériques ; les options du graphique peuvent la remplacer. Pour les longues périodes, propose aussi le détail fin dans le panneau Historique.",
           "large_range_detail_threshold_days": "Utilise le détail automatique lorsque la période sélectionnée couvre au moins ce nombre de jours.",
-          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
-          "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous."
+          "numeric_card_options": "Valeurs par défaut utilisées uniquement par les graphiques numériques. Ouvrez l’éditeur visuel ou modifiez directement le code.",
+          "state_card_options": "Valeurs par défaut utilisées uniquement par les graphiques de chronologie d’état. Ouvrez l’éditeur visuel ou modifiez directement le code."
         }
       },
       "more_info": {
@@ -60,14 +56,20 @@
         "data": {
           "replace_more_info_history": "Utiliser Statistics Graph dans Plus d’informations",
           "more_info_show_date_picker": "Afficher le calendrier du graphique",
+          "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
           "card_module_url": "URL du module de la carte graphique",
-          "more_info_card_options": "Valeurs par défaut de Plus d’informations"
+          "numeric_card_options": "Options des graphiques numériques",
+          "state_card_options": "Options des graphiques d’état",
+          "large_range_automatic_detail": "Détail automatique"
         },
         "data_description": {
           "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
+          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
-          "more_info_card_options": "Paramètres Statistics Graph Chart Card distincts pour le graphique des boîtes de dialogue d’entité. Modifiez le YAML directement ou utilisez son bouton d’éditeur visuel."
+          "numeric_card_options": "Valeurs par défaut utilisées uniquement par les graphiques numériques. Ouvrez l’éditeur visuel ou modifiez directement le code.",
+          "state_card_options": "Valeurs par défaut utilisées uniquement par les graphiques de chronologie d’état. Ouvrez l’éditeur visuel ou modifiez directement le code.",
+          "large_range_automatic_detail": "Définit par défaut la mise à l’échelle automatique des points des graphiques numériques Plus d’informations ; les options du graphique et de l’entité peuvent la remplacer."
         }
       },
       "reconfigure_more_info": {
@@ -76,14 +78,20 @@
         "data": {
           "replace_more_info_history": "Utiliser Statistics Graph dans Plus d’informations",
           "more_info_show_date_picker": "Afficher le calendrier du graphique",
+          "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
           "card_module_url": "URL du module de la carte graphique",
-          "more_info_card_options": "Valeurs par défaut de Plus d’informations"
+          "numeric_card_options": "Options des graphiques numériques",
+          "state_card_options": "Options des graphiques d’état",
+          "large_range_automatic_detail": "Détail automatique"
         },
         "data_description": {
           "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
+          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
-          "more_info_card_options": "Paramètres Statistics Graph Chart Card distincts pour le graphique des boîtes de dialogue d’entité. Modifiez le YAML directement ou utilisez son bouton d’éditeur visuel."
+          "numeric_card_options": "Valeurs par défaut utilisées uniquement par les graphiques numériques. Ouvrez l’éditeur visuel ou modifiez directement le code.",
+          "state_card_options": "Valeurs par défaut utilisées uniquement par les graphiques de chronologie d’état. Ouvrez l’éditeur visuel ou modifiez directement le code.",
+          "large_range_automatic_detail": "Définit par défaut la mise à l’échelle automatique des points des graphiques numériques Plus d’informations ; les options du graphique et de l’entité peuvent la remplacer."
         }
       }
     },
@@ -98,43 +106,53 @@
         "title": "Paramètres d’Advanced History",
         "description": "L’enregistrement recharge automatiquement le panneau ; Home Assistant n’a pas besoin d’être redémarré.",
         "data": {
-          "title": "Titre du panneau",
           "sidebar_icon": "Icône de la barre latérale",
           "max_entities": "Nombre maximal d’entités",
-          "large_range_automatic_detail": "Détail automatique pour les longues périodes",
+          "max_tabs": "Nombre maximal d’onglets",
+          "large_range_automatic_detail": "Détail automatique",
           "large_range_detail_threshold_days": "Seuil du détail automatique (jours)",
-          "default_hours": "Nombre d’heures par défaut",
           "graph_height": "Hauteur du graphique",
           "include_hidden": "Inclure les entités masquées",
           "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
           "replace_more_info_history": "Utiliser Statistics Graph dans Plus d’informations",
           "more_info_show_date_picker": "Afficher le calendrier du graphique",
           "card_module_url": "URL du module de la carte graphique",
-          "card_options": "Valeurs par défaut de la carte",
-          "more_info_card_options": "Valeurs par défaut de Plus d’informations",
-          "compare": "Comparaison par défaut",
-          "require_admin": "Administrateurs uniquement"
+          "require_admin": "Administrateurs uniquement",
+          "numeric_card_options": "Options des graphiques numériques",
+          "state_card_options": "Options des graphiques d’état"
         },
         "data_description": {
-          "large_range_automatic_detail": "Utilise un regroupement automatique pour les longues périodes, avec la possibilité de charger un détail plus fin depuis le panneau Historique.",
+          "large_range_automatic_detail": "Définit par défaut la mise à l’échelle automatique des points des graphiques numériques ; les options du graphique peuvent la remplacer. Pour les longues périodes, propose aussi le détail fin dans le panneau Historique.",
           "large_range_detail_threshold_days": "Utilise le détail automatique lorsque la période sélectionnée couvre au moins ce nombre de jours.",
           "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
           "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
-          "card_options": "Paramètres par défaut de Statistics Graph Chart Card pour les nouveaux graphiques. Modifiez directement le YAML ou utilisez le bouton Ouvrir l’éditeur visuel situé dessous.",
-          "more_info_card_options": "Paramètres Statistics Graph Chart Card distincts pour le graphique des boîtes de dialogue d’entité. Modifiez le YAML directement ou utilisez son bouton d’éditeur visuel."
+          "numeric_card_options": "Valeurs par défaut utilisées uniquement par les graphiques numériques. Ouvrez l’éditeur visuel ou modifiez directement le code.",
+          "state_card_options": "Valeurs par défaut utilisées uniquement par les graphiques de chronologie d’état. Ouvrez l’éditeur visuel ou modifiez directement le code."
         }
-      }
-    }
-  },
-  "selector": {
-    "compare_mode": {
-      "options": {
-        "follow_energy": "Suivre le sélecteur Énergie",
-        "previous_period": "Période précédente",
-        "last_year": "Année précédente",
-        "disabled": "Désactivé"
+      },
+      "more_info": {
+        "title": "Paramètres de More-Info",
+        "description": "L’enregistrement recharge automatiquement More-Info ; Home Assistant n’a pas besoin d’être redémarré.",
+        "data": {
+          "replace_more_info_history": "Utiliser Statistics Graph dans Plus d’informations",
+          "more_info_show_date_picker": "Afficher le calendrier du graphique",
+          "redirect_show_more": "Ouvrir Afficher plus dans Advanced History",
+          "card_module_url": "URL du module de la carte graphique",
+          "numeric_card_options": "Options des graphiques numériques",
+          "state_card_options": "Options des graphiques d’état",
+          "large_range_automatic_detail": "Détail automatique"
+        },
+        "data_description": {
+          "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
+          "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
+          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
+          "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
+          "numeric_card_options": "Valeurs par défaut utilisées uniquement par les graphiques numériques. Ouvrez l’éditeur visuel ou modifiez directement le code.",
+          "state_card_options": "Valeurs par défaut utilisées uniquement par les graphiques de chronologie d’état. Ouvrez l’éditeur visuel ou modifiez directement le code.",
+          "large_range_automatic_detail": "Définit par défaut la mise à l’échelle automatique des points des graphiques numériques Plus d’informations ; les options du graphique et de l’entité peuvent la remplacer."
+        }
       }
     }
   }

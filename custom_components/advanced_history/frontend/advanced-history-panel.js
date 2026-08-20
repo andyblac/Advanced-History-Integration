@@ -9,8 +9,9 @@ import { GraphMethods } from "./graphs.js";
 import { ShareMethods } from "./share.js";
 import { StorageMethods } from "./storage.js";
 import { panelStyles as css } from "./styles.js";
+import { PanelTabsMethods } from "./panel-tabs.js";
 import { TargetPickerMethods } from "./target-picker.js";
-import { customLocalize } from "./translations.js";
+import { customLocalize, loadTranslations } from "./translations.js";
 
 class AdvancedHistoryPanel extends HTMLElement {
   constructor() {
@@ -23,6 +24,9 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._entities = [];
     this._targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
+    this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
+    this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
+    this._excludeY2Comparison = false;
     this._draftTargets = null;
     this._activeTab = "area_id";
     this._dialogSearch = "";
@@ -34,11 +38,21 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._notice = "";
     this._energyRenderToken = null;
     this._energyCompare = null;
+    this._energyCompareChoice = null;
+    this._energyCompareCount = 1;
+    this._energyComparePeriodKind = null;
     this._energyUnsubscribe = null;
     this._nativeTargetPicker = null;
+    this._nativeY2TargetPicker = null;
     this._editorAutoColors = new Map();
     this._activeSnapshot = null;
     this._energyCollection = null;
+    this._panelTimeRange = null;
+    this._panelRollingHours = null;
+    this._panelRollingResumeHours = null;
+    this._panelRollingTimer = null;
+    this._pendingRollingCompareRestore = null;
+    this._panelTimeRangePreview = false;
     this._pendingPeriodRestore = null;
     this._currentSnapshot = null;
     this._freshSnapshotSessionFingerprint = null;
@@ -46,24 +60,48 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._bookmarkSyncReady = false;
     this._bookmarkSaveQueue = Promise.resolve();
     this._loadedBookmarkId = null;
+    this._loadedExternalBookmark = false;
+    this._loadedExternalBookmarkOwnerId = null;
+    this._loadedExternalBookmarkId = null;
+    this._externalBookmarkRefreshToken = 0;
     this._loadedBookmarkBaselineFingerprint = null;
     this._loadedBookmarkDirty = false;
+    this._bookmarkCatalog = { shared: [], users: [] };
+    this._bookmarkLibraryView = "mine";
+    this._bookmarkRemoteLibraries = new Map();
     this._unsavedDialogPromise = null;
     this._periodRestoreLoading = false;
     this._periodRestoreExpected = null;
     this._periodRestoreTimer = null;
+    this._energyInteractionLoading = false;
     this._energyResetPending = false;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
     this._largeRangeDetailDismissedKey = null;
     this._versionLogged = false;
+    const initialPanelTabId = globalThis.crypto?.randomUUID?.()
+      || `panel-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    this._panelTabs = [{ id: initialPanelTabId, state: null }];
+    this._activePanelTabId = initialPanelTabId;
+    this._panelTabsStorageInspected = false;
+    this._panelTabsPersistenceSuppressed = false;
+    this._persistPanelsOnPageHide = () => this._persistPanelTabs();
+    this._refreshAliasOnVisibility = () => {
+      if (document.visibilityState === "visible") {
+        this._scheduleExternalBookmarkRefresh?.();
+      }
+    };
   }
 
   set hass(value) {
     this._hass = value;
     if (this._nativeTargetPicker) {
       this._nativeTargetPicker.hass = this._targetPickerHass();
-      this._syncNativeTargetVisibility();
+      this._syncNativeTargetVisibility("primary");
+    }
+    if (this._nativeY2TargetPicker) {
+      this._nativeY2TargetPicker.hass = this._targetPickerHass();
+      this._syncNativeTargetVisibility("secondary");
     }
     for (const card of this._cards) this._setGraphCardHass(card, value);
     if (!this._loaded && value) this._initialize();
@@ -78,10 +116,47 @@ class AdvancedHistoryPanel extends HTMLElement {
     if (!this._loaded && this._hass) this._initialize();
   }
   get panel() { return this._panel; }
-  set narrow(value) { this._narrow = value; }
+  set narrow(value) {
+    const changed = this._narrow !== value;
+    this._narrow = value;
+    if (changed && this._initialized && this.isConnected) this._render();
+  }
   get narrow() { return this._narrow; }
   get config() { return this._panel?.config || {}; }
   get maxEntities() { return Number(this.config.max_entities) || 30; }
+  get maxTabs() {
+    return Math.max(1, Math.min(50, Math.trunc(Number(this.config.max_tabs)) || 10));
+  }
+
+  _comparisonIsActive(value = this._effectiveCompare?.()) {
+    return value !== null
+      && value !== undefined
+      && value !== false
+      && value !== ""
+      && (!Array.isArray(value) || value.length > 0);
+  }
+
+  _syncY2ComparisonToggle(compareActive = this._comparisonIsActive()) {
+    const button = this.shadowRoot?.getElementById("toggle-y2-comparison");
+    if (!button) return;
+    const excluded = Boolean(this._excludeY2Comparison);
+    button.hidden = !compareActive || !this._targetCount(this._y2Targets);
+    button.classList.toggle("active", !excluded);
+    button.setAttribute("aria-pressed", String(!excluded));
+    const label = this._customLocalize(
+      excluded ? "include_y2_comparison" : "exclude_y2_comparison",
+    );
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    button.querySelector("ha-icon")?.setAttribute("icon", "mdi:compare-horizontal");
+  }
+
+  _toggleY2Comparison() {
+    this._excludeY2Comparison = !this._excludeY2Comparison;
+    this._syncY2ComparisonToggle(true);
+    this._recordChange(null, true);
+    this._renderGraphs();
+  }
 
   _localize(key, fallback, replacements) {
     return this._hass?.localize?.(key, replacements) || fallback;
@@ -93,23 +168,37 @@ class AdvancedHistoryPanel extends HTMLElement {
   }
 
   connectedCallback() {
+    window.addEventListener("pagehide", this._persistPanelsOnPageHide);
+    document.addEventListener("visibilitychange", this._refreshAliasOnVisibility);
     if (!this._initialized || !this._hass) return;
     queueMicrotask(() => {
-      if (this.isConnected && !this._energyUnsubscribe) this._render();
+      if (!this.isConnected) return;
+      if (!this._energyUnsubscribe) this._render();
+      if (this._panelRollingHours) this._refreshPanelRollingRange();
+      this._scheduleExternalBookmarkRefresh?.();
     });
   }
 
   disconnectedCallback() {
+    this._persistPanelTabs();
+    window.removeEventListener("pagehide", this._persistPanelsOnPageHide);
+    document.removeEventListener("visibilitychange", this._refreshAliasOnVisibility);
+    this._panelTabsResizeObserver?.disconnect();
+    this._panelTabsResizeObserver = null;
+    this._disconnectDynamicGraphLayout?.();
     this._energyRenderToken = null;
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;
     this._energyCollection = null;
+    if (this._panelRollingTimer) window.clearTimeout(this._panelRollingTimer);
+    this._panelRollingTimer = null;
     if (this._periodRestoreTimer) window.clearTimeout(this._periodRestoreTimer);
     this._periodRestoreTimer = null;
   }
 
   async _initialize() {
     this._loaded = true;
+    await loadTranslations(this._hass?.locale?.language || this._hass?.language);
     await this._loadTargets();
     this._loadingView();
     try {
@@ -131,7 +220,9 @@ class AdvancedHistoryPanel extends HTMLElement {
       }),
     ]);
     this._initialized = true;
-    if (this.isConnected) this._render();
+    const restoredPanels = this._restorePersistedPanelTabs();
+    if (this.isConnected && !restoredPanels) this._render();
+    this._scheduleExternalBookmarkRefresh?.();
   }
 
   async _loadEnergyTranslations() {
@@ -206,12 +297,23 @@ class AdvancedHistoryPanel extends HTMLElement {
     const chartHistory = this._customLocalize("chart_history");
     const undo = this._localize("ui.common.undo", "Undo");
     const redo = this._localize("ui.common.redo", "Redo");
+    const addPanel = this._customLocalize("add_panel");
+    const addPanelRequiresVersion = this._customLocalize("add_panel_requires_version");
     const dependencyMissing = Boolean(this._cardLoadError);
+    const secondaryAxisEditable = this._secondaryAxisEditable();
+    const hasY1Targets = Boolean(this._targetCount(this._targets));
+    const hasY2Targets = secondaryAxisEditable && Boolean(this._targetCount(this._y2Targets));
+    const y1TargetClass = !hasY1Targets && hasY2Targets ? " axis-target-compact" : "";
+    const y2TargetClass = !hasY2Targets && hasY1Targets ? " axis-target-compact" : "";
     this._nativeTargetPicker = null;
+    this._nativeY2TargetPicker = null;
     this.shadowRoot.innerHTML = `
       <style>${css}</style>
       <header class="appbar">
-        <ha-menu-button id="menu"></ha-menu-button><h1>${this._escape(title)}</h1><span class="spacer"></span>
+        <ha-menu-button id="menu"></ha-menu-button><h1>${this._escape(title)}</h1>
+        ${this._renderPanelTabs()}
+        <span class="spacer"></span>
+        ${this._desktopPanelLayoutAvailable() ? `<button id="add-panel" class="icon-button desktop-panel-only" title="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" aria-label="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" ${this._panelTabs.length >= this.maxTabs ? "disabled" : ""}><ha-icon icon="mdi:plus"></ha-icon></button>` : ""}
         <button id="bookmarks" class="icon-button" title="${this._escape(bookmarks)}"><ha-icon icon="mdi:bookmark-multiple-outline"></ha-icon></button>
         <button id="chart-history" class="icon-button" title="${this._escape(chartHistory)}"><ha-icon icon="mdi:history"></ha-icon></button>
         <button id="undo" class="icon-button" title="${this._escape(undo)}"><ha-icon icon="mdi:undo"></ha-icon></button>
@@ -219,14 +321,27 @@ class AdvancedHistoryPanel extends HTMLElement {
         <button id="remove-all" class="icon-button" title="${this._escape(removeAll)}" ${this._targetCount() ? "" : "hidden"}><ha-icon icon="mdi:filter-remove-outline"></ha-icon></button>
       </header>
       <main class="content">
-        ${dependencyMissing ? "" : `<section class="filters">
-          <div id="target-picker-host" class="native-target-picker">
-            <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+        ${dependencyMissing ? "" : `<section class="filters axis-targets">
+          <div class="axis-target-group axis-target-primary${y1TargetClass}">
+            <div class="axis-target-label"><span class="axis-badge">Y1</span><span>${this._escape(this._customLocalize("primary_axis"))}</span></div>
+            <div id="target-picker-host" class="native-target-picker">
+              <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+            </div>
           </div>
+          ${secondaryAxisEditable ? `<div class="axis-target-divider" aria-hidden="true"></div>
+          <div class="axis-target-group axis-target-secondary${y2TargetClass}">
+            <div class="axis-target-label">
+              <button id="toggle-y2-comparison" class="axis-compare-toggle${this._excludeY2Comparison ? "" : " active"}" type="button" hidden aria-pressed="${this._excludeY2Comparison ? "false" : "true"}"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+              <span class="axis-badge">Y2</span><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
+            </div>
+            <div id="y2-target-picker-host" class="native-target-picker">
+              <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+            </div>
+          </div>` : ""}
         </section>`}
         <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
           <ha-circular-progress active size="small"></ha-circular-progress>
-          <span>${this._escape(this._customLocalize("loading_saved_range"))}</span>
+          <span id="period-loading-text">${this._escape(this._customLocalize("loading_requested_range"))}</span>
         </section>
         ${dependencyMissing ? "" : `<section id="compare-banner" class="compare-banner" hidden></section>`}
         <section id="detail-banner" class="detail-banner" hidden></section>
@@ -244,8 +359,19 @@ class AdvancedHistoryPanel extends HTMLElement {
     this.shadowRoot.getElementById("chart-history")?.addEventListener("click", () => this._openLibrary("history"));
     this.shadowRoot.getElementById("undo")?.addEventListener("click", () => this._undo());
     this.shadowRoot.getElementById("redo")?.addEventListener("click", () => this._redo());
+    this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
+      "click",
+      () => this._toggleY2Comparison(),
+    );
+    this._syncY2ComparisonToggle();
+    this._bindPanelTabs();
     this._updateUndoRedoButtons();
-    if (!dependencyMissing) this._renderNativeTargetPicker();
+    if (!dependencyMissing) {
+      void this._renderNativeTargetPicker("primary").then(() => {
+        if (secondaryAxisEditable) return this._renderNativeTargetPicker("secondary");
+        return undefined;
+      });
+    }
     this._renderContent();
   }
 
@@ -276,6 +402,7 @@ for (const methods of [
   GraphMethods,
   EnergyMethods,
   DiagnosticsMethods,
+  PanelTabsMethods,
 ]) {
   for (const name of Object.getOwnPropertyNames(methods.prototype)) {
     if (name === "constructor") continue;

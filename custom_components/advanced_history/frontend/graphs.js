@@ -13,6 +13,7 @@ import {
 } from "./state-colors.js";
 
 const DATA_SOURCE_CACHE = new Map();
+const ENTITY_OPTION_REMOVALS = "__advanced_history_remove_options";
 
 function historyTimestamp(value) {
   const numeric = Number(value);
@@ -84,6 +85,7 @@ export class GraphMethods {
   _renderGraphs() {
     const host = this.shadowRoot.getElementById("charts");
     if (!host) return;
+    this._disconnectDynamicGraphLayout();
     const detail = this._largeRangeDetailProfile();
     this._cards = this._cards.filter((card) => !this._graphCards.includes(card));
     this._graphCards = [];
@@ -116,25 +118,35 @@ export class GraphMethods {
       return;
     }
     if (this._activeSnapshot?.single_graph) {
-      const cardOptions = this._cardOptions();
-      const mode = cardOptions.chart_mode
-        || (series.some((item) => this._isNumeric(item)) ? "timeline" : "state_timeline");
-      const title = cardOptions.card_header
-        || this._customLocalize(mode === "state_timeline" ? "state_history" : "numeric_history");
+      const hasNumeric = series.some((item) => this._isNumeric(item));
+      const cardOptions = this._cardOptions(hasNumeric ? "timeline" : "state_timeline");
+      const mode = hasNumeric
+        ? (cardOptions.chart_mode || "timeline")
+        : "state_timeline";
       const graphDetail = mode === "state_timeline" ? null : detail;
       this._renderLargeRangeDetailBanner(graphDetail);
-      this._createGraph(host, series, title, mode, graphDetail);
+      this._configureDynamicGraphLayout(
+        host,
+        mode !== "state_timeline",
+        mode === "state_timeline",
+      );
+      this._createGraph(host, series, "", mode, graphDetail);
       return;
     }
     const numeric = series.filter((item) => this._isNumeric(item));
     const states = series.filter((item) => !this._isNumeric(item));
+    const multipleCharts = Boolean(numeric.length && states.length);
     this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
+    // Establish the available chart region before configuring cards with the
+    // card's native height:auto + numeric grid-row contract.
+    this._configureDynamicGraphLayout(host, Boolean(numeric.length), Boolean(states.length));
     if (numeric.length) {
+      const numericMode = this._cardOptions("timeline").chart_mode || "timeline";
       this._createGraph(
         host,
         numeric,
-        this._customLocalize("numeric_history"),
-        "timeline",
+        multipleCharts ? this._customLocalize("numeric_history") : "",
+        numericMode,
         detail,
       );
     }
@@ -142,16 +154,275 @@ export class GraphMethods {
       this._createGraph(
         host,
         states,
-        this._customLocalize("state_history"),
+        multipleCharts ? this._customLocalize("state_history") : "",
         "state_timeline",
         null,
       );
     }
   }
 
+  _disconnectDynamicGraphLayout() {
+    this._graphLayoutResizeObserver?.disconnect();
+    this._graphLayoutResizeObserver = null;
+    this._graphLayoutMutationObserver?.disconnect();
+    this._graphLayoutMutationObserver = null;
+    this._graphLayoutObservedElements = null;
+    this._graphLayoutObservedRoots = null;
+    if (this._graphLayoutAnimationFrame) {
+      cancelAnimationFrame(this._graphLayoutAnimationFrame);
+    }
+    if (this._graphLayoutSettleFrame) {
+      cancelAnimationFrame(this._graphLayoutSettleFrame);
+    }
+    this._graphLayoutAnimationFrame = null;
+    this._graphLayoutSettleFrame = null;
+    this._graphLayoutSchedule = null;
+    this._graphLayoutObserveCard = null;
+    if (this._graphLayoutResizeHandler) {
+      window.removeEventListener("resize", this._graphLayoutResizeHandler);
+      window.visualViewport?.removeEventListener("resize", this._graphLayoutResizeHandler);
+    }
+    this._graphLayoutResizeHandler = null;
+  }
+
+  _numericCardRequiredHeight(card) {
+    const root = card?.shadowRoot;
+    const cardElement = root?.querySelector("ha-card.sgc-card");
+    const plotWrap = root?.querySelector(".sgc-plot-wrap");
+    if (!cardElement || !plotWrap) return 0;
+    const cardStyle = getComputedStyle(cardElement);
+    const pixels = (value) => Number.parseFloat(value) || 0;
+    let required = pixels(cardStyle.paddingTop)
+      + pixels(cardStyle.paddingBottom)
+      + pixels(cardStyle.borderTopWidth)
+      + pixels(cardStyle.borderBottomWidth);
+
+    // Fill-height mode is deliberately allowed to shrink the plot, so the
+    // card's outer scrollHeight is not a reliable intrinsic measurement. Sum
+    // every in-flow section instead. In particular, a wrapping detail legend
+    // can overflow its flex allocation without changing the outer card box.
+    for (const section of cardElement.children) {
+      const style = getComputedStyle(section);
+      if (
+        section === plotWrap
+        || style.display === "none"
+        || style.position === "absolute"
+        || style.position === "fixed"
+      ) continue;
+      required += Math.max(
+        section.getBoundingClientRect().height,
+        section.scrollHeight || 0,
+      ) + pixels(style.marginTop) + pixels(style.marginBottom);
+    }
+
+    const plotStyle = getComputedStyle(plotWrap);
+    required += 200 + pixels(plotStyle.marginTop) + pixels(plotStyle.marginBottom);
+    return Math.ceil(required);
+  }
+
+  _fitStateTimelineCard(card) {
+    const root = card?.shadowRoot;
+    const plotWrap = root?.querySelector(".sgc-plot-wrap");
+    if (!plotWrap) return;
+    const plotRect = plotWrap.getBoundingClientRect();
+    if (!plotRect.height) return;
+
+    // height:auto in Statistics Graph Chart Card retains its generic 200px
+    // plot minimum. State timelines only need enough plot space for their
+    // rendered rows and x-axis. Measure those rendered primitives so wrapped
+    // entity labels and comparison rows are accounted for exactly.
+    let rowsBottom = 0;
+    const cells = plotWrap.querySelectorAll(".sgc-stl-cell");
+    for (const element of cells) {
+      const rect = element.getBoundingClientRect();
+      if (!rect.width || !rect.height) continue;
+      rowsBottom = Math.max(rowsBottom, rect.bottom - plotRect.top);
+    }
+    if (!rowsBottom) return;
+
+    let axisTextHeight = 0;
+    for (const element of plotWrap.querySelectorAll("svg text")) {
+      const rect = element.getBoundingClientRect();
+      if (!rect.width || !rect.height || rect.top < plotRect.top + rowsBottom - 1) continue;
+      axisTextHeight = Math.max(axisTextHeight, rect.height);
+    }
+
+    const height = Math.max(48, Math.ceil(rowsBottom + axisTextHeight + 12));
+    if (card.__advancedHistoryStateHeight === height) return;
+    const config = card.__advancedHistoryConfig;
+    if (!config || config.chart_mode !== "state_timeline") return;
+    card.__advancedHistoryStateHeight = height;
+    const fittedConfig = { ...config, height };
+    card.__advancedHistoryConfig = fittedConfig;
+    card.setConfig(fittedConfig);
+  }
+
+  _configureDynamicGraphLayout(host, hasNumeric, hasState) {
+    const configuredNumericHeight = this._cardOptions("timeline").height;
+    const autoNumericHeight = hasNumeric && (
+      configuredNumericHeight == null || configuredNumericHeight === "auto"
+    );
+    host.classList.toggle("dynamic-numeric", autoNumericHeight);
+    host.classList.toggle("has-state-graph", autoNumericHeight && hasState);
+    if (!autoNumericHeight) {
+      host.style.removeProperty("height");
+      host.style.removeProperty("min-height");
+      host.style.removeProperty("--numeric-graph-height");
+    }
+    const resize = () => {
+      if (!this.isConnected || this.shadowRoot?.getElementById("charts") !== host) return;
+      if (hasState) {
+        for (const stateCard of host.querySelectorAll(".state-graph > statistics-graph-chart-card")) {
+          this._fitStateTimelineCard(stateCard);
+        }
+      }
+      if (!autoNumericHeight) return;
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const controller = this.shadowRoot?.getElementById("date-controller");
+      const controllerRect = controller?.getBoundingClientRect?.();
+      const bottom = controllerRect?.height > 0
+        ? Math.min(viewportHeight, controllerRect.top)
+        : viewportHeight;
+      const top = Math.max(0, host.getBoundingClientRect().top);
+      const available = Math.max(240, Math.floor(bottom - top - 16));
+      const numericShell = host.querySelector(".graph-shell.numeric-graph");
+      const numericCard = numericShell?.querySelector(CARD_TAG);
+      const cardRoot = numericCard?.shadowRoot;
+      const cardElement = cardRoot?.querySelector("ha-card.sgc-card");
+      const detailLegend = cardRoot?.querySelector(".sgc-detail-legend");
+      const observe = (element) => {
+        if (
+          !element
+          || !this._graphLayoutResizeObserver
+          || this._graphLayoutObservedElements?.has(element)
+        ) return;
+        this._graphLayoutResizeObserver.observe(element);
+        this._graphLayoutObservedElements?.add(element);
+      };
+      observe(cardElement);
+      observe(detailLegend);
+      const numericRequirement = this._numericCardRequiredHeight(numericCard);
+      if (hasState) {
+        host.style.removeProperty("height");
+        // Do not give the grid a viewport-sized minimum: an auto state row is
+        // otherwise allowed to absorb that free space and stops being natural
+        // height. The explicit numeric row owns the remaining viewport space.
+        host.style.removeProperty("min-height");
+        const stateShell = host.querySelector(".graph-shell.state-graph");
+        const stateHeight = Math.ceil(stateShell?.getBoundingClientRect().height || 0);
+        const numericHeight = `${Math.max(
+          240,
+          available - stateHeight - 16,
+          numericRequirement,
+        )}px`;
+        if (host.style.getPropertyValue("--numeric-graph-height") !== numericHeight) {
+          host.style.setProperty("--numeric-graph-height", numericHeight);
+        }
+      } else {
+        host.style.removeProperty("min-height");
+        host.style.removeProperty("--numeric-graph-height");
+        const next = `${Math.max(available, numericRequirement)}px`;
+        if (host.style.height !== next) host.style.height = next;
+      }
+    };
+    const schedule = () => {
+      if (this._graphLayoutAnimationFrame) return;
+      this._graphLayoutAnimationFrame = requestAnimationFrame(() => {
+        this._graphLayoutAnimationFrame = null;
+        resize();
+        // The card rebuilds its SVG and legend asynchronously. A second frame
+        // catches the resulting flex layout without an open-ended timer loop.
+        if (this._graphLayoutSettleFrame) cancelAnimationFrame(this._graphLayoutSettleFrame);
+        this._graphLayoutSettleFrame = requestAnimationFrame(() => {
+          this._graphLayoutSettleFrame = null;
+          resize();
+        });
+      });
+    };
+    this._graphLayoutResizeHandler = schedule;
+    this._graphLayoutSchedule = schedule;
+    window.addEventListener("resize", schedule);
+    window.visualViewport?.addEventListener("resize", schedule);
+    if (typeof ResizeObserver !== "undefined") {
+      this._graphLayoutResizeObserver = new ResizeObserver(schedule);
+      this._graphLayoutObservedElements = new WeakSet();
+      const content = host.closest(".content");
+      if (content) {
+        this._graphLayoutResizeObserver.observe(content);
+        this._graphLayoutObservedElements.add(content);
+      }
+    }
+    if (typeof MutationObserver !== "undefined") {
+      this._graphLayoutMutationObserver = new MutationObserver(schedule);
+      this._graphLayoutObservedRoots = new WeakSet();
+    }
+    this._graphLayoutObserveCard = (card) => {
+      const observeRoot = () => {
+        const root = card?.shadowRoot;
+        if (!root || this._graphLayoutObservedRoots?.has(root)) return Boolean(root);
+        this._graphLayoutMutationObserver?.observe(root, {
+          childList: true,
+          characterData: true,
+          subtree: true,
+        });
+        this._graphLayoutObservedRoots?.add(root);
+        schedule();
+        return true;
+      };
+      if (!observeRoot()) requestAnimationFrame(observeRoot);
+      card?.updateComplete?.then(() => {
+        observeRoot();
+        schedule();
+      });
+    };
+    resize();
+    schedule();
+  }
+
+  _detailCardOptions(detail = null) {
+    if (!detail) {
+      const configured = this._effectiveCardOptionsConfig("timeline");
+      const hasManualResolution = (
+        ["points_per_hour", "group_by"].some(
+          (key) => Object.prototype.hasOwnProperty.call(configured || {}, key),
+        )
+        || configured?.show_pph_picker === true
+        || configured?.show_group_by_picker === true
+      );
+      return {
+        auto_scale_points: hasManualResolution
+          ? false
+          : this.config.large_range_automatic_detail !== false,
+      };
+    }
+    if (detail.automatic) return { auto_scale_points: true };
+    return {
+      auto_scale_points: false,
+      group_by: detail.groupBy,
+      show_group_by_picker: true,
+    };
+  }
+
+  _hasDetailResolutionOverride() {
+    const configured = this._effectiveCardOptionsConfig("timeline");
+    const configuredResolution = ["auto_scale_points", "points_per_hour", "group_by"].some(
+      (key) => Object.prototype.hasOwnProperty.call(configured || {}, key),
+    );
+    return configuredResolution
+      || configured?.show_pph_picker === true
+      || configured?.show_group_by_picker === true;
+  }
+
+  _resolvedDetailCardOptions(detail = null, cardOptions = {}) {
+    // Automatic detail supplies inherited defaults. Explicit integration or
+    // chart options are always applied afterwards and therefore win.
+    return { ...this._detailCardOptions(detail), ...cardOptions };
+  }
+
   _createGraph(host, series, title, mode, detail = null) {
     const shell = document.createElement("div");
     shell.className = "graph-shell";
+    shell.classList.add(mode === "state_timeline" ? "state-graph" : "numeric-graph");
     const sourceIndicator = document.createElement("span");
     sourceIndicator.className = "data-source-indicator pending";
     sourceIndicator.textContent = this._customLocalize("data_source_pending");
@@ -165,18 +436,21 @@ export class GraphMethods {
     );
     card.__advancedHistoryChartMode = mode;
     card.__advancedHistorySourceKey = sourceKey;
-    const cardOptions = { ...this._cardOptions() };
+    this._guardFutureEnergySeries(card);
+    const cardOptionsConfig = this._effectiveCardOptionsConfig(mode);
+    const cardOptions = { ...this._cardOptions(mode, cardOptionsConfig) };
     if (cardOptions.chart_mode && cardOptions.chart_mode !== mode) {
       delete cardOptions.chart_mode;
     }
-    const detailOptions = !detail
-      ? {}
-      : detail.automatic
-        ? { auto_scale_points: true }
-        : { auto_scale_points: false, group_by: detail.groupBy, show_group_by_picker: true };
+    const resolvedCardOptions = this._resolvedDetailCardOptions(detail, cardOptions);
     const palette = customElements.get(CARD_TAG)?.PALETTE;
-    const entities = series.map((item, index) => {
-      const configured = this._entityCardConfig(item, mode);
+    const entities = series.map((item) => this._entityCardConfig(
+      item,
+      mode,
+      cardOptionsConfig,
+    ));
+    const automaticEntityColors = entities.map((configured) => configured.color == null);
+    entities.forEach((configured, index) => {
       // Keep automatically assigned colors stable when entities are toggled.
       // The card otherwise reindexes its palette after disabled entities are
       // removed, causing the remaining series to change color.
@@ -188,22 +462,78 @@ export class GraphMethods {
       ) {
         configured.color = palette[index % palette.length];
       }
-      return configured;
     });
-    const height = this._effectiveGraphHeight();
+    const comparedEntities = entities.filter((configured) => Array.isArray(configured.compare));
+    const soleComparedEntity = comparedEntities.length === 1
+      && (series.length === 1 || this._excludeY2Comparison)
+      ? comparedEntities[0]
+      : null;
+    if (soleComparedEntity) {
+      const comparedIndex = entities.indexOf(soleComparedEntity);
+      this._colorAutomaticComparisons(soleComparedEntity, palette, comparedIndex);
+
+      // When Y2 is excluded from comparison, keep the sole Y1 entity's
+      // single-entity comparison palette and place automatic Y2 colours after
+      // every colour already used by Y1 and its comparison periods.
+      if (
+        this._excludeY2Comparison
+        && Array.isArray(palette)
+        && palette.length
+      ) {
+        const usedColors = new Set([
+          soleComparedEntity.color,
+          ...soleComparedEntity.compare.map((comparison) => comparison?.color),
+        ].filter(Boolean));
+        entities.forEach((configured, index) => {
+          if (
+            configured.y_axis !== "secondary"
+            || !automaticEntityColors[index]
+            || Array.isArray(configured.compare)
+          ) return;
+          const available = palette.find((color) => !usedColors.has(color));
+          if (available) configured.color = available;
+          usedColors.add(configured.color);
+        });
+      }
+    }
+    const hasSecondaryAxis = mode !== "state_timeline"
+      && entities.some((entity) => entity.y_axis === "secondary");
     const config = {
-      type: `custom:${CARD_TAG}`, card_header: title, chart_mode: mode,
+      type: `custom:${CARD_TAG}`, card_header: title,
       entities,
       hours_to_show: this._effectiveDefaultHours(),
-      height,
-      ...cardOptions,
-      ...detailOptions,
+      ...resolvedCardOptions,
+      height: mode === "state_timeline" ? "auto" : (cardOptions.height ?? "auto"),
+      chart_mode: mode === "state_timeline"
+        ? "state_timeline"
+        : (cardOptions.chart_mode ?? mode),
+      show_y2_axis: hasSecondaryAxis,
       ...(mode === "state_timeline"
-        ? { height: "auto", auto_scale_points: false, group_by: "raw" }
+        ? { auto_scale_points: false, group_by: "raw" }
         : {}),
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
       energy_date_sync: true,
+      ...(this._panelEnergyCollectionKey()
+        ? { energy_collection_key: this._panelEnergyCollectionKey() }
+        : {}),
+      ...this._panelGraphHourOptions(),
     };
+    if (mode !== "state_timeline" && config.height === "auto") {
+      // The card's native height:auto implementation only enables its
+      // fill-height path when it is hosted in a numeric grid row. AHP owns
+      // the containing block, so expose its current size using the same
+      // 50px row convention as the card's getCardSize() implementation.
+      config.grid_options = {
+        ...(cardOptions.grid_options || {}),
+        rows: Math.max(1, Math.ceil(host.getBoundingClientRect().height / 50)),
+      };
+    }
+    if (
+      mode === "state_timeline"
+      && !String(config.card_header || "").trim()
+    ) {
+      shell.classList.add("state-controls-row");
+    }
     try {
       if (detail?.automatic) {
         // Statistics Graph Chart Card persists its on-card Group By and PPH
@@ -219,12 +549,14 @@ export class GraphMethods {
         });
       }
       card.setConfig(config);
+      card.__advancedHistoryConfig = config;
       this._setGraphCardHass(card, this._hass);
       shell.append(card, sourceIndicator);
-      if (
-        this.config.settings_path
-        && this._hass?.user?.is_admin
-      ) {
+      // Panel chart overrides belong to the current user's chart state. A
+      // bookmark loaded from another user's shared library remains read-only;
+      // service defaults and More Info entity overrides retain their separate
+      // administrator checks.
+      if (this._canEditPanelChart()) {
         shell.classList.add("has-card-editor");
         const editorButton = document.createElement("button");
         editorButton.className = "graph-card-editor icon-button";
@@ -240,8 +572,31 @@ export class GraphMethods {
       host.append(shell);
       this._cards.push(card);
       this._graphCards.push(card);
+      this._graphLayoutObserveCard?.(card);
+      card.updateComplete?.then(() => {
+        this._graphLayoutSchedule?.();
+      });
     }
     catch (error) { host.insertAdjacentHTML("beforeend", `<div class="error">${this._escape(error.message || error)}</div>`); }
+  }
+
+  _updateGraphHourOptionsInPlace() {
+    const hourOptions = this._panelGraphHourOptions();
+    for (const card of this._graphCards || []) {
+      const current = card.__advancedHistoryConfig;
+      if (!current) continue;
+      const next = { ...current };
+      delete next.graph_start_hour;
+      delete next.graph_end_hour;
+      Object.assign(next, hourOptions);
+      if (
+        current.graph_start_hour === next.graph_start_hour
+        && current.graph_end_hour === next.graph_end_hour
+      ) continue;
+      card.__advancedHistoryConfig = next;
+      card.setConfig(next);
+      this._setGraphCardHass(card, this._hass);
+    }
   }
 
   _largeRangePeriod() {
@@ -251,17 +606,19 @@ export class GraphMethods {
     const endMs = end?.getTime?.();
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return null;
     const hours = (endMs - startMs) / 3_600_000;
-    const compare = this._energyCollection?.compare || "";
+    const compare = this._effectiveCompare?.() || "";
+    const compareKey = typeof compare === "string" ? compare : JSON.stringify(compare);
     return {
       start,
       end,
       hours,
-      key: `${start.toISOString()}|${end.toISOString()}|${compare}`,
+      key: `${start.toISOString()}|${end.toISOString()}|${compareKey}`,
     };
   }
 
   _largeRangeDetailProfile() {
     if (this.config.large_range_automatic_detail === false) return null;
+    if (this._hasDetailResolutionOverride()) return null;
     const period = this._largeRangePeriod();
     const thresholdDays = Math.max(7, Number(this.config.large_range_detail_threshold_days) || 31);
     if (!period) return null;
@@ -347,6 +704,10 @@ export class GraphMethods {
     });
   }
 
+  _canEditPanelChart() {
+    return Boolean(this.config.settings_path) && !this._loadedExternalBookmark;
+  }
+
   _createDataSourceTracker(indicator, active = true, sourceKey = null) {
     const sources = new Set();
     const sourceCache = this._graphDataSources || DATA_SOURCE_CACHE;
@@ -391,9 +752,13 @@ export class GraphMethods {
         render();
       },
       beginCycle: () => {
-        sources.clear();
+        // Keep showing the last confirmed source while the card processes a
+        // new Energy range. The card may satisfy the new range from its own
+        // cache without issuing another websocket request; clearing here left
+        // the indicator stuck on "Determining source…" even though the graph
+        // had finished rendering. A new request still replaces the retained
+        // source through cyclePending in record().
         cyclePending = true;
-        if (sourceKey) sourceCache.delete(sourceKey);
         render();
       },
       activate: () => {
@@ -421,14 +786,86 @@ export class GraphMethods {
     const end = this._energyCollection?.end;
     const startKey = Number.isFinite(start?.getTime?.()) ? start.toISOString() : "";
     const endKey = Number.isFinite(end?.getTime?.()) ? end.toISOString() : "";
-    const compare = this._energyCollection?.compare || "";
+    const compare = this._effectiveCompare?.() || "";
+    const compareKey = typeof compare === "string" ? compare : JSON.stringify(compare);
     return [
       mode,
       series.map((item) => item.key).join("\u001f"),
       startKey,
       endKey,
-      compare,
+      compareKey,
+      this._excludeY2Comparison ? "exclude-y2-comparison" : "compare-y2",
     ].join("\u001e");
+  }
+
+  _guardFutureEnergySeries(card) {
+    const shouldTrackLive = card?._isLiveTrackingNeeded;
+    if (typeof shouldTrackLive === "function") {
+      card._isLiveTrackingNeeded = (...args) => {
+        // The card otherwise relocates the live state to the end of a future
+        // visible window, which its bucketing turns into a flat series.
+        const start = this._panelDayPeriod?.()?.start
+          || card._energyStart
+          || this._energyCollection?.start;
+        const startTime = start instanceof Date
+          ? start.getTime()
+          : new Date(start).getTime();
+        if (Number.isFinite(startTime) && startTime > Date.now()) return false;
+        return shouldTrackLive.apply(card, args);
+      };
+    }
+
+    const bucketSeries = card?._bucketSeries;
+    if (typeof bucketSeries !== "function") return;
+    card._bucketSeries = (...args) => {
+      let result = bucketSeries.apply(card, args);
+      const entity = args[1];
+      const windowStart = Number(args[3]);
+      const windowEnd = Number(args[4]);
+      const offsetHours = Number(entity?.offset);
+
+      if (
+        card?._config?.chart_mode === "state_timeline"
+        && entity?._compareOf == null
+        && (!Number.isFinite(offsetHours) || offsetHours === 0)
+        && Number.isFinite(windowStart)
+        && Number.isFinite(windowEnd)
+      ) {
+        const now = Date.now();
+        if (windowStart <= now && now < windowEnd && Array.isArray(result?.points)) {
+          const points = result.points.filter((point) => point?.t <= now);
+          const lastPoint = points.at(-1);
+          if (lastPoint?.v != null) {
+            // State-timeline rendering carries its final value to the visible
+            // window end. A null transition at now closes that segment while
+            // leaving the requested future portion of the axis visible.
+            points.push({ ...lastPoint, t: now, v: null });
+          }
+          result = { ...result, points };
+        }
+      }
+
+      if (
+        entity?._compareOf == null
+        || !Number.isFinite(offsetHours)
+        || offsetHours <= 0
+        || !Number.isFinite(windowEnd)
+      ) return result;
+
+      const shiftedNow = Date.now() + offsetHours * 60 * 60 * 1000;
+      if (shiftedNow >= windowEnd) return result;
+      // A partial current period compared in a future window must stop at its
+      // shifted "now", rather than carrying its last bucket to the window end.
+      const beforeShiftedNow = (point) => point?.t <= shiftedNow;
+      return {
+        ...result,
+        points: result?.points?.filter(beforeShiftedNow) || [],
+        maSeries: result?.maSeries?.map((series) => ({
+          ...series,
+          points: series.points?.filter(beforeShiftedNow) || [],
+        })) || result?.maSeries,
+      };
+    };
   }
 
   _beginGraphDataSourceCycle() {
@@ -710,19 +1147,27 @@ export class GraphMethods {
   _entityCardConfig(
     value,
     mode,
-    cardOptionsConfig = this._effectiveCardOptionsConfig(),
+    cardOptionsConfig = null,
     entityOptionsConfig = this._effectiveEntityOptionsConfig()
   ) {
+    cardOptionsConfig ||= this._effectiveCardOptionsConfig(mode);
     const descriptor = this._seriesDescriptor(value);
     const { entity, attribute, key } = descriptor;
     const entitySavedOptions = entityOptionsConfig?.[entity];
     const seriesSavedOptions = attribute ? entityOptionsConfig?.[key] : null;
     const entityOptions = {
       ...automaticEntityOptions(this._hass.states[entity], mode),
-      ...this._defaultEntityOptions(cardOptionsConfig),
-      ...(entitySavedOptions && typeof entitySavedOptions === "object" ? entitySavedOptions : {}),
-      ...(seriesSavedOptions && typeof seriesSavedOptions === "object" ? seriesSavedOptions : {}),
+      ...this._defaultEntityOptions(cardOptionsConfig, mode),
     };
+    const applySavedOptions = (saved) => {
+      if (!saved || typeof saved !== "object" || Array.isArray(saved)) return;
+      for (const [option, value] of Object.entries(saved)) {
+        if (option !== ENTITY_OPTION_REMOVALS) entityOptions[option] = value;
+      }
+      for (const option of saved[ENTITY_OPTION_REMOVALS] || []) delete entityOptions[option];
+    };
+    applySavedOptions(entitySavedOptions);
+    applySavedOptions(seriesSavedOptions);
     if (attribute) {
       entityOptions.attribute = attribute;
       // Let the card derive its own attribute label so card-level naming
@@ -735,11 +1180,16 @@ export class GraphMethods {
       if (entityOptions.unit == null && unit != null) entityOptions.unit = unit;
     }
     const enabled = this._enabledResolvedEntityIds?.has(entity) !== false;
+    const { compare: compareDefaults, ...options } = entityOptions;
+    const activeCompare = this._effectiveCompare();
+    let compare = this._withTimeRangeComparisonLayout(
+      this._mergeCompareOptions(activeCompare, compareDefaults),
+    );
     if (mode !== "state_timeline") {
-      const { compare: compareDefaults, ...options } = entityOptions;
       delete options.state_map;
-      const activeCompare = this._effectiveCompare();
-      const compare = this._mergeCompareOptions(activeCompare, compareDefaults);
+      const secondaryAxis = this._y2ResolvedEntityIds?.has(entity);
+      options.y_axis = secondaryAxis ? "secondary" : "primary";
+      if (secondaryAxis && this._excludeY2Comparison) compare = null;
       return compare == null
         ? { ...options, entity, enabled }
         : { ...options, entity, enabled, compare };
@@ -752,42 +1202,131 @@ export class GraphMethods {
       entity,
       ...(stateMap ? { state_map: stateMap } : {}),
     };
-    return { ...entityOptions, ...generated, entity, enabled };
+    delete options.y_axis;
+    return compare == null
+      ? { ...options, ...generated, entity, enabled }
+      : { ...options, ...generated, entity, enabled, compare };
   }
 
   _mergeCompareOptions(activeCompare, defaults) {
     if (activeCompare == null || activeCompare === false) return activeCompare;
-    if (!defaults || typeof defaults !== "object" || Array.isArray(defaults)) return activeCompare;
 
-    const mergeOne = (active) => {
-      if (active === true) return { ...defaults };
+    const mergeOne = (active, configuredDefaults) => {
+      const resolvedDefaults = configuredDefaults
+        && typeof configuredDefaults === "object"
+        && !Array.isArray(configuredDefaults)
+        ? configuredDefaults
+        : null;
+      if (!resolvedDefaults) return active;
+      if (active === true) return { ...resolvedDefaults };
       if (active && typeof active === "object" && !Array.isArray(active)) {
-        return { ...defaults, ...active };
+        return { ...resolvedDefaults, ...active };
       }
-      return { ...defaults, period: active };
+      return { ...resolvedDefaults, period: active };
     };
-    return Array.isArray(activeCompare) ? activeCompare.map(mergeOne) : mergeOne(activeCompare);
+    if (Array.isArray(activeCompare)) {
+      const defaultRows = Array.isArray(defaults) ? defaults : null;
+      return activeCompare.map((active, index) => mergeOne(
+        active,
+        defaultRows
+          ? defaultRows.length === 1
+            ? defaultRows[0]
+            : defaultRows[index]
+          : defaults,
+      ));
+    }
+    return mergeOne(activeCompare, Array.isArray(defaults) ? defaults[0] : defaults);
   }
 
-  _cardOptions(configured = this._effectiveCardOptionsConfig()) {
+  _comparisonEditorDefaults(compare) {
+    const clean = (configured) => {
+      if (!configured || typeof configured !== "object" || Array.isArray(configured)) return {};
+      const options = structuredClone(configured);
+      // These describe the comparison selected in the Energy picker and must
+      // continue to follow that picker rather than becoming entity overrides.
+      delete options.period;
+      delete options.periods_back;
+      if (this._panelTimeRange && options.layout === "sequential") delete options.layout;
+      return options;
+    };
+    const rows = (Array.isArray(compare) ? compare : [compare]).map(clean);
+    if (!rows.some((row) => Object.keys(row).length)) return undefined;
+    const first = rows[0];
+    if (rows.every((row) => this._sameGraphOption(row, first))) return first;
+    return rows;
+  }
+
+  _withTimeRangeComparisonLayout(compare) {
+    // The card's sequential layout places the preceding time slot directly
+    // before the selected one. It is meaningful only for a selected day slot.
+    if (!this._panelTimeRange || !this._panelDayPeriod?.() || compare == null || compare === false) {
+      return compare;
+    }
+    const withLayout = (value) => {
+      if (value === true) return { layout: "sequential" };
+      if (typeof value === "string") {
+        return value === "previous_period" ? { period: value, layout: "sequential" } : value;
+      }
+      if (!value || typeof value !== "object" || Array.isArray(value) || value.layout != null) {
+        return value;
+      }
+      if ((value.period ?? "previous_period") !== "previous_period") return value;
+      return { ...value, layout: "sequential" };
+    };
+    return Array.isArray(compare) ? compare.map(withLayout) : withLayout(compare);
+  }
+
+  _colorAutomaticComparisons(configured, palette, entityIndex = 0) {
+    if (
+      !Array.isArray(this._energyCompare)
+      || this._effectiveCompare() !== this._energyCompare
+      || !Array.isArray(configured?.compare)
+      || !Array.isArray(palette)
+      || palette.length < 2
+    ) return configured;
+    const configuredIndex = palette.indexOf(configured.color);
+    const baseIndex = configuredIndex >= 0 ? configuredIndex : entityIndex % palette.length;
+    configured.compare = configured.compare.map((comparison, index) => (
+      comparison && typeof comparison === "object" && comparison.color == null
+        ? { ...comparison, color: palette[(baseIndex + index + 1) % palette.length] }
+        : comparison
+    ));
+    return configured;
+  }
+
+  _cardOptions(mode = "timeline", configured = this._effectiveCardOptionsConfig(mode)) {
     if (!configured || typeof configured !== "object" || Array.isArray(configured)) return {};
     const options = { ...configured };
     delete options.entities;
     delete options.energy_date_sync;
-    delete options.height;
+    delete options.energy_collection_key;
+    if (mode === "state_timeline") delete options.height;
     delete options.hours_to_show;
+    delete options.numeric_entities;
+    delete options.state_entities;
     return options;
   }
 
-  _defaultEntityOptions(cardOptionsConfig = this._effectiveCardOptionsConfig()) {
-    const configured = cardOptionsConfig?.entities;
-    const templates = Array.isArray(configured) ? configured : configured ? [configured] : [];
+  _defaultEntityOptions(
+    cardOptionsConfig = null,
+    mode = "timeline",
+  ) {
+    cardOptionsConfig ||= this._effectiveCardOptionsConfig(mode);
     const defaults = {};
-    for (const template of templates) {
-      if (!template || typeof template !== "object" || Array.isArray(template)) continue;
-      if (template.entity != null || template.statistic_id != null) continue;
-      Object.assign(defaults, template);
-    }
+    const applyTemplates = (configured) => {
+      const templates = Array.isArray(configured) ? configured : configured ? [configured] : [];
+      for (const template of templates) {
+        if (!template || typeof template !== "object" || Array.isArray(template)) continue;
+        if (template.entity != null || template.statistic_id != null) continue;
+        Object.assign(defaults, template);
+      }
+    };
+    applyTemplates(cardOptionsConfig?.entities);
+    applyTemplates(
+      mode === "state_timeline"
+        ? cardOptionsConfig?.state_entities
+        : cardOptionsConfig?.numeric_entities,
+    );
     return defaults;
   }
 
@@ -798,7 +1337,6 @@ export class GraphMethods {
     scopedHeader = null,
   ) {
     const entityIds = this._resolvedEntityIds();
-    const cardOptionsConfig = editDefaults ? this.config.card_options : this._effectiveCardOptionsConfig();
     const entityOptionsConfig = editDefaults ? this.config.entity_options : this._effectiveEntityOptionsConfig();
     const series = this._seriesDescriptors(entityIds, entityOptionsConfig);
     const numeric = series.filter((item) => this._isNumeric(item));
@@ -809,9 +1347,12 @@ export class GraphMethods {
         : (numeric.length ? numeric : series);
     const editorHasNumeric = editorEntities.some((item) => this._isNumeric(item));
     const editorMode = scopedMode || (editorHasNumeric ? "timeline" : "state_timeline");
+    const cardOptionsConfig = editDefaults
+      ? this._configuredCardOptions(editorMode)
+      : this._effectiveCardOptionsConfig(editorMode);
     const editorHeader = scopedHeader
-      || this._customLocalize(editorHasNumeric ? "numeric_history" : "state_history");
-    const cardOptions = this._cardOptions(cardOptionsConfig);
+      ?? this._customLocalize(editorHasNumeric ? "numeric_history" : "state_history");
+    const cardOptions = this._cardOptions(editorMode, cardOptionsConfig);
     const palette = customElements.get(CARD_TAG)?.PALETTE;
     this._editorAutoColors = new Map();
     const entities = editorEntities.map((item, index) => {
@@ -836,29 +1377,82 @@ export class GraphMethods {
     });
     return {
       hours_to_show: editDefaults ? Number(this.config.default_hours) || 24 : this._effectiveDefaultHours(),
-      height: editDefaults ? Number(this.config.graph_height) || 300 : this._effectiveGraphHeight(),
       ...cardOptions,
+      auto_scale_points: editorMode === "state_timeline"
+        ? false
+        : (cardOptions.auto_scale_points
+          ?? (this.config.large_range_automatic_detail !== false)),
+      height: editorMode === "state_timeline" ? "auto" : (cardOptions.height ?? "auto"),
       type: `custom:${CARD_TAG}`,
       card_header: cardOptions.card_header ?? editorHeader,
-      chart_mode: cardOptions.chart_mode ?? editorMode,
+      chart_mode: editorMode === "state_timeline"
+        ? "state_timeline"
+        : (cardOptions.chart_mode ?? editorMode),
       entities,
       energy_date_sync: true,
+      ...(this._panelEnergyCollectionKey()
+        ? { energy_collection_key: this._panelEnergyCollectionKey() }
+        : {}),
     };
   }
 
-  _splitGraphEditorConfig(config, editDefaults = false) {
-    const configuredCardOptions = editDefaults ? this.config.card_options : this._effectiveCardOptionsConfig();
+  _splitGraphEditorConfig(config, editDefaults = false, editorBase = null) {
+    const editorMode = editorBase?.chart_mode === "state_timeline"
+      || config?.chart_mode === "state_timeline"
+      ? "state_timeline"
+      : "timeline";
+    const configuredCardOptions = editDefaults
+      ? this._configuredCardOptions(editorMode)
+      : this._effectiveCardOptionsConfig(editorMode);
     const configuredEntityOptions = editDefaults ? this.config.entity_options : this._effectiveEntityOptionsConfig();
-    const integrationCardDefaults = this._cardOptions(this.config.card_options);
+    const integrationConfiguredCardOptions = this._configuredCardOptions(editorMode);
+    const integrationCardDefaults = this._cardOptions(editorMode, integrationConfiguredCardOptions);
+    if (
+      editorMode !== "state_timeline"
+      && integrationCardDefaults.auto_scale_points == null
+    ) {
+      integrationCardDefaults.auto_scale_points =
+        this.config.large_range_automatic_detail !== false;
+    }
     const integrationEntityDefaults = this.config.entity_options || {};
+    const configuredRemovals = this._activeSnapshot?.remove_card_options;
+    const typedRemovals = configuredRemovals
+      && typeof configuredRemovals === "object"
+      && !Array.isArray(configuredRemovals);
+    const existingRemovals = editDefaults
+      ? []
+      : typedRemovals
+        ? (editorMode === "state_timeline"
+            ? configuredRemovals.state
+            : configuredRemovals.numeric)
+        : configuredRemovals;
+    const removedCardOptions = new Set(
+      Array.isArray(existingRemovals) ? existingRemovals : [],
+    );
     const protectedKeys = new Set([
-      "type", "entities", "energy_date_sync", "height", "hours_to_show",
+      "type", "entities", "energy_date_sync", "energy_collection_key", "hours_to_show",
     ]);
+    if (editorMode === "state_timeline") protectedKeys.add("height");
     const cardOptions = {};
     for (const [key, value] of Object.entries(config || {})) {
       if (protectedKeys.has(key) || value === undefined) continue;
+      removedCardOptions.delete(key);
       if (editDefaults || !this._sameGraphOption(value, integrationCardDefaults[key])) {
         cardOptions[key] = structuredClone(value);
+      }
+    }
+    if (!editDefaults) {
+      for (const key of Object.keys(editorBase || {})) {
+        if (
+          protectedKeys.has(key)
+          || Object.prototype.hasOwnProperty.call(config || {}, key)
+          || !Object.prototype.hasOwnProperty.call(integrationCardDefaults, key)
+        ) continue;
+        // The native editor drops options changed back to its own default.
+        // Record that omission so the integration default is removed rather
+        // than silently inherited again.
+        removedCardOptions.add(key);
+        delete cardOptions[key];
       }
     }
     const configuredHasHeader = Object.prototype.hasOwnProperty.call(
@@ -875,9 +1469,13 @@ export class GraphMethods {
         : this._seriesDescriptor(row))
       .filter((item) => item.entity);
     const editorHasNumeric = editorSeries.some((item) => this._isNumeric(item));
-    const automaticHeader = this._customLocalize(
-      editorHasNumeric ? "numeric_history" : "state_history"
-    );
+    const allSeries = this._seriesDescriptors(this._resolvedEntityIds());
+    const hasMultipleCharts = !this._activeSnapshot?.single_graph
+      && allSeries.some((item) => this._isNumeric(item))
+      && allSeries.some((item) => !this._isNumeric(item));
+    const automaticHeader = hasMultipleCharts
+      ? this._customLocalize(editorHasNumeric ? "numeric_history" : "state_history")
+      : "";
     const automaticMode = editorHasNumeric ? "timeline" : "state_timeline";
     if (!configuredHasHeader && cardOptions.card_header === automaticHeader) {
       delete cardOptions.card_header;
@@ -886,7 +1484,7 @@ export class GraphMethods {
       delete cardOptions.chart_mode;
     }
     for (const [key, value] of Object.entries(
-      editDefaults ? this._cardOptions(configuredCardOptions) : {}
+      editDefaults ? this._cardOptions(editorMode, configuredCardOptions) : {}
     )) {
       if (value === true && !(key in (config || {}))) cardOptions[key] = false;
     }
@@ -894,8 +1492,38 @@ export class GraphMethods {
       cardOptions.entities = structuredClone(configuredCardOptions.entities);
     }
 
+    const editorBaseEntities = new Map();
+    for (const raw of editorBase?.entities || []) {
+      if (!raw || typeof raw === "string") continue;
+      const entity = raw.entity || raw.statistic_id;
+      if (!entity) continue;
+      editorBaseEntities.set(this._seriesKey(entity, raw.attribute), raw);
+    }
+    let editorRows = config?.entities || [];
+    if (editorBaseEntities.size) {
+      const draftEntities = new Map();
+      for (const raw of editorRows) {
+        if (!raw || typeof raw === "string") continue;
+        const entity = raw.entity || raw.statistic_id;
+        if (!entity) continue;
+        draftEntities.set(this._seriesKey(entity, raw.attribute), raw);
+      }
+      editorRows = [...editorBaseEntities.entries()].map(([seriesKey, base]) => {
+        const row = structuredClone(draftEntities.get(seriesKey) || base);
+        if (base.entity != null) {
+          row.entity = base.entity;
+          delete row.statistic_id;
+        } else {
+          row.statistic_id = base.statistic_id;
+          delete row.entity;
+        }
+        if (base.attribute != null) row.attribute = base.attribute;
+        else delete row.attribute;
+        return row;
+      });
+    }
     const entityOptions = editDefaults ? structuredClone(configuredEntityOptions || {}) : {};
-    for (const raw of config?.entities || []) {
+    for (const raw of editorRows) {
       if (!raw || typeof raw === "string") continue;
       const entity = raw.entity || raw.statistic_id;
       if (!entity) continue;
@@ -903,17 +1531,49 @@ export class GraphMethods {
       const options = structuredClone(raw);
       delete options.entity;
       delete options.statistic_id;
+      delete options[ENTITY_OPTION_REMOVALS];
+      const compareOptions = this._comparisonEditorDefaults(options.compare);
       delete options.compare;
+      if (compareOptions !== undefined) options.compare = compareOptions;
       // Target-chip visibility is stored separately with the chart and is
       // applied to generated card entities through the card's native enabled
       // option. Do not turn that transient state into an editor override.
       delete options.enabled;
       const integrationBase = {
-        ...automaticEntityOptions(this._hass.states[entity], "timeline"),
-        ...this._defaultEntityOptions(this.config.card_options),
+        ...automaticEntityOptions(this._hass.states[entity], editorMode),
+        ...this._defaultEntityOptions(
+          integrationConfiguredCardOptions,
+          editorMode,
+        ),
         ...(integrationEntityDefaults?.[entity] || {}),
         ...(integrationEntityDefaults?.[seriesKey] || {}),
       };
+      delete integrationBase[ENTITY_OPTION_REMOVALS];
+      const existingOptions = configuredEntityOptions?.[seriesKey];
+      const removedOptions = new Set(
+        Array.isArray(existingOptions?.[ENTITY_OPTION_REMOVALS])
+          ? existingOptions[ENTITY_OPTION_REMOVALS]
+          : [],
+      );
+      for (const key of Object.keys(options)) removedOptions.delete(key);
+      const editorBaseOptions = structuredClone(editorBaseEntities.get(seriesKey) || {});
+      delete editorBaseOptions.entity;
+      delete editorBaseOptions.statistic_id;
+      delete editorBaseOptions.enabled;
+      delete editorBaseOptions[ENTITY_OPTION_REMOVALS];
+      const baseCompareOptions = this._comparisonEditorDefaults(editorBaseOptions.compare);
+      delete editorBaseOptions.compare;
+      if (baseCompareOptions !== undefined) editorBaseOptions.compare = baseCompareOptions;
+      if (!editDefaults) {
+        for (const key of Object.keys(editorBaseOptions)) {
+          if (
+            !Object.prototype.hasOwnProperty.call(options, key)
+            && Object.prototype.hasOwnProperty.call(integrationBase, key)
+          ) {
+            removedOptions.add(key);
+          }
+        }
+      }
       if (
         !Object.prototype.hasOwnProperty.call(options, "aggregate_func")
         && (integrationBase.aggregate_func ?? CARD_DEFAULT_AGGREGATE) !== CARD_DEFAULT_AGGREGATE
@@ -932,7 +1592,9 @@ export class GraphMethods {
         delete options.color;
       }
       for (const [key, value] of Object.entries(
-        editDefaults ? this._defaultEntityOptions(configuredCardOptions) : {}
+        editDefaults
+          ? this._defaultEntityOptions(configuredCardOptions, config?.chart_mode)
+          : {}
       )) {
         if (value === true && !(key in options)) options[key] = false;
       }
@@ -940,11 +1602,18 @@ export class GraphMethods {
         for (const [key, value] of Object.entries(options)) {
           if (this._sameGraphOption(value, integrationBase[key])) delete options[key];
         }
+        if (removedOptions.size) {
+          options[ENTITY_OPTION_REMOVALS] = [...removedOptions].sort();
+        }
       }
       if (Object.keys(options).length) entityOptions[seriesKey] = options;
       else delete entityOptions[seriesKey];
     }
-    return { cardOptions, entityOptions };
+    return {
+      cardOptions,
+      cardOptionRemovals: [...removedCardOptions].sort(),
+      entityOptions,
+    };
   }
 
   _sameGraphOption(left, right) {
@@ -959,8 +1628,16 @@ export class GraphMethods {
     }
   }
 
-  _applyGraphEditorConfig(config, scopedSeries = null) {
-    const { cardOptions, entityOptions: editedEntityOptions } = this._splitGraphEditorConfig(config);
+  _applyGraphEditorConfig(config, scopedSeries = null, editorBase = null) {
+    const {
+      cardOptions,
+      cardOptionRemovals,
+      entityOptions: editedEntityOptions,
+    } = this._splitGraphEditorConfig(
+      config,
+      false,
+      editorBase,
+    );
     let entityOptions = editedEntityOptions;
     if (Array.isArray(scopedSeries)) {
       entityOptions = structuredClone(this._activeSnapshot?.entity_options || {});
@@ -971,42 +1648,193 @@ export class GraphMethods {
       }
       Object.assign(entityOptions, editedEntityOptions);
     }
+    const editorMode = editorBase?.chart_mode === "state_timeline"
+      || config?.chart_mode === "state_timeline"
+      ? "state_timeline"
+      : "timeline";
+    return this._commitGraphEditorConfig(
+      cardOptions,
+      cardOptionRemovals,
+      entityOptions,
+      config,
+      editorMode,
+    );
+  }
+
+  _commitGraphEditorConfig(
+    cardOptions,
+    cardOptionRemovals,
+    entityOptions,
+    config,
+    editorMode = null,
+  ) {
     const defaultHours = Number(config?.hours_to_show) || this._effectiveDefaultHours();
-    const graphHeight = Number(config?.height) || this._effectiveGraphHeight();
-    const compare = this._snapshotCompareSetting();
+    const compare = this._activeSnapshot?.compare;
     const singleGraph = Boolean(this._activeSnapshot?.single_graph);
     const attributeSelection = this._clone(this._activeSnapshot?.attribute_selection);
+    const currentCardOptions = this._activeSnapshot?.card_options;
+    const currentTypedOptions = currentCardOptions
+      && typeof currentCardOptions === "object"
+      && !Array.isArray(currentCardOptions)
+      && (currentCardOptions.numeric || currentCardOptions.state);
+    const typedCardOptions = editorMode == null
+      ? this._clone(cardOptions || { numeric: {}, state: {} })
+      : currentTypedOptions
+        ? this._clone(currentCardOptions)
+        : {
+            numeric: this._clone(currentCardOptions || {}),
+            state: this._clone(currentCardOptions || {}),
+          };
+    const currentRemovals = this._activeSnapshot?.remove_card_options;
+    const currentTypedRemovals = currentRemovals
+      && typeof currentRemovals === "object"
+      && !Array.isArray(currentRemovals);
+    const typedCardOptionRemovals = editorMode == null
+      ? this._clone(cardOptionRemovals || { numeric: [], state: [] })
+      : currentTypedRemovals
+        ? this._clone(currentRemovals)
+        : {
+            numeric: this._clone(Array.isArray(currentRemovals) ? currentRemovals : []),
+            state: this._clone(Array.isArray(currentRemovals) ? currentRemovals : []),
+          };
+    if (editorMode != null) {
+      const variant = editorMode === "state_timeline" ? "state" : "numeric";
+      typedCardOptions[variant] = this._clone(cardOptions || {});
+      typedCardOptionRemovals[variant] = this._clone(cardOptionRemovals || []);
+    }
     this._activeSnapshot = {
-      card_options: cardOptions,
+      defaults_mode: "overrides",
+      card_options: typedCardOptions,
       entity_options: entityOptions,
-      default_hours: defaultHours,
-      graph_height: graphHeight,
     };
+    if (
+      typedCardOptionRemovals.numeric?.length
+      || typedCardOptionRemovals.state?.length
+    ) {
+      this._activeSnapshot.remove_card_options = typedCardOptionRemovals;
+    }
+    if (defaultHours !== (Number(this.config.default_hours) || 24)) {
+      this._activeSnapshot.default_hours = defaultHours;
+    }
     if (singleGraph) this._activeSnapshot.single_graph = true;
     if (attributeSelection && Object.keys(attributeSelection).length) {
       this._activeSnapshot.attribute_selection = attributeSelection;
     }
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
+    if (this._hasDetailResolutionOverride()) this._largeRangeFineDetail = false;
     this._recordChange(null, true);
-    return { cardOptions, entityOptions, defaultHours, graphHeight };
+    return { cardOptions, entityOptions, defaultHours };
+  }
+
+  _applyGraphEditorVariants(variants) {
+    const entityOptions = structuredClone(this._activeSnapshot?.entity_options || {});
+    const cardOptions = { numeric: {}, state: {} };
+    const cardOptionRemovals = { numeric: [], state: [] };
+    let primaryConfig = null;
+    for (const variant of variants) {
+      const split = this._splitGraphEditorConfig(variant.config, false, variant.initialConfig);
+      const key = variant.mode === "state_timeline" ? "state" : "numeric";
+      cardOptions[key] = split.cardOptions;
+      cardOptionRemovals[key] = split.cardOptionRemovals;
+      if (!primaryConfig || key === "numeric") primaryConfig = variant.config;
+      for (const item of variant.series) {
+        const descriptor = this._seriesDescriptor(item);
+        delete entityOptions[descriptor.key];
+        if (!descriptor.attribute) delete entityOptions[descriptor.entity];
+      }
+      Object.assign(entityOptions, split.entityOptions);
+    }
+    return this._commitGraphEditorConfig(
+      cardOptions,
+      cardOptionRemovals,
+      entityOptions,
+      primaryConfig || {},
+    );
   }
 
   async _openGraphEditor(scopedSeries = null, scopedMode = null, scopedHeader = null) {
+    const allSeries = this._seriesDescriptors(this._resolvedEntityIds());
+    const numeric = allSeries.filter((item) => this._isNumeric(item));
+    const states = allSeries.filter((item) => !this._isNumeric(item));
+    const combinedEditor = !this._activeSnapshot?.single_graph && numeric.length && states.length;
+    const entries = combinedEditor
+      ? [
+        {
+          key: "numeric",
+          mode: this._cardOptions("timeline").chart_mode || "timeline",
+          header: this._customLocalize("numeric_history"),
+          series: numeric,
+        },
+        {
+          key: "state",
+          mode: "state_timeline",
+          header: this._customLocalize("state_history"),
+          series: states,
+        },
+      ]
+      : [{
+        key: scopedMode === "state_timeline" ? "state" : "numeric",
+        mode: scopedMode,
+        header: scopedHeader,
+        series: scopedSeries,
+      }];
+    for (const entry of entries) {
+      entry.initialConfig = this._graphEditorConfig(
+        false,
+        entry.series,
+        entry.mode,
+        entry.header,
+      );
+      entry.styles = `
+        #add-entity,
+        .edb[data-action="delete"],
+        .edup[data-action="duplicate"],
+        .cmp-add,
+        .cmp-del,
+        .cmp-row .f:has(.cmp-period),
+        .cmp-row .f:has(.cmp-back),
+        .f:has(.e-entity),
+        .f:has(.e-statistic_id),
+        .f:has(.e-attribute),
+        .f:has(.e-enabled),
+        .f:has(.e-y_axis),
+        .overlay-row:has(#energy_date_sync),
+        .overlay-row:has(#show_date_picker),
+        .f:has(#hours_to_show),
+        label:has(#show_y2_axis),
+        .overlay-row:has(#show_interval_picker),
+        .overlay-row:has(#show_attribute_list) { display: none !important; }
+        ${entry.mode === "state_timeline"
+          ? `
+            .f:has(#chart_mode),
+            .f:has(#height),
+            .f:has(#group_by),
+            .f:has(#points_per_hour),
+            .overlay-row:has(#show_pph_picker),
+            .overlay-row:has(#show_group_by_picker) { display: none !important; }
+          `
+          : ""}
+      `;
+    }
+    const initialEntry = entries.find((entry) => entry.mode === scopedMode) || entries[0];
+    const variantSpecificKeys = new Set([
+      "entities", "chart_mode", "height", "group_by", "auto_scale_points", "points_per_hour",
+      "show_pph_picker", "pph_picker_position", "pph_picker_group",
+      "show_group_by_picker", "group_by_picker_position", "group_by_picker_group",
+    ]);
     await openCardEditorDialog({
       hass: this._hass,
       container: this,
-      initialConfig: this._graphEditorConfig(
-        false,
-        scopedSeries,
-        scopedMode,
-        scopedHeader,
-      ),
+      initialConfig: initialEntry.initialConfig,
       title: this._customLocalize("graph_settings"),
       note: this._customLocalize("graph_editor_note"),
       labels: {
         loading: this._localize("ui.common.loading", "Loading"),
         cancel: this._localize("ui.common.cancel", "Cancel"),
         save: this._localize("ui.common.save", "Save"),
+        reset: this._localize("ui.common.reset", "Reset"),
+        confirmResetTitle: `${this._localize("ui.common.reset", "Reset")} ${this._customLocalize("graph_settings")}?`,
+        confirmReset: "This removes this panel's saved graph and entity overrides and restores the integration defaults.",
         showCode: this._localize(
           "ui.panel.lovelace.editor.edit_card.show_code_editor",
           "Show code editor",
@@ -1022,8 +1850,39 @@ export class GraphMethods {
         label: this._customLocalize("diagnostics"),
         onClick: () => this._openDiagnostics(),
       },
-      onSave: (draft) => {
-        this._applyGraphEditorConfig(draft, scopedSeries);
+      editorVariants: combinedEditor
+        ? entries.map((entry) => ({
+          key: entry.key,
+          label: entry.header,
+          initialConfig: entry.initialConfig,
+          visualEditorStyles: entry.styles,
+        }))
+        : null,
+      initialVariantKey: initialEntry.key,
+      shouldSyncVariantKey: combinedEditor
+        ? (key) => !variantSpecificKeys.has(key)
+        : null,
+      visualEditorStyles: initialEntry.styles,
+      onReset: () => {
+        const snapshot = this._clone(this._activeSnapshot || {});
+        snapshot.defaults_mode = "overrides";
+        snapshot.card_options = { numeric: {}, state: {} };
+        snapshot.entity_options = {};
+        delete snapshot.remove_card_options;
+        this._activeSnapshot = snapshot;
+        this._largeRangeFineDetail = false;
+        this._recordChange(null, true);
+        this._render();
+      },
+      onSave: (draft, variantState) => {
+        if (combinedEditor) {
+          this._applyGraphEditorVariants(entries.map((entry) => ({
+            ...entry,
+            config: variantState?.drafts?.[entry.key] || entry.initialConfig,
+          })));
+        } else {
+          this._applyGraphEditorConfig(draft, scopedSeries, initialEntry.initialConfig);
+        }
         this._render();
       },
     });

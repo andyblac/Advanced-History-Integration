@@ -23,7 +23,7 @@ Advanced History provides a dedicated Home Assistant sidebar panel that keeps th
 
 It includes native target selection, Energy-style date navigation and comparisons, visual graph editing, reusable bookmarks, chart history, Undo/Redo, and independent defaults for the sidebar and More Info graphs.
 
-![Advanced History graphing multiple climate attributes](https://raw.githubusercontent.com/andyblac/Advanced-History-Integration/master/docs/images/advanced-history-attributes.jpeg)
+![Advanced History with multiple panels, dual Y axes, yearly comparisons and automatic detail](https://raw.githubusercontent.com/andyblac/Advanced-History-Integration/master/docs/images/advanced-history-overview.png)
 
 ## Why was it created?
 
@@ -34,6 +34,8 @@ Advanced History brings those two ideas together: select targets as you would in
 ## Highlights
 
 - Select multiple areas, devices, or entities with Home Assistant's native target picker.
+- Work across independent desktop panels that can be renamed, rearranged, and restored automatically.
+- Plot targets on separate Y1 and Y2 scales, with the option to exclude Y2 from period comparisons.
 - Display numeric history and state timelines.
 - Navigate dates and compare periods with native Energy controls.
 - Edit the current chart through the Statistics Graph Chart Card visual editor.
@@ -52,7 +54,7 @@ Advanced History brings those two ideas together: select targets as you would in
 
 - Home Assistant with support for custom integrations.
 - [HACS](https://www.hacs.xyz/) is recommended.
-- [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) **v3.32 or newer** is a separate required dependency.
+- [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) **v3.32 or newer** is a separate required dependency. Multiple panels require **v4.02 or newer** so each panel can use an independent Energy Date Sync collection.
 
 If the graph card is missing, Advanced History displays an **Install using HACS** link and a **Retry** button.
 

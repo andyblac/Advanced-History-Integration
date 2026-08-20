@@ -11,8 +11,10 @@ const OMITTED_CARD_KEYS = new Set([
   "type",
   "entities",
   "energy_date_sync",
+  "energy_collection_key",
   "height",
   "hours_to_show",
+  "show_y2_axis",
   "show_advanced_history_button",
   "grid_options",
   "layout_options",
@@ -66,6 +68,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
 
   const entityIds = [];
   const hiddenEntityIds = [];
+  const secondaryEntityIds = new Set();
   const entityOptions = {};
   const attributeSelection = {};
   const seriesRows = {};
@@ -83,6 +86,8 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
       const options = clone(row);
       delete options.entity;
       delete options.statistic_id;
+      if (options.y_axis === "secondary") secondaryEntityIds.add(entityId);
+      delete options.y_axis;
       if (options.compare !== undefined) comparisons.push(options.compare);
       const key = series === "state" ? entityId : `${entityId}::${series}`;
       if (Object.keys(options).length) entityOptions[key] = options;
@@ -109,6 +114,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
   }
 
   const chart = {
+    defaults_mode: "overrides",
     card_options: cardOptions,
     entity_options: entityOptions,
     attribute_selection: attributeSelection,
@@ -125,17 +131,32 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
   if (defaultHours !== undefined) chart.default_hours = defaultHours;
   if (graphHeight !== undefined) chart.source_graph_height = graphHeight;
 
+  const primaryEntityIds = entityIds.filter((entityId) => !secondaryEntityIds.has(entityId));
+  const y2EntityIds = entityIds.filter((entityId) => secondaryEntityIds.has(entityId));
+  const primaryHiddenEntityIds = hiddenEntityIds.filter((entityId) => !secondaryEntityIds.has(entityId));
+  const y2HiddenEntityIds = hiddenEntityIds.filter((entityId) => secondaryEntityIds.has(entityId));
+
   return {
     schema: 1,
     targets: {
       area_id: [],
       device_id: [],
-      entity_id: entityIds,
+      entity_id: primaryEntityIds,
     },
     hidden_targets: {
       area_id: [],
       device_id: [],
-      entity_id: hiddenEntityIds,
+      entity_id: primaryHiddenEntityIds,
+    },
+    y2_targets: {
+      area_id: [],
+      device_id: [],
+      entity_id: y2EntityIds,
+    },
+    hidden_y2_targets: {
+      area_id: [],
+      device_id: [],
+      entity_id: y2HiddenEntityIds,
     },
     chart,
     period: normalizePeriod(period),

@@ -132,10 +132,21 @@ export class DiagnosticsMethods {
           explicit_entities: this._targets.entity_id.length,
           resolved_entities: resolvedEntities.size,
         },
+        y2_targets: {
+          areas: this._y2Targets.area_id.length,
+          devices: this._y2Targets.device_id.length,
+          explicit_entities: this._y2Targets.entity_id.length,
+          resolved_entities: this._y2ResolvedEntityIds?.size || 0,
+        },
         hidden_targets: {
           areas: this._hiddenTargets.area_id.length,
           devices: this._hiddenTargets.device_id.length,
           entities: this._hiddenTargets.entity_id.length,
+        },
+        hidden_y2_targets: {
+          areas: this._hiddenY2Targets.area_id.length,
+          devices: this._hiddenY2Targets.device_id.length,
+          entities: this._hiddenY2Targets.entity_id.length,
         },
         period: snapshot.period ? {
           start: snapshot.period.start || null,
@@ -147,6 +158,7 @@ export class DiagnosticsMethods {
         default_hours: snapshot.chart?.default_hours ?? this._effectiveDefaultHours(),
         graph_height: snapshot.chart?.graph_height ?? this._effectiveGraphHeight(),
         compare: this._sanitizeDiagnosticValue(snapshot.chart?.compare ?? this._effectiveCompare(), aliases),
+        exclude_y2_comparison: Boolean(snapshot.chart?.exclude_y2_comparison),
         large_range_detail: (() => {
           const profile = this._largeRangeDetailProfile();
           return {
@@ -215,13 +227,14 @@ export class DiagnosticsMethods {
     const backdrop = document.createElement("div");
     backdrop.className = "backdrop diagnostics-backdrop";
     backdrop.innerHTML = `<section class="dialog diagnostics-dialog" role="dialog" aria-modal="true" aria-label="${this._escape(title)}">
-      <header class="dialog-title"><h2>${this._escape(title)}</h2></header>
+      <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${this._escape(title)}</h2></header>
       <div class="diagnostics-note">${this._escape(note)}</div>
       <pre class="diagnostics-preview" tabindex="0">${this._escape(report)}</pre>
       <footer class="dialog-actions"><button data-action="close">${this._escape(close)}</button><button class="primary" data-action="copy">${this._escape(copy)}</button></footer>
     </section>`;
     backdrop.addEventListener("click", (event) => { if (event.target === backdrop) backdrop.remove(); });
     backdrop.querySelector('[data-action="close"]').addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector('[data-action="close-dialog"]').addEventListener("click", () => backdrop.remove());
     backdrop.querySelector('[data-action="copy"]').addEventListener("click", (event) => {
       this._copyDiagnostics(report, event.currentTarget);
     });

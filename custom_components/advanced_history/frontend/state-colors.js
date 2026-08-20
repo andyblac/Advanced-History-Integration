@@ -113,7 +113,12 @@ export function nativeStateColor(domain, deviceClass, state) {
   return cssVariableChain(properties);
 }
 
-export function nativeStateMap(hass, entityId) {
+export function nativeStateMap(
+  hass,
+  entityId,
+  observedStates = [],
+  observedColors = new Map(),
+) {
   const stateObj = hass?.states?.[entityId];
   if (!stateObj) return undefined;
   const domain = entityId?.split(".", 1)[0];
@@ -134,6 +139,12 @@ export function nativeStateMap(hass, entityId) {
   ) {
     values = ["off", "on"];
     paletteValues = values;
+  } else if (domain === "sensor" && observedStates.length) {
+    // Activity assigns arbitrary sensor states graph colours in the order it
+    // encounters them. More Info supplies its native timeline newest-first so
+    // the replacement chart can use the same categorical ordering.
+    values = [...new Set([stateObj.state, ...observedStates].filter(Boolean))];
+    paletteValues = values;
   }
   if (!Array.isArray(values)) return undefined;
 
@@ -146,12 +157,16 @@ export function nativeStateMap(hass, entityId) {
   const deviceClass = stateObj.attributes?.device_class;
   return states.map((state) => {
     const paletteIndex = paletteValues?.indexOf(state) ?? -1;
+    const observedColor = domain === "sensor" && paletteValues
+      ? observedColors.get(state)
+      : undefined;
     return {
       value: state,
       label: hass?.formatEntityState?.(stateObj, state) || state,
-      color: paletteIndex >= 0
-        ? graphPaletteColor(paletteIndex)
-        : nativeStateColor(domain, deviceClass, state),
+      color: observedColor
+        || (paletteIndex >= 0
+          ? graphPaletteColor(paletteIndex)
+          : nativeStateColor(domain, deviceClass, state)),
     };
   });
 }

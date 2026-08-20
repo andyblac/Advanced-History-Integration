@@ -1,6 +1,7 @@
 import { CARD_TAG } from "./constants.js";
 
 const DIALOG_TAG = "advanced-history-card-editor-dialog";
+const VISUAL_EDITOR_STYLE_KEY = "__advancedHistoryVisualEditorStyleSheet";
 let activeDialogHost = null;
 
 function escapeHtml(value) {
@@ -22,6 +23,12 @@ export async function openCardEditorDialog({
   resetDisabled = false,
   leadingAction,
   allowCode = true,
+  visualEditorStyles = "",
+  editorVariants = null,
+  initialVariantKey = null,
+  shouldSyncVariantKey = null,
+  codeConfigFromDraft = null,
+  draftFromCodeConfig = null,
 }) {
   if (activeDialogHost?.isConnected) return null;
   const dialogHost = document.createElement(DIALOG_TAG);
@@ -31,6 +38,7 @@ export async function openCardEditorDialog({
   const strings = {
     loading: "Loading",
     cancel: "Cancel",
+    close: "Close",
     save: "Save",
     reset: "Reset",
     confirmResetTitle: "Reset graph settings?",
@@ -48,8 +56,16 @@ export async function openCardEditorDialog({
   const resetMarkup = onReset
     ? `<button data-action="reset">${escapeHtml(strings.reset)}</button>`
     : "";
-  const leadingMarkup = leadingAction
-    ? `<button data-action="leading">${escapeHtml(leadingAction.label)}</button>`
+  const headerActionMarkup = leadingAction
+    ? `<button class="header-action" data-action="leading">${escapeHtml(leadingAction.label)}</button>`
+    : "";
+  const variants = Array.isArray(editorVariants)
+    ? editorVariants.filter((variant) => variant?.key && variant?.initialConfig)
+    : [];
+  const variantMarkup = variants.length > 1
+    ? `<nav class="editor-variants" aria-label="${escapeHtml(title)}">${variants.map((variant, index) => `
+        <button type="button" class="editor-variant${index === 0 ? " active" : ""}" data-editor-variant="${escapeHtml(variant.key)}">${escapeHtml(variant.label)}</button>
+      `).join("")}</nav>`
     : "";
   root.innerHTML = `
     <style>
@@ -61,10 +77,17 @@ export async function openCardEditorDialog({
       dialog.confirm section { height:auto; min-height:0; flex:none; }
       dialog.confirm .confirm-content { padding:24px; color:var(--primary-text-color); line-height:1.5; }
       section { width:100%; height:100%; display:flex; flex-direction:column; overflow:hidden; }
-      header { min-height:64px; padding:0 24px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--divider-color); }
+      header { min-height:64px; padding:0 24px 0 12px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--divider-color); }
       h2 { margin:0; font-size:20px; font-weight:500; }
-      .mode-toggle { margin-left:auto; min-width:40px; border-radius:20px; display:flex; align-items:center; gap:8px; }
+      .editor-variants { display:flex; align-self:stretch; align-items:flex-end; gap:4px; margin-left:8px; }
+      .editor-variant { min-width:0; height:48px; padding:0 14px; border-radius:0; border-bottom:3px solid transparent; color:var(--secondary-text-color); }
+      .editor-variant.active { color:var(--primary-color); border-bottom-color:var(--primary-color); }
+      .header-action { margin-left:auto; }
+      .mode-toggle { min-width:40px; border-radius:20px; display:flex; align-items:center; gap:8px; }
       .mode-toggle ha-icon { width:20px; height:20px; }
+      .dialog-close { min-width:40px; width:40px; height:40px; padding:8px; display:grid; place-items:center; border-radius:50%; color:var(--primary-text-color); }
+      .dialog-close:hover { color:var(--primary-text-color); background:var(--secondary-background-color); }
+      .dialog-close ha-icon { width:22px; height:22px; }
       .note { margin:14px 18px 8px; padding:10px 12px; border-radius:8px; color:var(--secondary-text-color); background:var(--secondary-background-color); line-height:1.4; }
       .note:empty { display:none; }
       .host { flex:1; min-height:0; overflow:auto; padding:8px 18px 18px; }
@@ -80,22 +103,22 @@ export async function openCardEditorDialog({
       @media (max-width:600px) {
         dialog { width:100vw; height:100vh; border-radius:0; }
         dialog.confirm { width:min(440px,calc(100vw - 32px)); height:fit-content !important; min-height:0; max-height:calc(100vh - 32px); border-radius:12px; }
-        header { padding:0 14px; }
+        header { padding:0 14px 0 12px; }
         .mode-toggle { padding:0 10px; }
         .mode-toggle span { display:none; }
       }
     </style>
     <dialog aria-label="${escapeHtml(title)}">
       <section>
-        <header><h2>${escapeHtml(title)}</h2>${toggleMarkup}</header>
+        <header><button class="dialog-close" data-action="close-editor" title="${escapeHtml(strings.close)}" aria-label="${escapeHtml(strings.close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${escapeHtml(title)}</h2>${variantMarkup}${headerActionMarkup}</header>
         <div class="note">${escapeHtml(note)}</div>
         <div class="host"><div class="loading">${escapeHtml(strings.loading)}…</div></div>
-        <footer>${resetMarkup}${leadingMarkup}<span class="status"></span><button data-action="cancel">${escapeHtml(strings.cancel)}</button><button class="primary" data-action="save">${escapeHtml(strings.save)}</button></footer>
+        <footer>${toggleMarkup}${resetMarkup}<span class="status"></span><button data-action="cancel">${escapeHtml(strings.cancel)}</button><button class="primary" data-action="save">${escapeHtml(strings.save)}</button></footer>
       </section>
     </dialog>
     <dialog class="confirm" aria-label="${escapeHtml(strings.confirmResetTitle)}">
       <section>
-        <header><h2>${escapeHtml(strings.confirmResetTitle)}</h2></header>
+        <header><button class="dialog-close" data-action="close-reset" title="${escapeHtml(strings.close)}" aria-label="${escapeHtml(strings.close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${escapeHtml(strings.confirmResetTitle)}</h2></header>
         <div class="confirm-content">${escapeHtml(strings.confirmReset)}</div>
         <footer><ha-button appearance="plain" data-action="cancel-reset">${escapeHtml(strings.cancel)}</ha-button><ha-button variant="danger" data-action="confirm-reset">${escapeHtml(strings.reset)}</ha-button></footer>
       </section>
@@ -108,9 +131,33 @@ export async function openCardEditorDialog({
   const save = root.querySelector('[data-action="save"]');
   const reset = root.querySelector('[data-action="reset"]');
   const toggle = root.querySelector('[data-action="toggle-editor"]');
-  let draft = structuredClone(initialConfig || {});
+  let activeVariantKey = variants.some((variant) => variant.key === initialVariantKey)
+    ? initialVariantKey
+    : variants[0]?.key || null;
+  const variantDrafts = new Map(variants.map((variant) => [
+    variant.key,
+    structuredClone(variant.initialConfig),
+  ]));
+  const variantDirtyKeys = new Map(variants.map((variant) => [variant.key, new Set()]));
+  let draft = activeVariantKey
+    ? structuredClone(variantDrafts.get(activeVariantKey))
+    : structuredClone(initialConfig || {});
   let mode = "visual";
+  let visualEditor = null;
   let renderToken = 0;
+
+  const flushVisualDraft = () => {
+    if (
+      mode !== "visual"
+      || !visualEditor?.isConnected
+      || typeof visualEditor._valueChanged !== "function"
+    ) return;
+    // The card's visual editor renders a few controls without wiring their
+    // change event to its serializer (x_axis_font_size is one example). Its
+    // canonical serializer does read every rendered option, so invoke it at
+    // our dialog boundaries to ensure the draft contains the current form.
+    visualEditor._valueChanged();
+  };
 
   const close = () => {
     if (modal.open) modal.close();
@@ -129,6 +176,66 @@ export async function openCardEditorDialog({
     toggle.querySelector("span").textContent = label;
     toggle.setAttribute("aria-label", label);
     toggle.title = label;
+  };
+
+  const activeVariant = () => variants.find((variant) => variant.key === activeVariantKey);
+  const currentVisualEditorStyles = () => activeVariant()?.visualEditorStyles
+    ?? visualEditorStyles;
+  const updateVariantTabs = () => {
+    for (const button of root.querySelectorAll("[data-editor-variant]")) {
+      button.classList.toggle("active", button.dataset.editorVariant === activeVariantKey);
+    }
+  };
+  const updateDraft = (nextDraft, trackChanges = true) => {
+    const next = structuredClone(nextDraft || {});
+    const changedKeys = [];
+    if (activeVariantKey && trackChanges) {
+      const dirty = variantDirtyKeys.get(activeVariantKey);
+      const keys = new Set([...Object.keys(draft || {}), ...Object.keys(next)]);
+      for (const key of keys) {
+        if (JSON.stringify(draft?.[key]) !== JSON.stringify(next[key])) {
+          dirty.add(key);
+          changedKeys.push(key);
+        }
+      }
+    }
+    draft = next;
+    if (activeVariantKey) {
+      variantDrafts.set(activeVariantKey, structuredClone(next));
+      if (trackChanges && changedKeys.length && typeof shouldSyncVariantKey === "function") {
+        for (const [variantKey, variantDraft] of variantDrafts) {
+          if (variantKey === activeVariantKey) continue;
+          const synced = structuredClone(variantDraft);
+          for (const key of changedKeys) {
+            if (!shouldSyncVariantKey(key, activeVariantKey, variantKey)) continue;
+            if (Object.prototype.hasOwnProperty.call(next, key)) {
+              synced[key] = structuredClone(next[key]);
+            } else {
+              delete synced[key];
+            }
+          }
+          variantDrafts.set(variantKey, synced);
+        }
+      }
+    }
+  };
+
+  const applyVisualEditorStyles = (editor) => {
+    const styles = currentVisualEditorStyles();
+    if (!styles || !editor.shadowRoot) return;
+    const root = editor.shadowRoot;
+    if (editor[VISUAL_EDITOR_STYLE_KEY]) return;
+    if (typeof CSSStyleSheet === "function" && "adoptedStyleSheets" in root) {
+      const sheet = new CSSStyleSheet();
+      sheet.replaceSync(styles);
+      root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
+      editor[VISUAL_EDITOR_STYLE_KEY] = sheet;
+      return;
+    }
+    const style = document.createElement("style");
+    style.textContent = styles;
+    root.append(style);
+    editor[VISUAL_EDITOR_STYLE_KEY] = style;
   };
 
   const renderVisual = async () => {
@@ -150,12 +257,46 @@ export async function openCardEditorDialog({
         editor = document.createElement("statistics-graph-chart-card-editor");
       }
       if (token !== renderToken || !dialogHost.isConnected) return;
+      let configSyncQueued = false;
+      let syncingConfig = false;
       editor.addEventListener("config-changed", (event) => {
-        if (event.detail?.config) draft = event.detail.config;
+        if (syncingConfig || !event.detail?.config) return;
+        updateDraft(event.detail.config);
+        if (configSyncQueued) return;
+        configSyncQueued = true;
+        queueMicrotask(() => {
+          configSyncQueued = false;
+          if (token !== renderToken || !editor.isConnected || mode !== "visual") return;
+          // The normal Lovelace card dialog feeds emitted configuration back
+          // into the editor. Some dependent controls (for example State Row)
+          // do not refresh until setConfig receives that updated configuration.
+          syncingConfig = true;
+          try {
+            editor.setConfig(draft);
+            editor.requestUpdate?.();
+          } finally {
+            syncingConfig = false;
+          }
+          applyVisualEditorStyles(editor);
+        });
       });
       editor.hass = hass;
       editor.setConfig(draft);
       editorHost.replaceChildren(editor);
+      visualEditor = editor;
+      editor.shadowRoot?.addEventListener("change", () => {
+        queueMicrotask(() => {
+          if (editor === visualEditor && editor.isConnected && mode === "visual") {
+            editor._valueChanged?.();
+          }
+        });
+      });
+      applyVisualEditorStyles(editor);
+      Promise.resolve(editor.updateComplete)
+        .then(() => {
+          if (token === renderToken && editor.isConnected) applyVisualEditorStyles(editor);
+        })
+        .catch(() => undefined);
     } catch (error) {
       if (token !== renderToken) return;
       editorHost.innerHTML = `<div class="error">${escapeHtml(error?.message || strings.loadError)}</div>`;
@@ -167,6 +308,7 @@ export async function openCardEditorDialog({
   const renderCode = async () => {
     ++renderToken;
     mode = "code";
+    visualEditor = null;
     status.textContent = "";
     save.disabled = false;
     toggle.disabled = false;
@@ -183,7 +325,9 @@ export async function openCardEditorDialog({
       const editor = document.createElement("ha-yaml-editor");
       editor.hass = hass;
       editor.inDialog = true;
-      editor.setValue(draft);
+      editor.setValue(typeof codeConfigFromDraft === "function"
+        ? codeConfigFromDraft(structuredClone(draft), activeVariantKey)
+        : draft);
       editor.addEventListener("value-changed", (event) => {
         const value = event.detail?.value;
         const valid = event.detail?.isValid !== false
@@ -193,7 +337,11 @@ export async function openCardEditorDialog({
         status.textContent = valid ? "" : event.detail?.errorMsg || strings.mappingError;
         save.disabled = !valid;
         toggle.disabled = !valid;
-        if (valid) draft = value;
+        if (valid) {
+          updateDraft(typeof draftFromCodeConfig === "function"
+            ? draftFromCodeConfig(structuredClone(value), activeVariantKey)
+            : value);
+        }
       });
       editor.addEventListener("editor-save", () => { if (!save.disabled) save.click(); });
       editorHost.replaceChildren(editor);
@@ -204,13 +352,30 @@ export async function openCardEditorDialog({
     }
   };
 
-  modal.addEventListener("click", (event) => { if (event.target === modal) close(); });
+  // Keep edits safe from accidental pointer clicks on the modal backdrop.
+  // The explicit close and Cancel controls remain available.
   modal.addEventListener("cancel", (event) => { event.preventDefault(); close(); });
   root.querySelector('[data-action="cancel"]').addEventListener("click", close);
+  root.querySelector('[data-action="close-editor"]').addEventListener("click", close);
   toggle?.addEventListener("click", () => {
-    if (mode === "visual") renderCode();
+    if (mode === "visual") {
+      flushVisualDraft();
+      renderCode();
+    }
     else renderVisual();
   });
+  for (const button of root.querySelectorAll("[data-editor-variant]")) {
+    button.addEventListener("click", () => {
+      const key = button.dataset.editorVariant;
+      if (!key || key === activeVariantKey || !variantDrafts.has(key)) return;
+      flushVisualDraft();
+      activeVariantKey = key;
+      draft = structuredClone(variantDrafts.get(key));
+      updateVariantTabs();
+      if (mode === "code") renderCode();
+      else renderVisual();
+    });
+  }
   if (reset) {
     reset.disabled = resetDisabled;
     reset.addEventListener("click", () => confirmModal.showModal());
@@ -219,10 +384,10 @@ export async function openCardEditorDialog({
       event.preventDefault();
       cancelReset();
     });
-    confirmModal.addEventListener("click", (event) => {
-      if (event.target === confirmModal) cancelReset();
-    });
+    // Reset confirmation is also explicit: backdrop clicks do not choose an
+    // action on the user's behalf.
     root.querySelector('[data-action="cancel-reset"]').addEventListener("click", cancelReset);
+    root.querySelector('[data-action="close-reset"]').addEventListener("click", cancelReset);
     root.querySelector('[data-action="confirm-reset"]').addEventListener("click", async () => {
       confirmModal.close();
       reset.disabled = true;
@@ -243,11 +408,24 @@ export async function openCardEditorDialog({
     leadingAction.onClick();
   });
   save.addEventListener("click", async () => {
+    flushVisualDraft();
     save.disabled = true;
     if (reset) reset.disabled = true;
     status.textContent = "";
     try {
-      await onSave(structuredClone(draft));
+      const variantState = variants.length
+        ? {
+          drafts: Object.fromEntries([...variantDrafts].map(([key, value]) => [
+            key,
+            structuredClone(value),
+          ])),
+          dirtyKeys: Object.fromEntries([...variantDirtyKeys].map(([key, value]) => [
+            key,
+            [...value],
+          ])),
+        }
+        : null;
+      await onSave(structuredClone(draft), variantState);
       close();
     } catch (error) {
       showError(error, strings.saveError);
@@ -256,6 +434,7 @@ export async function openCardEditorDialog({
     }
   });
 
+  updateVariantTabs();
   modal.showModal();
   await renderVisual();
   return dialogHost;

@@ -15,22 +15,20 @@ from homeassistant.helpers import selector
 
 from .const import (
     CONF_CARD_MODULE_URL,
-    CONF_CARD_OPTIONS,
-    CONF_COMPARE,
-    CONF_DEFAULT_HOURS,
     CONF_ENTITY_OPTIONS,
     CONF_ENTRY_TYPE,
-    CONF_GRAPH_HEIGHT,
     CONF_INCLUDE_HIDDEN,
     CONF_LARGE_RANGE_AUTOMATIC_DETAIL,
     CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS,
     CONF_MAX_ENTITIES,
-    CONF_MORE_INFO_CARD_OPTIONS,
+    CONF_MAX_TABS,
+    CONF_NUMERIC_CARD_OPTIONS,
     CONF_MORE_INFO_SHOW_DATE_PICKER,
     CONF_REDIRECT_SHOW_MORE,
     CONF_REPLACE_MORE_INFO_HISTORY,
     CONF_REQUIRE_ADMIN,
     CONF_SIDEBAR_ICON,
+    CONF_STATE_CARD_OPTIONS,
     CONF_TITLE,
     DEFAULT_MORE_INFO_OPTIONS,
     DEFAULT_OPTIONS,
@@ -45,9 +43,13 @@ from .const import (
 
 def _panel_schema(values: dict[str, Any]) -> vol.Schema:
     """Return the Advanced History panel form schema."""
+    numeric_card_options = dict(values[CONF_NUMERIC_CARD_OPTIONS])
+    numeric_card_options.setdefault(
+        "auto_scale_points",
+        values[CONF_LARGE_RANGE_AUTOMATIC_DETAIL] is not False,
+    )
     return vol.Schema(
         {
-            vol.Optional(CONF_TITLE, default=values[CONF_TITLE]): selector.TextSelector(),
             vol.Optional(
                 CONF_SIDEBAR_ICON, default=values[CONF_SIDEBAR_ICON]
             ): selector.IconSelector(),
@@ -56,6 +58,13 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=1, max=200, step=1, mode=selector.NumberSelectorMode.BOX
+                )
+            ),
+            vol.Optional(
+                CONF_MAX_TABS, default=values[CONF_MAX_TABS]
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=1, max=50, step=1, mode=selector.NumberSelectorMode.BOX
                 )
             ),
             vol.Optional(
@@ -71,54 +80,57 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Optional(
-                CONF_DEFAULT_HOURS, default=values[CONF_DEFAULT_HOURS]
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=1, max=8760, step=1, mode=selector.NumberSelectorMode.BOX
-                )
-            ),
-            vol.Optional(
-                CONF_GRAPH_HEIGHT, default=values[CONF_GRAPH_HEIGHT]
-            ): selector.NumberSelector(
-                selector.NumberSelectorConfig(
-                    min=150, max=1200, step=10, mode=selector.NumberSelectorMode.BOX
-                )
-            ),
-            vol.Optional(
                 CONF_INCLUDE_HIDDEN, default=values[CONF_INCLUDE_HIDDEN]
             ): selector.BooleanSelector(),
             vol.Optional(
-                CONF_REDIRECT_SHOW_MORE, default=values[CONF_REDIRECT_SHOW_MORE]
+                CONF_NUMERIC_CARD_OPTIONS,
+                default=numeric_card_options,
+            ): selector.ObjectSelector(),
+            vol.Optional(
+                CONF_STATE_CARD_OPTIONS,
+                default=values[CONF_STATE_CARD_OPTIONS],
+            ): selector.ObjectSelector(),
+            vol.Optional(
+                CONF_REQUIRE_ADMIN, default=values[CONF_REQUIRE_ADMIN]
             ): selector.BooleanSelector(),
             vol.Optional(
                 CONF_CARD_MODULE_URL, default=values[CONF_CARD_MODULE_URL]
             ): selector.TextSelector(),
-            vol.Optional(
-                CONF_CARD_OPTIONS, default=values[CONF_CARD_OPTIONS]
-            ): selector.ObjectSelector(),
-            vol.Optional(CONF_COMPARE, default=values[CONF_COMPARE]): (
-                selector.SelectSelector(
-                    selector.SelectSelectorConfig(
-                        options=[
-                            "follow_energy",
-                            "previous_period",
-                            "last_year",
-                            "disabled",
-                        ],
-                        mode=selector.SelectSelectorMode.DROPDOWN,
-                        translation_key="compare_mode",
-                    )
-                )
-            ),
-            vol.Optional(
-                CONF_REQUIRE_ADMIN, default=values[CONF_REQUIRE_ADMIN]
-            ): selector.BooleanSelector(),
         }
     )
 
 
+def _automatic_detail_options_from_input(
+    user_input: dict[str, Any], existing: dict[str, Any] | None = None
+) -> dict[str, Any]:
+    """Keep the switch-derived point-scaling value as an inherited default."""
+    result = dict(user_input)
+    numeric = result.get(CONF_NUMERIC_CARD_OPTIONS)
+    if not isinstance(numeric, dict):
+        return result
+
+    configured = (existing or {}).get(CONF_NUMERIC_CARD_OPTIONS)
+    configured = configured if isinstance(configured, dict) else {}
+    if "auto_scale_points" not in configured:
+        previous_automatic_detail = (existing or {}).get(
+            CONF_LARGE_RANGE_AUTOMATIC_DETAIL, True
+        )
+        if numeric.get("auto_scale_points") == (
+            previous_automatic_detail is not False
+        ):
+            numeric = dict(numeric)
+            numeric.pop("auto_scale_points", None)
+            result[CONF_NUMERIC_CARD_OPTIONS] = numeric
+    return result
+
+
 def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
     """Return the independent More-Info service form schema."""
+    numeric_card_options = dict(values[CONF_NUMERIC_CARD_OPTIONS])
+    numeric_card_options.setdefault(
+        "auto_scale_points",
+        values[CONF_LARGE_RANGE_AUTOMATIC_DETAIL] is not False,
+    )
     return vol.Schema(
         {
             vol.Optional(
@@ -130,12 +142,23 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
                 default=values[CONF_MORE_INFO_SHOW_DATE_PICKER],
             ): selector.BooleanSelector(),
             vol.Optional(
+                CONF_REDIRECT_SHOW_MORE, default=values[CONF_REDIRECT_SHOW_MORE]
+            ): selector.BooleanSelector(),
+            vol.Optional(
+                CONF_LARGE_RANGE_AUTOMATIC_DETAIL,
+                default=values[CONF_LARGE_RANGE_AUTOMATIC_DETAIL],
+            ): selector.BooleanSelector(),
+            vol.Optional(
+                CONF_NUMERIC_CARD_OPTIONS,
+                default=numeric_card_options,
+            ): selector.ObjectSelector(),
+            vol.Optional(
+                CONF_STATE_CARD_OPTIONS,
+                default=values[CONF_STATE_CARD_OPTIONS],
+            ): selector.ObjectSelector(),
+            vol.Optional(
                 CONF_CARD_MODULE_URL, default=values[CONF_CARD_MODULE_URL]
             ): selector.TextSelector(),
-            vol.Optional(
-                CONF_MORE_INFO_CARD_OPTIONS,
-                default=values[CONF_MORE_INFO_CARD_OPTIONS],
-            ): selector.ObjectSelector(),
         }
     )
 
@@ -143,7 +166,7 @@ def _more_info_schema(values: dict[str, Any]) -> vol.Schema:
 class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
     """Handle Advanced History config entries."""
 
-    VERSION = 6
+    VERSION = 15
 
     def _configured_types(self) -> set[str]:
         """Return the service roles which are already configured."""
@@ -191,9 +214,9 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
         self._abort_if_unique_id_configured()
         if user_input is not None:
             return self.async_create_entry(
-                title=user_input[CONF_TITLE],
+                title=DEFAULT_OPTIONS[CONF_TITLE],
                 data={CONF_ENTRY_TYPE: ENTRY_TYPE_PANEL},
-                options=user_input,
+                options=_automatic_detail_options_from_input(user_input),
             )
         return self.async_show_form(
             step_id="user", data_schema=_panel_schema(DEFAULT_OPTIONS)
@@ -209,7 +232,7 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
             return self.async_create_entry(
                 title="More-Info",
                 data={CONF_ENTRY_TYPE: ENTRY_TYPE_MORE_INFO},
-                options=user_input,
+                options=_automatic_detail_options_from_input(user_input),
             )
         return self.async_show_form(
             step_id="more_info",
@@ -225,12 +248,15 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
             return await self.async_step_reconfigure_more_info(user_input)
 
         if user_input is not None:
+            user_input = _automatic_detail_options_from_input(
+                user_input, dict(entry.options)
+            )
             user_input[CONF_ENTITY_OPTIONS] = entry.options.get(
                 CONF_ENTITY_OPTIONS, {}
             )
             return self.async_update_reload_and_abort(
                 entry,
-                title=user_input[CONF_TITLE],
+                title=DEFAULT_OPTIONS[CONF_TITLE],
                 options=user_input,
             )
         return self.async_show_form(
@@ -244,6 +270,9 @@ class AdvancedHistoryConfigFlow(ConfigFlow, domain=DOMAIN):
         """Reconfigure the independent More-Info service entry."""
         entry = self._get_reconfigure_entry()
         if user_input is not None:
+            user_input = _automatic_detail_options_from_input(
+                user_input, dict(entry.options)
+            )
             return self.async_update_reload_and_abort(
                 entry,
                 title="More-Info",
@@ -270,16 +299,12 @@ class AdvancedHistoryOptionsFlow(OptionsFlowWithReload):
     ) -> ConfigFlowResult:
         """Edit the selected service entry's options."""
         if config_entry_type(self.config_entry) == ENTRY_TYPE_MORE_INFO:
-            if user_input is not None:
-                return self.async_create_entry(title="", data=user_input)
-            return self.async_show_form(
-                step_id="init",
-                data_schema=_more_info_schema(
-                    more_info_options_with_defaults(self.config_entry.options)
-                ),
-            )
+            return await self.async_step_more_info(user_input)
 
         if user_input is not None:
+            user_input = _automatic_detail_options_from_input(
+                user_input, dict(self.config_entry.options)
+            )
             user_input[CONF_ENTITY_OPTIONS] = self.config_entry.options.get(
                 CONF_ENTITY_OPTIONS, {}
             )
@@ -287,4 +312,20 @@ class AdvancedHistoryOptionsFlow(OptionsFlowWithReload):
         return self.async_show_form(
             step_id="init",
             data_schema=_panel_schema(options_with_defaults(self.config_entry.options)),
+        )
+
+    async def async_step_more_info(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Edit the independent More Info service options."""
+        if user_input is not None:
+            user_input = _automatic_detail_options_from_input(
+                user_input, dict(self.config_entry.options)
+            )
+            return self.async_create_entry(title="", data=user_input)
+        return self.async_show_form(
+            step_id="more_info",
+            data_schema=_more_info_schema(
+                more_info_options_with_defaults(self.config_entry.options)
+            ),
         )
