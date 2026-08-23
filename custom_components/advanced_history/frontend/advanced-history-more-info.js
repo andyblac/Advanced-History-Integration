@@ -706,9 +706,7 @@ function applyMoreInfoHostLayout(historyView, host) {
   host.style.removeProperty("margin-inline-end");
   host.style.removeProperty("margin-block-start");
   host.style.removeProperty("inline-size");
-  host.style.marginBlockEnd = isStandaloneMoreInfoHistory(historyView)
-    ? "10px"
-    : "calc(var(--ha-space-6, 24px) * -1)";
+  host.style.marginBlockEnd = "calc(var(--ha-space-6, 24px) * -1)";
 }
 
 function showMoreInfoLoading(root, nativeChart) {
