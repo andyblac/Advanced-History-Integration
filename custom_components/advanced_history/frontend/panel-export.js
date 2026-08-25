@@ -3,6 +3,7 @@ import { CARD_TAG } from "./constants.js";
 const BRIDGE_TAG = "ha-panel-history";
 const SUGGEST_DIALOG_TAG = "hui-dialog-suggest-card";
 const WIDE_PREVIEW_MARKER = Symbol("advanced-history-wide-dashboard-preview");
+const DIALOG_TITLE_MARKER = Symbol("advanced-history-dashboard-dialog-title");
 const DESELECTED_OPTIONS_MARKER = Symbol("advanced-history-deselected-export-options");
 const WIDE_PREVIEW_PATCH = "__advancedHistoryWidePreviewPatched";
 const OMITTED_RUNTIME_KEYS = new Set([
@@ -240,7 +241,14 @@ function installWideNativePreview() {
   if (!prototype || prototype[WIDE_PREVIEW_PATCH]) return;
   const showDialog = prototype.showDialog;
   if (typeof showDialog !== "function") return;
+  const updated = prototype.updated;
   prototype[WIDE_PREVIEW_PATCH] = true;
+  prototype.updated = function updateAdvancedHistoryDashboardPreview(changedProperties) {
+    updated?.call(this, changedProperties);
+    const title = this._params?.[DIALOG_TITLE_MARKER];
+    const dialog = title && this.shadowRoot?.querySelector("ha-dialog");
+    if (dialog) dialog.headerTitle = title;
+  };
   prototype.showDialog = function showAdvancedHistoryDashboardPreview(params) {
     const result = showDialog.call(this, params);
     const choices = params?.[DESELECTED_OPTIONS_MARKER];
@@ -371,6 +379,7 @@ export async function addCardsToDashboard({ hass, container, cards, labels, ensu
         detail.dialogParams.sectionConfig = { type: "grid", cards: clone(initialCards) };
         detail.dialogParams.entities = bridge._getEntityIds();
         detail.dialogParams[WIDE_PREVIEW_MARKER] = true;
+        detail.dialogParams[DIALOG_TITLE_MARKER] = labels.dialogTitle;
         if (choices) detail.dialogParams[DESELECTED_OPTIONS_MARKER] = choices;
         installWideNativePreview();
         queueMicrotask(cleanup);

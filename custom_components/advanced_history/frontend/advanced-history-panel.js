@@ -177,6 +177,7 @@ class AdvancedHistoryPanel extends HTMLElement {
         cards,
         ensureNativeHistory: () => this._loadNativeHistoryPicker(true),
         labels: {
+          dialogTitle: this._customLocalize("add_current_panel_to_dashboard"),
           fallbackTitle: this._customLocalize("dashboard_yaml_fallback_title"),
           copyYaml: this._customLocalize("copy_dashboard_yaml"),
           copied: this._customLocalize("dashboard_yaml_copied"),
