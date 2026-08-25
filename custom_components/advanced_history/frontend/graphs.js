@@ -498,6 +498,30 @@ export class GraphMethods {
     }
     const hasSecondaryAxis = mode !== "state_timeline"
       && entities.some((entity) => entity.y_axis === "secondary");
+    if (mode !== "state_timeline") {
+      const promoteBatteryUpperBound = (axis, option) => {
+        if (Object.prototype.hasOwnProperty.call(resolvedCardOptions, option)) return;
+        const axisEntities = entities.filter((entity) => {
+          const entityAxis = entity.y_axis || "primary";
+          return entityAxis === axis;
+        });
+        if (
+          !axisEntities.length
+          || !axisEntities.every(
+            (entity) => this._hass.states[entity.entity]?.attributes?.device_class === "battery",
+          )
+        ) return;
+        const bounds = axisEntities.map((entity) => entity.upper_bound);
+        if (
+          bounds[0] !== undefined
+          && bounds.every((bound) => bound === bounds[0])
+        ) {
+          resolvedCardOptions[option] = bounds[0];
+        }
+      };
+      promoteBatteryUpperBound("primary", "upper_bound");
+      promoteBatteryUpperBound("secondary", "upper_bound_secondary");
+    }
     const config = {
       type: `custom:${CARD_TAG}`, card_header: title,
       entities,

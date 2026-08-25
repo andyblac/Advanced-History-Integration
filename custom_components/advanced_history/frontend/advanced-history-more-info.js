@@ -346,6 +346,16 @@ function moreInfoCardConfig(
       }
       return [row];
     })();
+  const batteryUpperBounds = entityRows
+    .filter((row) => row.y_axis !== "secondary" && row.y_axis !== "independent")
+    .map((row) => row.upper_bound);
+  const promotedBatteryUpperBound = (
+    historyView.hass?.states?.[entityId]?.attributes?.device_class === "battery"
+    && batteryUpperBounds.length === entityRows.length
+    && batteryUpperBounds.every(
+      (bound) => bound !== undefined && bound === batteryUpperBounds[0],
+    )
+  ) ? batteryUpperBounds[0] : undefined;
   const configuredHeight = cardOptions.height === "auto"
     ? "auto"
     : (Number(cardOptions.height) || 240);
@@ -360,6 +370,12 @@ function moreInfoCardConfig(
     ...(cardOptions.hours_to_show !== undefined
       ? { hours_to_show: cardOptions.hours_to_show }
       : {}),
+    ...(
+      !Object.prototype.hasOwnProperty.call(cardOptions, "upper_bound")
+      && promotedBatteryUpperBound !== undefined
+        ? { upper_bound: promotedBatteryUpperBound }
+        : {}
+    ),
     height: numeric
       ? configuredHeight
       : Math.min(

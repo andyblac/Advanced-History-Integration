@@ -5,9 +5,11 @@ export function automaticEntityOptions(stateObj, mode = "timeline") {
 
   const stateClass = stateObj?.attributes?.state_class;
   const deviceClass = stateObj?.attributes?.device_class;
+  if (deviceClass === "battery") {
+    return { aggregate_func: "last", upper_bound: 100 };
+  }
   if (
-    deviceClass === "battery"
-    || stateClass === "total"
+    stateClass === "total"
     || stateClass === "total_increasing"
   ) {
     return { aggregate_func: "last" };
