@@ -325,11 +325,12 @@ export class PanelTabsMethods {
     const close = this._localize("ui.common.close", "Close");
     const previous = this._localize("ui.common.previous", "Previous");
     const next = this._localize("ui.common.next", "Next");
+    const tabHelp = this._customLocalize("panel_tab_help");
     return `<div class="panel-tabs-shell">
       <button class="panel-tabs-scroll" data-scroll-panels="-1" title="${this._escape(previous)}" aria-label="${this._escape(previous)}" hidden><ha-icon icon="mdi:chevron-left"></ha-icon></button>
       <nav class="panel-tabs" aria-label="${this._escape(this._customLocalize("panels"))}">
         ${this._panelTabs.map((tab, index) => `<span class="panel-tab${tab.id === this._activePanelTabId ? " active" : ""}" draggable="true" data-panel-tab-item="${this._escape(tab.id)}">
-          <button class="panel-tab-select" data-panel-tab="${this._escape(tab.id)}" ${tab.id === this._activePanelTabId ? 'aria-current="page"' : ""}>${this._escape(this._panelTabDisplayLabel(tab, index))}</button>
+          <button class="panel-tab-select" data-panel-tab="${this._escape(tab.id)}" title="${this._escape(tabHelp)}" ${tab.id === this._activePanelTabId ? 'aria-current="page"' : ""}>${this._escape(this._panelTabDisplayLabel(tab, index))}</button>
           <button class="panel-tab-close" data-close-panel="${this._escape(tab.id)}" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button>
         </span>`).join("")}
       </nav>

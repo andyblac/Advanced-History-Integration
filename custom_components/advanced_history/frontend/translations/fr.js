@@ -8,6 +8,7 @@ export default {
   "add_panel": "Ajouter un panneau",
   "add_panel_requires_version": "Plusieurs panneaux nécessitent Statistics Graph Chart Card v4.02 ou une version ultérieure",
   "panel_number": "Panneau {number}",
+  "panel_tab_help": "Double-cliquez pour renommer. Maintenez le clic et faites glisser pour réorganiser.",
   "chart_history": "Historique des graphiques",
   "graph_settings": "Paramètres du graphique",
   "numeric_history": "Historique numérique",

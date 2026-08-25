@@ -8,6 +8,7 @@ export default {
   "add_panel": "Aggiungi pannello",
   "add_panel_requires_version": "I pannelli multipli richiedono Statistics Graph Chart Card v4.02 o versioni successive",
   "panel_number": "Pannello {number}",
+  "panel_tab_help": "Fai doppio clic per rinominare. Tieni premuto e trascina per riordinare.",
   "chart_history": "Cronologia dei grafici",
   "graph_settings": "Impostazioni del grafico",
   "numeric_history": "Cronologia numerica",
