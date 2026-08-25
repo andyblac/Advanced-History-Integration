@@ -583,14 +583,7 @@ export class EnergyMethods {
   }
 
   _resetNativeEnergyCompareUI() {
-    const controller = this.shadowRoot
-      ?.getElementById("date-controller")
-      ?.querySelector(".energy-date-controller");
-    const selector = controller?.shadowRoot?.querySelector("hui-energy-period-selector");
-    if (selector) {
-      selector._compare = false;
-      selector.requestUpdate?.();
-    }
+    this._syncNativeEnergyCompareSelection(false);
     const compareCard = this.shadowRoot
       ?.getElementById("compare-banner")
       ?.querySelector("hui-energy-compare-card");
@@ -600,6 +593,17 @@ export class EnergyMethods {
       compareCard._compareMode = "";
       compareCard.hidden = true;
       compareCard.requestUpdate?.();
+    }
+  }
+
+  _syncNativeEnergyCompareSelection(active) {
+    const controller = this.shadowRoot
+      ?.getElementById("date-controller")
+      ?.querySelector(".energy-date-controller");
+    const selector = controller?.shadowRoot?.querySelector("hui-energy-period-selector");
+    if (selector) {
+      selector._compare = Boolean(active);
+      selector.requestUpdate?.();
     }
   }
 
@@ -1424,6 +1428,11 @@ export class EnergyMethods {
           this._energyCompareCount,
         )
         : null;
+      // HA's selector renders its Compare icon from a private flag populated
+      // by the most recent Energy data payload. When switching panels, that
+      // payload can briefly belong to the previous collection. Keep the
+      // native control aligned with this panel's restored comparison mode.
+      this._syncNativeEnergyCompareSelection(Boolean(next));
       this._syncY2ComparisonToggle(Boolean(next));
       const nextDetailKey = this._largeRangeDetailRenderKey();
       if (this._periodRestoreLoading) {
