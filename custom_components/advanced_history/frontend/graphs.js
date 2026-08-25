@@ -14,6 +14,94 @@ import {
 
 const DATA_SOURCE_CACHE = new Map();
 const ENTITY_OPTION_REMOVALS = "__advanced_history_remove_options";
+const EXTENDED_ENTITY_COLORS = Object.freeze([
+  // The card's compact palette already covers red, blue, green, orange,
+  // purple and teal. Start its extension with a visibly separate colour so
+  // the first Y2/overflow series cannot look like the first Y1 series.
+  "#d4e157",
+  "#f06292",
+  "#7986cb",
+  "#4dd0e1",
+  "#ff8a65",
+  "#a1887f",
+  "#aed581",
+  "#9575cd",
+  "#ffd54f",
+  "#90a4ae",
+  "#4fc3f7",
+  "#fff176",
+]);
+
+function extendedEntityPalette(cardPalette, minimumSize = 0) {
+  const colors = [];
+  const seen = new Set();
+  for (const color of [
+    ...(Array.isArray(cardPalette) ? cardPalette : []),
+    ...EXTENDED_ENTITY_COLORS,
+  ]) {
+    if (typeof color !== "string") continue;
+    const key = color.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    colors.push(color);
+  }
+  let generatedIndex = 0;
+  while (colors.length < minimumSize) {
+    const hue = Math.round((17 + generatedIndex * 137.508) % 360);
+    const lightness = generatedIndex % 2 ? 62 : 48;
+    const color = `hsl(${hue} 72% ${lightness}%)`;
+    generatedIndex += 1;
+    if (seen.has(color)) continue;
+    seen.add(color);
+    colors.push(color);
+  }
+  return colors;
+}
+
+function graphColorKey(color) {
+  return typeof color === "string" ? color.trim().toLowerCase() : "";
+}
+
+function graphColorRgb(color) {
+  const value = graphColorKey(color);
+  const shortHex = value.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
+  if (shortHex) {
+    return shortHex.slice(1).map((part) => Number.parseInt(part + part, 16));
+  }
+  const hex = value.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (hex) return hex.slice(1).map((part) => Number.parseInt(part, 16));
+  const rgb = value.match(
+    /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*[\d.]+%?)?\s*\)$/i,
+  );
+  return rgb ? rgb.slice(1).map((part) => Number(part)) : null;
+}
+
+function graphColorsAreSimilar(left, right) {
+  if (graphColorKey(left) === graphColorKey(right)) return true;
+  const leftRgb = graphColorRgb(left);
+  const rightRgb = graphColorRgb(right);
+  if (!leftRgb || !rightRgb) return false;
+  const redMean = (leftRgb[0] + rightRgb[0]) / 2;
+  const red = leftRgb[0] - rightRgb[0];
+  const green = leftRgb[1] - rightRgb[1];
+  const blue = leftRgb[2] - rightRgb[2];
+  const distance = Math.sqrt(
+    (2 + redMean / 256) * red * red
+    + 4 * green * green
+    + (2 + (255 - redMean) / 256) * blue * blue,
+  );
+  return distance < 110;
+}
+
+function graphColorIsUsed(color, usedColors) {
+  return [...usedColors].some((used) => graphColorsAreSimilar(color, used));
+}
+
+function nextUnusedGraphColor(palette, usedColors) {
+  const color = palette.find((candidate) => !graphColorIsUsed(candidate, usedColors));
+  if (color) usedColors.add(graphColorKey(color));
+  return color;
+}
 
 function historyTimestamp(value) {
   const numeric = Number(value);
@@ -443,13 +531,38 @@ export class GraphMethods {
       delete cardOptions.chart_mode;
     }
     const resolvedCardOptions = this._resolvedDetailCardOptions(detail, cardOptions);
-    const palette = customElements.get(CARD_TAG)?.PALETTE;
     const entities = series.map((item) => this._entityCardConfig(
       item,
       mode,
       cardOptionsConfig,
     ));
-    const automaticEntityColors = entities.map((configured) => configured.color == null);
+    const palette = extendedEntityPalette(
+      customElements.get(CARD_TAG)?.PALETTE,
+      entities.length + entities.reduce(
+        (count, configured) => count + (configured.compare?.length || 0),
+        0,
+      ),
+    );
+    const usedColors = new Set();
+    if (mode !== "state_timeline") {
+      // Older scoped editor sessions could persist the first palette colour
+      // independently for Y1 and Y2. Preserve the first resolved occurrence,
+      // then return later duplicates to automatic allocation.
+      entities.forEach((configured) => {
+        const key = graphColorKey(configured.color);
+        if (!key) return;
+        if (graphColorIsUsed(configured.color, usedColors)) delete configured.color;
+        else usedColors.add(key);
+      });
+      entities.forEach((configured) => {
+        for (const comparison of configured.compare || []) {
+          const key = graphColorKey(comparison?.color);
+          if (!key) continue;
+          if (graphColorIsUsed(comparison.color, usedColors)) delete comparison.color;
+          else usedColors.add(key);
+        }
+      });
+    }
     entities.forEach((configured, index) => {
       // Keep automatically assigned colors stable when entities are toggled.
       // The card otherwise reindexes its palette after disabled entities are
@@ -460,7 +573,8 @@ export class GraphMethods {
         && Array.isArray(palette)
         && palette.length
       ) {
-        configured.color = palette[index % palette.length];
+        configured.color = nextUnusedGraphColor(palette, usedColors)
+          || palette[index % palette.length];
       }
     });
     const comparedEntities = entities.filter((configured) => Array.isArray(configured.compare));
@@ -469,32 +583,7 @@ export class GraphMethods {
       ? comparedEntities[0]
       : null;
     if (soleComparedEntity) {
-      const comparedIndex = entities.indexOf(soleComparedEntity);
-      this._colorAutomaticComparisons(soleComparedEntity, palette, comparedIndex);
-
-      // When Y2 is excluded from comparison, keep the sole Y1 entity's
-      // single-entity comparison palette and place automatic Y2 colours after
-      // every colour already used by Y1 and its comparison periods.
-      if (
-        this._excludeY2Comparison
-        && Array.isArray(palette)
-        && palette.length
-      ) {
-        const usedColors = new Set([
-          soleComparedEntity.color,
-          ...soleComparedEntity.compare.map((comparison) => comparison?.color),
-        ].filter(Boolean));
-        entities.forEach((configured, index) => {
-          if (
-            configured.y_axis !== "secondary"
-            || !automaticEntityColors[index]
-            || Array.isArray(configured.compare)
-          ) return;
-          const available = palette.find((color) => !usedColors.has(color));
-          if (available) configured.color = available;
-          usedColors.add(configured.color);
-        });
-      }
+      this._colorAutomaticComparisons(soleComparedEntity, palette, usedColors);
     }
     const hasSecondaryAxis = mode !== "state_timeline"
       && entities.some((entity) => entity.y_axis === "secondary");
@@ -1300,7 +1389,7 @@ export class GraphMethods {
     return Array.isArray(compare) ? compare.map(withLayout) : withLayout(compare);
   }
 
-  _colorAutomaticComparisons(configured, palette, entityIndex = 0) {
+  _colorAutomaticComparisons(configured, palette, usedColors = new Set()) {
     if (
       !Array.isArray(this._energyCompare)
       || this._effectiveCompare() !== this._energyCompare
@@ -1308,11 +1397,13 @@ export class GraphMethods {
       || !Array.isArray(palette)
       || palette.length < 2
     ) return configured;
-    const configuredIndex = palette.indexOf(configured.color);
-    const baseIndex = configuredIndex >= 0 ? configuredIndex : entityIndex % palette.length;
     configured.compare = configured.compare.map((comparison, index) => (
       comparison && typeof comparison === "object" && comparison.color == null
-        ? { ...comparison, color: palette[(baseIndex + index + 1) % palette.length] }
+        ? {
+            ...comparison,
+            color: nextUnusedGraphColor(palette, usedColors)
+              || palette[index % palette.length],
+          }
         : comparison
     ));
     return configured;
@@ -1377,7 +1468,10 @@ export class GraphMethods {
     const editorHeader = scopedHeader
       ?? this._customLocalize(editorHasNumeric ? "numeric_history" : "state_history");
     const cardOptions = this._cardOptions(editorMode, cardOptionsConfig);
-    const palette = customElements.get(CARD_TAG)?.PALETTE;
+    const palette = extendedEntityPalette(
+      customElements.get(CARD_TAG)?.PALETTE,
+      editorEntities.length,
+    );
     this._editorAutoColors = new Map();
     const entities = editorEntities.map((item, index) => {
       const entityConfig = this._entityCardConfig(
