@@ -12,6 +12,10 @@ import { panelStyles as css } from "./styles.js";
 import { PanelTabsMethods } from "./panel-tabs.js";
 import { TargetPickerMethods } from "./target-picker.js";
 import { customLocalize, loadTranslations } from "./translations.js";
+import {
+  addCardsToDashboard,
+  dashboardCardSnapshots,
+} from "./panel-export.js";
 
 class AdvancedHistoryPanel extends HTMLElement {
   constructor() {
@@ -156,6 +160,35 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._syncY2ComparisonToggle(true);
     this._recordChange(null, true);
     this._renderGraphs();
+  }
+
+  async _addCurrentPanelToDashboard(button) {
+    const cards = dashboardCardSnapshots(this._graphCards, {
+      start: this._energyCollection?.start,
+      end: this._energyCollection?.end,
+      rollingHours: this._panelRollingHours,
+    });
+    if (!cards.length) return;
+    if (button) button.disabled = true;
+    try {
+      await addCardsToDashboard({
+        hass: this._hass,
+        container: this,
+        cards,
+        ensureNativeHistory: () => this._loadNativeHistoryPicker(true),
+        labels: {
+          fallbackTitle: this._customLocalize("dashboard_yaml_fallback_title"),
+          copyYaml: this._customLocalize("copy_dashboard_yaml"),
+          copied: this._customLocalize("dashboard_yaml_copied"),
+          copyFailed: this._customLocalize("dashboard_yaml_copy_error"),
+          hideEntitiesOnLoad: this._customLocalize("hide_entities_on_load"),
+          hideEntitiesOnLoadNote: this._customLocalize("hide_entities_on_load_note"),
+          close: this._localize("ui.common.close", "Close"),
+        },
+      });
+    } finally {
+      if (button?.isConnected) button.disabled = false;
+    }
   }
 
   _localize(key, fallback, replacements) {

@@ -1,3 +1,5 @@
+const PANEL_EXPORT_ICON_PATH = "M3 3H11V11H3V3M5 5V9H9V5H5M13 3H21V11H13V3M15 5V9H19V5H15M3 13H11V21H3V13M5 15V19H9V15H5M18 13V16H21V18H18V21H16V18H13V16H16V13H18Z";
+
 export class EnergyMethods {
   _energyCompareChoiceFromNative(mode) {
     return mode === "previous"
@@ -1219,6 +1221,7 @@ export class EnergyMethods {
         selector.requestUpdate?.();
         await selector.updateComplete;
         const attachDatePickerListener = () => {
+          this._installEnergyPanelExportAction(selector);
           const datePicker = selector.shadowRoot?.querySelector("ha-date-range-picker");
           if (!datePicker || datePicker.__advancedHistoryDetailListener) return;
           datePicker.__advancedHistoryDetailListener = true;
@@ -1253,6 +1256,26 @@ export class EnergyMethods {
       }
       await new Promise((resolve) => requestAnimationFrame(resolve));
     }
+  }
+
+  _installEnergyPanelExportAction(selector) {
+    const dropdown = selector?.shadowRoot?.querySelector("ha-dropdown");
+    if (!dropdown || dropdown.querySelector("[data-advanced-history-panel-export]")) return;
+
+    const label = this._customLocalize("add_current_panel_to_dashboard");
+    const item = document.createElement("ha-dropdown-item");
+    item.dataset.advancedHistoryPanelExport = "";
+    const icon = document.createElement("ha-svg-icon");
+    icon.slot = "icon";
+    icon.path = PANEL_EXPORT_ICON_PATH;
+    item.append(icon, document.createTextNode(label));
+    item.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      dropdown.open = false;
+      void this._addCurrentPanelToDashboard(item);
+    });
+    dropdown.append(item);
   }
 
   _replaceEnergyDownloadAction(controller) {

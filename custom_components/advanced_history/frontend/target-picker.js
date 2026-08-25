@@ -10,8 +10,11 @@ export class TargetPickerMethods {
       || Boolean(this._loadedBookmarkId || this._loadedExternalBookmark);
   }
 
-  async _loadNativeHistoryPicker() {
-    if (customElements.get("ha-target-picker")) return;
+  async _loadNativeHistoryPicker(requireHistoryPanel = false) {
+    if (
+      customElements.get("ha-target-picker")
+      && (!requireHistoryPanel || customElements.get("ha-panel-history"))
+    ) return;
 
     let node = this;
     let resolver = null;
@@ -81,6 +84,7 @@ export class TargetPickerMethods {
 
     await historyRoute.load();
     await customElements.whenDefined("ha-target-picker");
+    if (requireHistoryPanel) await customElements.whenDefined("ha-panel-history");
   }
 
   async _renderNativeTargetPicker(axis = "primary") {
