@@ -1,5 +1,5 @@
 export const panelStyles = `
-  :host { display:block; min-height:100%; color:var(--primary-text-color); background:var(--primary-background-color); }
+  :host { display:block; min-height:100%; container-type:inline-size; color:var(--primary-text-color); background:var(--primary-background-color); }
   * { box-sizing:border-box; }
   button, input { font:inherit; }
   .appbar {
@@ -137,7 +137,10 @@ export const panelStyles = `
   }
   .add-target:hover { background:var(--secondary-background-color); }
   .add-target ha-icon { width:19px; height:19px; }
-  .charts { display:grid; gap:16px; }
+  .charts {
+    position:relative; left:50%; width:calc(100vw - 32px); width:calc(100cqw - 32px);
+    transform:translateX(-50%); display:grid; gap:16px;
+  }
   .charts[hidden] { display:none; }
   .charts.dynamic-numeric { grid-template-rows:minmax(240px,1fr); }
   .charts.dynamic-numeric.has-state-graph { grid-template-rows:var(--numeric-graph-height,240px) auto; align-content:start; }
