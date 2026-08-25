@@ -62,6 +62,12 @@ function graphColorKey(color) {
   return typeof color === "string" ? color.trim().toLowerCase() : "";
 }
 
+function graphComparisonRows(configured) {
+  const compare = configured?.compare;
+  if (Array.isArray(compare)) return compare;
+  return compare && typeof compare === "object" ? [compare] : [];
+}
+
 function graphColorRgb(color) {
   const value = graphColorKey(color);
   const shortHex = value.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
@@ -539,7 +545,7 @@ export class GraphMethods {
     const palette = extendedEntityPalette(
       customElements.get(CARD_TAG)?.PALETTE,
       entities.length + entities.reduce(
-        (count, configured) => count + (configured.compare?.length || 0),
+        (count, configured) => count + graphComparisonRows(configured).length,
         0,
       ),
     );
@@ -555,7 +561,7 @@ export class GraphMethods {
         else usedColors.add(key);
       });
       entities.forEach((configured) => {
-        for (const comparison of configured.compare || []) {
+        for (const comparison of graphComparisonRows(configured)) {
           const key = graphColorKey(comparison?.color);
           if (!key) continue;
           if (graphColorIsUsed(comparison.color, usedColors)) delete comparison.color;
