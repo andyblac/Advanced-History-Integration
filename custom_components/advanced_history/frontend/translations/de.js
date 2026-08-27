@@ -9,6 +9,7 @@ export default {
   "add_panel_requires_version": "Mehrere Ansichten erfordern Statistics Graph Chart Card v4.02 oder neuer",
   "panel_number": "Ansicht {number}",
   "panel_tab_help": "Zum Umbenennen doppelklicken. Zum Neuanordnen gedrückt halten und ziehen.",
+  "panel_limit_reached": "Schließen Sie eine Ansicht, bevor Sie ein weiteres Diagramm öffnen.",
   "chart_history": "Diagrammverlauf",
   "graph_settings": "Diagrammeinstellungen",
   "numeric_history": "Numerischer Verlauf",

@@ -9,6 +9,7 @@ export default {
   "add_panel_requires_version": "Meerdere panelen vereisen Statistics Graph Chart Card v4.02 of nieuwer",
   "panel_number": "Paneel {number}",
   "panel_tab_help": "Dubbelklik om de naam te wijzigen. Houd ingedrukt en sleep om de volgorde te wijzigen.",
+  "panel_limit_reached": "Sluit een paneel voordat u een andere grafiek opent.",
   "chart_history": "Grafiekgeschiedenis",
   "graph_settings": "Grafiekinstellingen",
   "numeric_history": "Numerieke geschiedenis",

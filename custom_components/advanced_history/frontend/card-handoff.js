@@ -14,6 +14,18 @@ const OMITTED_CARD_KEYS = new Set([
   "energy_collection_key",
   "height",
   "hours_to_show",
+  "show_date_picker",
+  "date_picker_position",
+  "date_picker_nav_position",
+  "date_picker_shortcuts_position",
+  "date_picker_group",
+  "date_picker_modes",
+  "date_picker_default_mode",
+  "date_picker_step",
+  "show_interval_picker",
+  "interval_picker_position",
+  "interval_picker_group",
+  "interval_options",
   "show_y2_axis",
   "show_advanced_history_button",
   "grid_options",
@@ -191,8 +203,11 @@ export function installCardHandoffApi() {
    * { start, end, compare }. Supplying it lets the receiving panel reproduce
    * the card's currently displayed range instead of retaining the Energy
    * date picker's current selection.
+   *
+   * `newPanel` keeps the receiver's persisted panel session and appends this
+   * chart as a new active panel. `panelName` supplies its optional tab label.
    */
-  api.openCard = ({ config, entities, period } = {}) => {
+  api.openCard = ({ config, entities, period, newPanel = false, panelName = "" } = {}) => {
     try {
       const hasCardConfig = Boolean(
         config && typeof config === "object" && !Array.isArray(config)
@@ -211,6 +226,8 @@ export function installCardHandoffApi() {
       const payload = JSON.stringify({
         schema_version: CARD_HANDOFF_SCHEMA,
         snapshot,
+        ...(newPanel ? { open_mode: "new_panel" } : {}),
+        ...(panelName ? { panel_name: String(panelName).slice(0, 40) } : {}),
       });
       if (new TextEncoder().encode(payload).length > MAX_HANDOFF_BYTES) {
         throw new Error("Card handoff is too large");
@@ -236,7 +253,13 @@ export function consumeCardHandoff(params) {
     if (!raw || new TextEncoder().encode(raw).length > MAX_HANDOFF_BYTES) return null;
     const payload = JSON.parse(raw);
     if (payload?.schema_version !== CARD_HANDOFF_SCHEMA) return null;
-    return payload.snapshot || null;
+    return {
+      snapshot: payload.snapshot || null,
+      openMode: payload.open_mode === "new_panel" ? "new_panel" : "replace",
+      panelName: typeof payload.panel_name === "string"
+        ? payload.panel_name.slice(0, 40)
+        : "",
+    };
   } catch (error) {
     console.warn("Advanced History: card handoff could not be loaded", error);
     return null;

@@ -1204,6 +1204,38 @@ function rewriteShowMoreLink(event) {
   const targetEntityId = entityId || nativeUrl.searchParams.get("entity_id");
   if (!targetEntityId) return;
 
+  const plainPrimaryClick = event.type === "click"
+    && event.button === 0
+    && !event.metaKey
+    && !event.ctrlKey
+    && !event.shiftKey
+    && !event.altKey;
+  if (plainPrimaryClick) {
+    const root = historyView.shadowRoot;
+    const cardConfig = root
+      ?.querySelector(`.${MORE_INFO_PICKER_BUTTON_CLASS}`)
+      ?.__advancedHistoryCardConfig
+      || root?.querySelector(`.${MORE_INFO_HOST_CLASS} ${CARD_TAG}`)?._config;
+    const openCard = window.advancedHistory?.openCard;
+    if (cardConfig && typeof openCard === "function") {
+      const state = historyView.hass?.states?.[targetEntityId];
+      const opened = openCard({
+        config: cardConfig,
+        newPanel: true,
+        panelName: state?.attributes?.friendly_name || targetEntityId,
+      });
+      if (opened) {
+        event.preventDefault();
+        event.stopPropagation();
+        historyView.dispatchEvent(new CustomEvent("close-dialog", {
+          bubbles: true,
+          composed: true,
+        }));
+        return;
+      }
+    }
+  }
+
   const target = new URL(PANEL_PATH, window.location.origin);
   target.searchParams.set("entity_id", targetEntityId);
   link.href = `${target.pathname}${target.search}`;

@@ -9,6 +9,7 @@ export default {
   "add_panel_requires_version": "Multiple panels require Statistics Graph Chart Card v4.02 or newer",
   "panel_number": "Panel {number}",
   "panel_tab_help": "Double-click to rename. Click and hold, then drag to rearrange.",
+  "panel_limit_reached": "Close a panel before opening another chart.",
   "chart_history": "Chart history",
   "graph_settings": "Graph settings",
   "numeric_history": "Numeric history",

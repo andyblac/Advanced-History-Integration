@@ -17,7 +17,15 @@ import { consumeCardHandoff } from "./card-handoff.js";
 export class StorageMethods {
   async _loadTargets() {
     const params = new URLSearchParams(location.search);
-    const handedOffSnapshot = this._validateSharedSnapshot(consumeCardHandoff(params));
+    const handoff = consumeCardHandoff(params);
+    const handedOffSnapshot = this._validateSharedSnapshot(handoff?.snapshot);
+    const handoffOpensPanel = Boolean(
+      handedOffSnapshot && handoff?.openMode === "new_panel"
+    );
+    this._pendingPanelTabHandoff = handoffOpensPanel ? {
+      snapshot: handedOffSnapshot,
+      name: handoff.panelName || "",
+    } : null;
     const sharedSnapshot = await this._sharedSnapshotFromUrl(params);
     if (params.has(CARD_HANDOFF_QUERY_PARAM) && !handedOffSnapshot) {
       const url = new URL(location.href);
@@ -33,7 +41,7 @@ export class StorageMethods {
     const fromUrl = { area_id: params.getAll("area_id"), device_id: params.getAll("device_id"), entity_id: params.getAll("entity_id") };
     const y2FromUrl = { area_id: params.getAll("y2_area_id"), device_id: params.getAll("y2_device_id"), entity_id: params.getAll("y2_entity_id") };
     const previous = this._loadCurrentSnapshot();
-    const incomingSnapshot = handedOffSnapshot || sharedSnapshot;
+    const incomingSnapshot = (handoffOpensPanel ? null : handedOffSnapshot) || sharedSnapshot;
     if (incomingSnapshot) {
       this._loadedBookmarkId = null;
       this._loadedExternalBookmark = false;

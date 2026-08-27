@@ -136,7 +136,7 @@ export class PanelTabsMethods {
     const params = new URLSearchParams(location.search);
     if (
       params.has(SHARE_QUERY_PARAM)
-      || params.has(CARD_HANDOFF_QUERY_PARAM)
+      || (params.has(CARD_HANDOFF_QUERY_PARAM) && !this._pendingPanelTabHandoff)
       || this._incomingTargetOverride
     ) {
       // The incoming view intentionally replaces the active panel for this
@@ -287,6 +287,44 @@ export class PanelTabsMethods {
     this._activePanelTabId = tab.id;
     this._restorePanelTab(tab);
     this._persistPanelTabs();
+  }
+
+  _openPendingPanelTabHandoff() {
+    const pending = this._pendingPanelTabHandoff;
+    this._pendingPanelTabHandoff = null;
+    if (!pending?.snapshot) return false;
+
+    if (!this._panelTabsDependencySupported()) {
+      this._applySnapshot(this._clone(pending.snapshot), false, true);
+      return true;
+    }
+    if (this._panelTabs.length >= this.maxTabs) {
+      this._saveTargets();
+      this.dispatchEvent(new CustomEvent("hass-notification", {
+        detail: { message: this._customLocalize("panel_limit_reached") },
+        bubbles: true,
+        composed: true,
+      }));
+      return false;
+    }
+
+    this._panelTabsStorageInspected = true;
+    this._saveActivePanelTab();
+    const id = this._panelTabId();
+    const state = this._blankPanelTabState();
+    state.snapshot = this._clone(pending.snapshot);
+    state.current_snapshot = this._clone(pending.snapshot);
+    const tab = {
+      id,
+      name: String(pending.name || "").trim().slice(0, 40),
+      energy_collection_key: this._panelEnergyCollectionKeyForId(id),
+      state,
+    };
+    this._panelTabs.push(tab);
+    this._activePanelTabId = tab.id;
+    this._restorePanelTab(tab);
+    this._persistPanelTabs();
+    return true;
   }
 
   _switchPanelTab(id) {

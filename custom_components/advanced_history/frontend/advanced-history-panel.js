@@ -89,6 +89,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._activePanelTabId = initialPanelTabId;
     this._panelTabsStorageInspected = false;
     this._panelTabsPersistenceSuppressed = false;
+    this._pendingPanelTabHandoff = null;
     this._persistPanelsOnPageHide = () => this._persistPanelTabs();
     this._refreshAliasOnVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -255,7 +256,8 @@ class AdvancedHistoryPanel extends HTMLElement {
     ]);
     this._initialized = true;
     const restoredPanels = this._restorePersistedPanelTabs();
-    if (this.isConnected && !restoredPanels) this._render();
+    const openedHandoffPanel = this._openPendingPanelTabHandoff?.();
+    if (this.isConnected && !restoredPanels && !openedHandoffPanel) this._render();
     this._scheduleExternalBookmarkRefresh?.();
   }
 

@@ -51,7 +51,10 @@ export const panelStyles = `
   .panel-tab-select, .panel-tab-close {
     box-sizing:border-box; height:100%; border:0; color:inherit; background:transparent; cursor:pointer;
   }
-  .panel-tab-select { min-width:70px; padding:0 5px 0 10px; white-space:nowrap; font-weight:500; }
+  .panel-tab-select {
+    min-width:70px; max-width:210px; padding:0 5px 0 10px; overflow:hidden;
+    text-overflow:ellipsis; white-space:nowrap; font-weight:500;
+  }
   .panel-tab-name-input { width:min(150px,20vw); min-width:70px; height:30px; padding:0 6px; color:inherit; background:var(--card-background-color); border:1px solid var(--primary-color); border-radius:4px; outline:0; }
   .panel-tab-close { position:absolute; z-index:2; top:0; right:0; bottom:0; width:30px; padding:0; display:flex; align-items:center; justify-content:center; }
   .panel-tab-close:hover, .panel-tab-select:hover { background:transparent; }
