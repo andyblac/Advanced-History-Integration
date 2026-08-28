@@ -65,7 +65,7 @@
         "data_description": {
           "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
-          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
+          "redirect_show_more": "Ouvre le lien Afficher plus de la section Historique des boîtes de dialogue d’entité dans Advanced History sous forme de nouveau panneau, tout en conservant les onglets de panneau existants.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
           "numeric_card_options": "Valeurs par défaut utilisées uniquement par les graphiques numériques. Ouvrez l’éditeur visuel ou modifiez directement le code.",
           "state_card_options": "Valeurs par défaut utilisées uniquement par les graphiques de chronologie d’état. Ouvrez l’éditeur visuel ou modifiez directement le code.",
@@ -87,7 +87,7 @@
         "data_description": {
           "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
-          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
+          "redirect_show_more": "Ouvre le lien Afficher plus de la section Historique des boîtes de dialogue d’entité dans Advanced History sous forme de nouveau panneau, tout en conservant les onglets de panneau existants.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
           "numeric_card_options": "Valeurs par défaut utilisées uniquement par les graphiques numériques. Ouvrez l’éditeur visuel ou modifiez directement le code.",
           "state_card_options": "Valeurs par défaut utilisées uniquement par les graphiques de chronologie d’état. Ouvrez l’éditeur visuel ou modifiez directement le code.",
@@ -124,7 +124,7 @@
         "data_description": {
           "large_range_automatic_detail": "Définit par défaut la mise à l’échelle automatique des points des graphiques numériques ; les options du graphique peuvent la remplacer. Pour les longues périodes, propose aussi le détail fin dans le panneau Historique.",
           "large_range_detail_threshold_days": "Utilise le détail automatique lorsque la période sélectionnée couvre au moins ce nombre de jours.",
-          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
+          "redirect_show_more": "Ouvre le lien Afficher plus de la section Historique des boîtes de dialogue d’entité dans Advanced History sous forme de nouveau panneau, tout en conservant les onglets de panneau existants.",
           "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
@@ -147,7 +147,7 @@
         "data_description": {
           "replace_more_info_history": "Remplace le graphique Historique natif des boîtes de dialogue d’entité par Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Affiche le sélecteur de dates intégré de Statistics Graph Chart Card dans les boîtes de dialogue d’entité.",
-          "redirect_show_more": "Redirige le lien Afficher plus de la section Historique des boîtes de dialogue d’entité vers Advanced History et remplace toutes les cibles existantes par cette entité.",
+          "redirect_show_more": "Ouvre le lien Afficher plus de la section Historique des boîtes de dialogue d’entité dans Advanced History sous forme de nouveau panneau, tout en conservant les onglets de panneau existants.",
           "card_module_url": "Laissez vide pour détecter automatiquement la ressource HACS de Statistics Graph Chart Card.",
           "numeric_card_options": "Valeurs par défaut utilisées uniquement par les graphiques numériques. Ouvrez l’éditeur visuel ou modifiez directement le code.",
           "state_card_options": "Valeurs par défaut utilisées uniquement par les graphiques de chronologie d’état. Ouvrez l’éditeur visuel ou modifiez directement le code.",

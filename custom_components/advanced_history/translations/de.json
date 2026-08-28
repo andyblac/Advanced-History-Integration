@@ -65,7 +65,7 @@
         "data_description": {
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
-          "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
+          "redirect_show_more": "Öffnet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen als neues Panel in Advanced History und behält die vorhandenen Panel-Tabs bei.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
           "numeric_card_options": "Standardeinstellungen, die nur für numerische Diagramme verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
           "state_card_options": "Standardeinstellungen, die nur für Zustandszeitachsen verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
@@ -87,7 +87,7 @@
         "data_description": {
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
-          "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
+          "redirect_show_more": "Öffnet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen als neues Panel in Advanced History und behält die vorhandenen Panel-Tabs bei.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
           "numeric_card_options": "Standardeinstellungen, die nur für numerische Diagramme verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
           "state_card_options": "Standardeinstellungen, die nur für Zustandszeitachsen verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
@@ -124,7 +124,7 @@
         "data_description": {
           "large_range_automatic_detail": "Legt die automatische Punktskalierung für numerische Diagramme als Standard fest; Diagrammoptionen können sie überschreiben. Für große Zeiträume bietet die Verlaufsansicht zusätzlich feinere Details.",
           "large_range_detail_threshold_days": "Verwendet automatische Details, wenn der ausgewählte Zeitraum mindestens so viele Tage umfasst.",
-          "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
+          "redirect_show_more": "Öffnet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen als neues Panel in Advanced History und behält die vorhandenen Panel-Tabs bei.",
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
@@ -147,7 +147,7 @@
         "data_description": {
           "replace_more_info_history": "Ersetzt das native Verlaufsdiagramm in Entitätsdialogen durch Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Zeigt die integrierte Datumsauswahl der Statistics Graph Chart Card in Entitätsdialogen an.",
-          "redirect_show_more": "Leitet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen zu Advanced History um und ersetzt alle vorhandenen Ziele durch diese Entität.",
+          "redirect_show_more": "Öffnet den Link „Mehr anzeigen“ im Verlauf von Entitätsdialogen als neues Panel in Advanced History und behält die vorhandenen Panel-Tabs bei.",
           "card_module_url": "Leer lassen, um die HACS-Ressource der Statistics Graph Chart Card automatisch zu erkennen.",
           "numeric_card_options": "Standardeinstellungen, die nur für numerische Diagramme verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",
           "state_card_options": "Standardeinstellungen, die nur für Zustandszeitachsen verwendet werden. Öffne den visuellen Editor oder bearbeite den Code direkt.",

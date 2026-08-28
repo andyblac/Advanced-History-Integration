@@ -65,7 +65,7 @@
         "data_description": {
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",
-          "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
+          "redirect_show_more": "Abre o link Mostrar mais da seção Histórico nos diálogos de entidade no Advanced History como um novo painel, preservando as guias de painel existentes.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
           "numeric_card_options": "Padrões usados somente por gráficos numéricos. Abra o editor visual ou edite o código diretamente.",
           "state_card_options": "Padrões usados somente por gráficos de linha do tempo de estados. Abra o editor visual ou edite o código diretamente.",
@@ -87,7 +87,7 @@
         "data_description": {
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",
-          "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
+          "redirect_show_more": "Abre o link Mostrar mais da seção Histórico nos diálogos de entidade no Advanced History como um novo painel, preservando as guias de painel existentes.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
           "numeric_card_options": "Padrões usados somente por gráficos numéricos. Abra o editor visual ou edite o código diretamente.",
           "state_card_options": "Padrões usados somente por gráficos de linha do tempo de estados. Abra o editor visual ou edite o código diretamente.",
@@ -124,7 +124,7 @@
         "data_description": {
           "large_range_automatic_detail": "Define o dimensionamento automático de pontos padrão para gráficos numéricos; as opções do gráfico podem substituí-lo. Para períodos longos, também oferece detalhes finos no painel Histórico.",
           "large_range_detail_threshold_days": "Usa o detalhe automático quando o período selecionado tiver pelo menos este número de dias.",
-          "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
+          "redirect_show_more": "Abre o link Mostrar mais da seção Histórico nos diálogos de entidade no Advanced History como um novo painel, preservando as guias de painel existentes.",
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
@@ -147,7 +147,7 @@
         "data_description": {
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",
-          "redirect_show_more": "Redireciona o link Mostrar mais da seção Histórico nos diálogos de entidade para o Advanced History, substituindo todos os alvos existentes por essa entidade.",
+          "redirect_show_more": "Abre o link Mostrar mais da seção Histórico nos diálogos de entidade no Advanced History como um novo painel, preservando as guias de painel existentes.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
           "numeric_card_options": "Padrões usados somente por gráficos numéricos. Abra o editor visual ou edite o código diretamente.",
           "state_card_options": "Padrões usados somente por gráficos de linha do tempo de estados. Abra o editor visual ou edite o código diretamente.",

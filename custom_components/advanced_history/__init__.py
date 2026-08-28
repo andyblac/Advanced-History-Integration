@@ -39,7 +39,7 @@ from .websocket import async_register_websocket_commands
 
 async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Migrate Advanced History config entries."""
-    if entry.version > 15:
+    if entry.version > 16:
         return False
 
     options = deepcopy(dict(entry.options))
@@ -204,10 +204,16 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
                 numeric.pop("auto_scale_points")
             options[CONF_NUMERIC_CARD_OPTIONS] = numeric
 
+    if entry.version < 16 and not is_panel:
+        # Show more now appends a panel without replacing the user's current
+        # Advanced History session, so enable the safer workflow once for
+        # existing More Info entries. Users can disable it again afterwards.
+        options[CONF_REDIRECT_SHOW_MORE] = True
+
     hass.config_entries.async_update_entry(
         entry,
         options=options,
-        version=15,
+        version=16,
         title="Advanced History" if is_panel else entry.title,
     )
     return True
