@@ -1144,13 +1144,6 @@ export class StorageMethods {
     return this.config.compare !== undefined ? this.config.compare : this._energyCompare;
   }
 
-  _snapshotCompareSetting() {
-    if (this._activeSnapshot?.compare !== undefined) {
-      return this._activeSnapshot.compare;
-    }
-    return this.config.compare;
-  }
-
   _applyStoredPeriod(collection, period, clearPending = true, refresh = true) {
     if (!period?.start || !collection) return false;
     const start = new Date(period.start);

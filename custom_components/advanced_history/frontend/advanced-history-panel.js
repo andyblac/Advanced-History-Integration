@@ -31,9 +31,6 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._excludeY2Comparison = false;
-    this._draftTargets = null;
-    this._activeTab = "area_id";
-    this._dialogSearch = "";
     this._loaded = false;
     this._initialized = false;
     this._cards = [];

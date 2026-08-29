@@ -112,10 +112,6 @@ export const panelStyles = `
     .panel-time-range ha-icon { display:none; }
     .panel-time-range-value { min-width:96px; }
   }
-  .target-picker {
-    flex:1; min-height:56px; padding:7px 10px; border:1px solid var(--divider-color); border-radius:4px;
-    background:var(--card-background-color); display:flex; align-items:center; flex-wrap:wrap; gap:7px; cursor:text;
-  }
   .native-target-picker { flex:1; min-width:0; }
   .native-target-picker ha-target-picker { display:block; width:100%; }
   .native-picker-status {
@@ -123,23 +119,6 @@ export const panelStyles = `
     color:var(--secondary-text-color); border:1px solid var(--divider-color); border-radius:4px;
     background:var(--card-background-color);
   }
-  .target-picker:hover { border-color:var(--primary-text-color); }
-  .target-label { width:100%; color:var(--secondary-text-color); font-size:12px; line-height:14px; }
-  .chip {
-    height:32px; max-width:270px; padding:0 5px 0 9px; display:flex; align-items:center; gap:7px;
-    border-radius:16px; color:var(--primary-text-color); background:var(--secondary-background-color); font-size:14px;
-  }
-  .chip ha-icon { width:18px; height:18px; color:var(--primary-color); }
-  .chip-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .chip button { width:25px; height:25px; border:0; border-radius:50%; display:grid; place-items:center; padding:3px; cursor:pointer; color:var(--secondary-text-color); background:transparent; }
-  .chip button:hover { background:var(--divider-color); }
-  .chip button ha-icon { width:17px; height:17px; color:inherit; }
-  .add-target {
-    height:34px; padding:0 11px; border:0; border-radius:17px; display:flex; align-items:center; gap:6px;
-    cursor:pointer; color:var(--primary-color); background:transparent; font-weight:500;
-  }
-  .add-target:hover { background:var(--secondary-background-color); }
-  .add-target ha-icon { width:19px; height:19px; }
   .charts {
     position:relative; left:50%; width:calc(100vw - 32px); width:calc(100cqw - 32px);
     transform:translateX(-50%); display:grid; gap:16px;
@@ -242,11 +221,6 @@ export const panelStyles = `
   .dialog-close { width:40px; height:40px; padding:8px; display:grid; place-items:center; flex:0 0 auto; border:0; border-radius:50%; cursor:pointer; color:var(--primary-text-color); background:transparent; }
   .dialog-close:hover { color:var(--primary-text-color); background:var(--secondary-background-color); }
   .dialog-close ha-icon { width:22px; height:22px; }
-  .tabs { height:48px; padding:0 16px; display:flex; gap:2px; border-bottom:1px solid var(--divider-color); }
-  .tab { padding:0 18px; border:0; border-bottom:2px solid transparent; cursor:pointer; color:var(--secondary-text-color); background:transparent; }
-  .tab.active { color:var(--primary-color); border-bottom-color:var(--primary-color); }
-  .search-wrap { padding:14px 18px; }
-  .search { width:100%; height:44px; padding:0 14px; color:var(--primary-text-color); background:var(--secondary-background-color); border:1px solid var(--divider-color); border-radius:8px; }
   .target-list { flex:1; min-height:0; overflow:auto; padding:0 10px 10px; }
   .target-row { min-height:52px; padding:6px 10px; display:grid; grid-template-columns:28px 34px minmax(0,1fr); align-items:center; gap:8px; border-radius:8px; cursor:pointer; }
   .target-row:hover { background:var(--secondary-background-color); }
@@ -254,7 +228,6 @@ export const panelStyles = `
   .target-row ha-icon { color:var(--state-icon-color,var(--secondary-text-color)); }
   .row-name { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
   .row-secondary { display:block; margin-top:2px; color:var(--secondary-text-color); font-size:12px; }
-  .no-results { padding:28px; color:var(--secondary-text-color); text-align:center; }
   .dialog-actions { min-height:64px; padding:10px 18px; display:flex; align-items:center; justify-content:flex-end; gap:8px; border-top:1px solid var(--divider-color); }
   .dialog-actions button { min-width:84px; height:40px; padding:0 14px; border:0; border-radius:8px; cursor:pointer; color:var(--primary-color); background:transparent; font-weight:500; }
   .dialog-actions button.primary { color:var(--text-primary-color,white); background:var(--primary-color); }
@@ -291,7 +264,6 @@ export const panelStyles = `
     .filters { flex-direction:column; gap:8px; }
     .axis-target-group.axis-target-compact { flex:1 1 auto; width:100%; }
     .axis-target-divider { width:100%; height:1px; margin:0; }
-    .target-picker { width:100%; min-width:0; }
   }
   @media (max-width:768px) {
     .desktop-panel-only, .panel-tabs-shell { display:none !important; }
@@ -311,7 +283,5 @@ export const panelStyles = `
     .dialog { height:100%; border-radius:0; }
     .backdrop { padding:0; }
     .dialog-title { padding:0 14px 0 12px; }
-    .tab { flex:1; padding:0 4px; }
-    .chip { max-width:230px; }
   }
 `;
