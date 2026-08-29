@@ -190,8 +190,51 @@ export class TargetPickerMethods {
       if (areaName) entityAreas.set(entity.entity_id, areaName);
     }
 
+    // Home Assistant's target picker builds its entity list from hass.states.
+    // An enabled registry entity can temporarily have no state while its
+    // integration/device is unavailable, which otherwise makes an existing
+    // selection disappear from the picker completely. Give the picker only a
+    // synthetic unavailable state; the graph continues to use the real hass.
+    const pickerStates = { ...hass.states };
+    const now = new Date().toISOString();
+    const addUnavailablePickerState = (entityId, registry = null) => {
+      if (pickerStates[entityId]) return;
+      const objectName = entityId
+        .split(".")
+        .pop()
+        .replaceAll("_", " ");
+      pickerStates[entityId] = {
+        entity_id: entityId,
+        state: "unavailable",
+        attributes: {
+          friendly_name: registry?.name || registry?.original_name || objectName,
+          ...(registry?.icon ? { icon: registry.icon } : {}),
+        },
+        context: { id: null, parent_id: null, user_id: null },
+        last_changed: now,
+        last_updated: now,
+      };
+    };
+    for (const entity of this._entities) {
+      if (
+        pickerStates[entity.entity_id]
+        || entity.disabled_by
+        || (!this.config.include_hidden && entity.hidden_by)
+      ) continue;
+      addUnavailablePickerState(entity.entity_id, entity);
+    }
+    // Renamed or removed entities no longer have either a state or registry
+    // entry. Preserve IDs saved in either axis so older HA picker versions do
+    // not silently discard their chips during validation.
+    for (const entityId of [
+      ...(this._targets?.entity_id || []),
+      ...(this._y2Targets?.entity_id || []),
+    ]) {
+      addUnavailablePickerState(entityId);
+    }
+
     const displayStateCache = new Map();
-    const states = new Proxy(hass.states, {
+    const states = new Proxy(pickerStates, {
       get(target, property, receiver) {
         const state = Reflect.get(target, property, receiver);
         if (typeof property !== "string" || !state) return state;
@@ -288,16 +331,20 @@ export class TargetPickerMethods {
             : "";
         }
       }
+      const entityIds = new Set(targets.entity_id || []);
       const chips = [
         ...picker.shadowRoot.querySelectorAll("ha-target-picker-value-chip"),
       ];
-      const entityIds = new Set(targets.entity_id || []);
       picker.shadowRoot
         .querySelectorAll("[data-advanced-history-series]")
         .forEach((button) => button.remove());
       chips.forEach((chip) => {
         const kind = `${chip.type}_id`;
         const hidden = Boolean(hiddenTargets[kind]?.includes(chip.itemId));
+        const unavailable = kind === "entity_id" && (
+          !this._hass.states[chip.itemId]
+          || this._hass.states[chip.itemId].state === "unavailable"
+        );
         const name = kind === "area_id"
           ? this._areaName(chip.itemId)
           : kind === "device_id"
@@ -309,18 +356,25 @@ export class TargetPickerMethods {
         chip.setAttribute("role", "button");
         chip.setAttribute("aria-pressed", hidden ? "true" : "false");
         chip.setAttribute("title", this._customLocalize(hidden ? "show_target" : "hide_target", { target: name }));
-        if (secondary) {
-          const applyAxisColor = async () => {
-            await chip.updateComplete;
-            if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
-            const tag = chip.shadowRoot?.querySelector("wa-tag");
-            if (!tag) return;
-            const axisColor = "var(--primary-color)";
+        const applyAxisColor = async () => {
+          await chip.updateComplete;
+          if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
+          const tag = chip.shadowRoot?.querySelector("wa-tag");
+          if (!tag) return;
+          const axisColor = unavailable
+            ? "var(--state-unavailable-color, var(--error-color, #db4437))"
+            : secondary
+              ? "var(--primary-color)"
+              : null;
+          if (axisColor) {
             tag.style.borderColor = axisColor;
             tag.style.setProperty("--background-color", axisColor);
-          };
-          void applyAxisColor();
-        }
+          } else {
+            tag.style.removeProperty("border-color");
+            tag.style.removeProperty("--background-color");
+          }
+        };
+        void applyAxisColor();
         if (
           kind === "entity_id"
           && entityIds.has(chip.itemId)
