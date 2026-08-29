@@ -211,7 +211,7 @@ export class GraphMethods {
       host.innerHTML = `<div class="start"><ha-icon icon="mdi:chart-timeline-variant"></ha-icon><p>${this._escape(prompt)}</p></div>`;
       return;
     }
-    if (this._activeSnapshot?.single_graph) {
+    if (this._usesSingleGraph(series)) {
       const hasNumeric = series.some((item) => this._isNumeric(item));
       const cardOptions = this._cardOptions(hasNumeric ? "timeline" : "state_timeline");
       const mode = hasNumeric
@@ -1168,6 +1168,13 @@ export class GraphMethods {
     };
   }
 
+  _usesSingleGraph(series) {
+    if (!this._activeSnapshot?.single_graph) return false;
+    const hasNumeric = series.some((item) => this._isNumeric(item));
+    const hasState = series.some((item) => !this._isNumeric(item));
+    return !(hasNumeric && hasState);
+  }
+
   _nativeHistorySeries(entity) {
     const state = this._hass.states[entity];
     return nativeHistoryAttributes(entity, state).map((attribute) => ({
@@ -1463,7 +1470,7 @@ export class GraphMethods {
     const numeric = series.filter((item) => this._isNumeric(item));
     const editorEntities = Array.isArray(scopedSeries)
       ? scopedSeries
-      : this._activeSnapshot?.single_graph
+      : this._usesSingleGraph(series)
         ? series
         : (numeric.length ? numeric : series);
     const editorHasNumeric = editorEntities.some((item) => this._isNumeric(item));
@@ -1594,7 +1601,7 @@ export class GraphMethods {
       .filter((item) => item.entity);
     const editorHasNumeric = editorSeries.some((item) => this._isNumeric(item));
     const allSeries = this._seriesDescriptors(this._resolvedEntityIds());
-    const hasMultipleCharts = !this._activeSnapshot?.single_graph
+    const hasMultipleCharts = !this._usesSingleGraph(allSeries)
       && allSeries.some((item) => this._isNumeric(item))
       && allSeries.some((item) => !this._isNumeric(item));
     const automaticHeader = hasMultipleCharts
@@ -1880,7 +1887,7 @@ export class GraphMethods {
     const allSeries = this._seriesDescriptors(this._resolvedEntityIds());
     const numeric = allSeries.filter((item) => this._isNumeric(item));
     const states = allSeries.filter((item) => !this._isNumeric(item));
-    const combinedEditor = !this._activeSnapshot?.single_graph && numeric.length && states.length;
+    const combinedEditor = !this._usesSingleGraph(allSeries) && numeric.length && states.length;
     const entries = combinedEditor
       ? [
         {
