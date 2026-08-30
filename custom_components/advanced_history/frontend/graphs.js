@@ -583,13 +583,39 @@ export class GraphMethods {
           || palette[index % palette.length];
       }
     });
-    const comparedEntities = entities.filter((configured) => Array.isArray(configured.compare));
-    const soleComparedEntity = comparedEntities.length === 1
-      && (series.length === 1 || this._excludeY2Comparison)
-      ? comparedEntities[0]
-      : null;
+    const enabledEntities = entities.filter((configured) => configured.enabled !== false);
+    // Prefer a sole compared Y1 series for the comparison palette. Y2 keeps
+    // its entity colour in a dual-axis chart, but becomes the palette owner
+    // when every Y1 series is hidden and it is the sole visible Y2 series.
+    const enabledPrimaryEntities = enabledEntities.filter(
+      (configured) => (configured.y_axis || "primary") === "primary"
+    );
+    const enabledSecondaryEntities = enabledEntities.filter(
+      (configured) => configured.y_axis === "secondary"
+    );
+    const soleComparedEntity = (
+      enabledPrimaryEntities.length === 1
+      && Array.isArray(enabledPrimaryEntities[0].compare)
+    )
+      ? enabledPrimaryEntities[0]
+      : enabledPrimaryEntities.length === 0
+        && enabledSecondaryEntities.length === 1
+        && Array.isArray(enabledSecondaryEntities[0].compare)
+        ? enabledSecondaryEntities[0]
+        : null;
     if (soleComparedEntity) {
-      this._colorAutomaticComparisons(soleComparedEntity, palette, usedColors);
+      const comparisonUsedColors = new Set(
+        enabledEntities.map((configured) => graphColorKey(configured.color)).filter(Boolean)
+      );
+      for (const comparison of graphComparisonRows(soleComparedEntity)) {
+        const key = graphColorKey(comparison?.color);
+        if (key) comparisonUsedColors.add(key);
+      }
+      this._colorAutomaticComparisons(
+        soleComparedEntity,
+        palette,
+        comparisonUsedColors,
+      );
     }
     const hasSecondaryAxis = mode !== "state_timeline"
       && entities.some((entity) => entity.y_axis === "secondary");
