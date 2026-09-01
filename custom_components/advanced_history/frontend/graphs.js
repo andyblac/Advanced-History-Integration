@@ -968,6 +968,38 @@ export class GraphMethods {
       const windowStart = Number(args[3]);
       const windowEnd = Number(args[4]);
       const offsetHours = Number(entity?.offset);
+      const now = Date.now();
+      const currentWindowExtendsIntoFuture = (
+        Number.isFinite(windowStart)
+        && Number.isFinite(windowEnd)
+        && windowStart <= now
+        && now < windowEnd
+      );
+
+      if (
+        card?._config?.chart_mode === "timeline"
+        && card?._config?.stacked === true
+        && entity?._compareOf == null
+        && (!Number.isFinite(offsetHours) || offsetHours === 0)
+        && currentWindowExtendsIntoFuture
+        && Array.isArray(result?.points)
+      ) {
+        // TODO: Remove this compatibility workaround once Statistics Graph
+        // Chart Card fixes stacked live endpoints in future-visible periods.
+        // Live states arrive at slightly different times for each entity. If
+        // the visible window continues into the future, stacked fills expose
+        // those different endpoints as diagonal wedges. Carry every current
+        // series to the same minute boundary so the stack ends vertically,
+        // while the remainder of the requested future axis stays empty.
+        const cutoff = Math.floor(now / 60_000) * 60_000;
+        const currentPoints = result.points.filter((point) => point?.t <= now);
+        const lastPoint = currentPoints.at(-1);
+        const points = currentPoints.filter((point) => point?.t < cutoff);
+        if (lastPoint?.v != null) {
+          points.push({ ...lastPoint, t: cutoff });
+        }
+        result = { ...result, points };
+      }
 
       if (
         card?._config?.chart_mode === "state_timeline"
@@ -976,7 +1008,6 @@ export class GraphMethods {
         && Number.isFinite(windowStart)
         && Number.isFinite(windowEnd)
       ) {
-        const now = Date.now();
         if (windowStart <= now && now < windowEnd && Array.isArray(result?.points)) {
           const points = result.points.filter((point) => point?.t <= now);
           const lastPoint = points.at(-1);
