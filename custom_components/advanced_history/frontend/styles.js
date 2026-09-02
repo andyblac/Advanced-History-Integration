@@ -59,7 +59,7 @@ export const panelStyles = `
   .panel-tab-close { position:absolute; z-index:2; top:0; right:0; bottom:0; width:30px; padding:0; display:flex; align-items:center; justify-content:center; }
   .panel-tab-close:hover, .panel-tab-select:hover { background:transparent; }
   .panel-tab-close ha-icon { display:block; width:18px; height:18px; line-height:0; --mdc-icon-size:18px; }
-  .content { max-width:1400px; margin:auto; padding:0 16px 104px; }
+  .content { max-width:1400px; margin:auto; padding:0 16px calc(72px + max(12px,env(safe-area-inset-bottom))); }
   .filters { display:flex; align-items:stretch; gap:12px; margin-top:var(--ha-space-2,8px); margin-bottom:16px; }
   .axis-target-group { flex:1 1 0; min-width:0; }
   .axis-target-group.axis-target-compact { flex:0 1 190px; }
@@ -272,7 +272,7 @@ export const panelStyles = `
     .axis-target-primary { flex:1 1 auto; width:100%; }
   }
   @media (max-width:600px) {
-    .content { padding:0 12px 96px; }
+    .content { padding:0 12px calc(72px + max(8px,env(safe-area-inset-bottom))); }
     .detail-banner { align-items:flex-start; flex-wrap:wrap; }
     .detail-banner span { flex:1 1 calc(100% - 84px); }
     .detail-banner ha-button { margin-inline-start:36px; }
