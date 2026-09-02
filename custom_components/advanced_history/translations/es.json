@@ -65,7 +65,7 @@
         "data_description": {
           "replace_more_info_history": "Sustituye el gráfico de Historial nativo de los diálogos de entidad por Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Muestra el selector de fechas integrado de Statistics Graph Chart Card en los diálogos de entidad.",
-          "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
+          "redirect_show_more": "Abre el enlace Mostrar más de la sección Historial de los diálogos de entidad en Advanced History como un panel nuevo y conserva las pestañas de panel existentes.",
           "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
           "numeric_card_options": "Valores predeterminados usados solo por gráficos numéricos. Abre el editor visual o edita el código directamente.",
           "state_card_options": "Valores predeterminados usados solo por gráficos de línea temporal de estados. Abre el editor visual o edita el código directamente.",
@@ -87,7 +87,7 @@
         "data_description": {
           "replace_more_info_history": "Sustituye el gráfico de Historial nativo de los diálogos de entidad por Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Muestra el selector de fechas integrado de Statistics Graph Chart Card en los diálogos de entidad.",
-          "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
+          "redirect_show_more": "Abre el enlace Mostrar más de la sección Historial de los diálogos de entidad en Advanced History como un panel nuevo y conserva las pestañas de panel existentes.",
           "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
           "numeric_card_options": "Valores predeterminados usados solo por gráficos numéricos. Abre el editor visual o edita el código directamente.",
           "state_card_options": "Valores predeterminados usados solo por gráficos de línea temporal de estados. Abre el editor visual o edita el código directamente.",
@@ -124,7 +124,7 @@
         "data_description": {
           "large_range_automatic_detail": "Establece el escalado automático de puntos predeterminado para los gráficos numéricos; las opciones del gráfico pueden anularlo. Para intervalos amplios, también ofrece detalle fino en el panel Historial.",
           "large_range_detail_threshold_days": "Usa el detalle automático cuando el intervalo seleccionado tenga al menos este número de días.",
-          "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
+          "redirect_show_more": "Abre el enlace Mostrar más de la sección Historial de los diálogos de entidad en Advanced History como un panel nuevo y conserva las pestañas de panel existentes.",
           "replace_more_info_history": "Sustituye el gráfico de Historial nativo de los diálogos de entidad por Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Muestra el selector de fechas integrado de Statistics Graph Chart Card en los diálogos de entidad.",
           "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
@@ -147,7 +147,7 @@
         "data_description": {
           "replace_more_info_history": "Sustituye el gráfico de Historial nativo de los diálogos de entidad por Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Muestra el selector de fechas integrado de Statistics Graph Chart Card en los diálogos de entidad.",
-          "redirect_show_more": "Redirige el enlace Mostrar más de la sección Historial de los diálogos de entidad a Advanced History y sustituye todos los objetivos existentes por esa entidad.",
+          "redirect_show_more": "Abre el enlace Mostrar más de la sección Historial de los diálogos de entidad en Advanced History como un panel nuevo y conserva las pestañas de panel existentes.",
           "card_module_url": "Déjalo vacío para detectar automáticamente el recurso HACS de Statistics Graph Chart Card.",
           "numeric_card_options": "Valores predeterminados usados solo por gráficos numéricos. Abre el editor visual o edita el código directamente.",
           "state_card_options": "Valores predeterminados usados solo por gráficos de línea temporal de estados. Abre el editor visual o edita el código directamente.",

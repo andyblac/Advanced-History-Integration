@@ -10,8 +10,11 @@ export class TargetPickerMethods {
       || Boolean(this._loadedBookmarkId || this._loadedExternalBookmark);
   }
 
-  async _loadNativeHistoryPicker() {
-    if (customElements.get("ha-target-picker")) return;
+  async _loadNativeHistoryPicker(requireHistoryPanel = false) {
+    if (
+      customElements.get("ha-target-picker")
+      && (!requireHistoryPanel || customElements.get("ha-panel-history"))
+    ) return;
 
     let node = this;
     let resolver = null;
@@ -81,6 +84,7 @@ export class TargetPickerMethods {
 
     await historyRoute.load();
     await customElements.whenDefined("ha-target-picker");
+    if (requireHistoryPanel) await customElements.whenDefined("ha-panel-history");
   }
 
   async _renderNativeTargetPicker(axis = "primary") {
@@ -186,8 +190,51 @@ export class TargetPickerMethods {
       if (areaName) entityAreas.set(entity.entity_id, areaName);
     }
 
+    // Home Assistant's target picker builds its entity list from hass.states.
+    // An enabled registry entity can temporarily have no state while its
+    // integration/device is unavailable, which otherwise makes an existing
+    // selection disappear from the picker completely. Give the picker only a
+    // synthetic unavailable state; the graph continues to use the real hass.
+    const pickerStates = { ...hass.states };
+    const now = new Date().toISOString();
+    const addUnavailablePickerState = (entityId, registry = null) => {
+      if (pickerStates[entityId]) return;
+      const objectName = entityId
+        .split(".")
+        .pop()
+        .replaceAll("_", " ");
+      pickerStates[entityId] = {
+        entity_id: entityId,
+        state: "unavailable",
+        attributes: {
+          friendly_name: registry?.name || registry?.original_name || objectName,
+          ...(registry?.icon ? { icon: registry.icon } : {}),
+        },
+        context: { id: null, parent_id: null, user_id: null },
+        last_changed: now,
+        last_updated: now,
+      };
+    };
+    for (const entity of this._entities) {
+      if (
+        pickerStates[entity.entity_id]
+        || entity.disabled_by
+        || (!this.config.include_hidden && entity.hidden_by)
+      ) continue;
+      addUnavailablePickerState(entity.entity_id, entity);
+    }
+    // Renamed or removed entities no longer have either a state or registry
+    // entry. Preserve IDs saved in either axis so older HA picker versions do
+    // not silently discard their chips during validation.
+    for (const entityId of [
+      ...(this._targets?.entity_id || []),
+      ...(this._y2Targets?.entity_id || []),
+    ]) {
+      addUnavailablePickerState(entityId);
+    }
+
     const displayStateCache = new Map();
-    const states = new Proxy(hass.states, {
+    const states = new Proxy(pickerStates, {
       get(target, property, receiver) {
         const state = Reflect.get(target, property, receiver);
         if (typeof property !== "string" || !state) return state;
@@ -284,16 +331,20 @@ export class TargetPickerMethods {
             : "";
         }
       }
+      const entityIds = new Set(targets.entity_id || []);
       const chips = [
         ...picker.shadowRoot.querySelectorAll("ha-target-picker-value-chip"),
       ];
-      const entityIds = new Set(targets.entity_id || []);
       picker.shadowRoot
         .querySelectorAll("[data-advanced-history-series]")
         .forEach((button) => button.remove());
       chips.forEach((chip) => {
         const kind = `${chip.type}_id`;
         const hidden = Boolean(hiddenTargets[kind]?.includes(chip.itemId));
+        const unavailable = kind === "entity_id" && (
+          !this._hass.states[chip.itemId]
+          || this._hass.states[chip.itemId].state === "unavailable"
+        );
         const name = kind === "area_id"
           ? this._areaName(chip.itemId)
           : kind === "device_id"
@@ -305,18 +356,25 @@ export class TargetPickerMethods {
         chip.setAttribute("role", "button");
         chip.setAttribute("aria-pressed", hidden ? "true" : "false");
         chip.setAttribute("title", this._customLocalize(hidden ? "show_target" : "hide_target", { target: name }));
-        if (secondary) {
-          const applyAxisColor = async () => {
-            await chip.updateComplete;
-            if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
-            const tag = chip.shadowRoot?.querySelector("wa-tag");
-            if (!tag) return;
-            const axisColor = "var(--primary-color)";
+        const applyAxisColor = async () => {
+          await chip.updateComplete;
+          if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
+          const tag = chip.shadowRoot?.querySelector("wa-tag");
+          if (!tag) return;
+          const axisColor = unavailable
+            ? "var(--state-unavailable-color, var(--error-color, #db4437))"
+            : secondary
+              ? "var(--primary-color)"
+              : null;
+          if (axisColor) {
             tag.style.borderColor = axisColor;
             tag.style.setProperty("--background-color", axisColor);
-          };
-          void applyAxisColor();
-        }
+          } else {
+            tag.style.removeProperty("border-color");
+            tag.style.removeProperty("--background-color");
+          }
+        };
+        void applyAxisColor();
         if (
           kind === "entity_id"
           && entityIds.has(chip.itemId)
@@ -682,103 +740,6 @@ export class TargetPickerMethods {
     return available;
   }
 
-  _openTargetDialog() {
-    if (this.shadowRoot.querySelector(".backdrop")) return;
-    this._draftTargets = structuredClone(this._targets);
-    this._dialogSearch = "";
-    this._activeTab = "area_id";
-    this._renderDialog();
-  }
-
-  _renderDialog() {
-    this.shadowRoot.querySelector(".backdrop")?.remove();
-    const addTarget = this._localize("ui.components.target-picker.add_target", "Add target");
-    const cancel = this._localize("ui.common.cancel", "Cancel");
-    const apply = this._localize("ui.common.apply", "Apply");
-    const close = this._localize("ui.common.close", "Close");
-    const targetTypes = {
-      area_id: this._localize("ui.components.target-picker.type.areas", "Areas"),
-      device_id: this._localize("ui.components.target-picker.type.devices", "Devices"),
-      entity_id: this._localize("ui.components.target-picker.type.entities", "Entities"),
-    };
-    const backdrop = document.createElement("div");
-    backdrop.className = "backdrop";
-    backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${this._escape(addTarget)}">
-      <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${this._escape(addTarget)}</h2><span class="count">${this._escape(this._localize("ui.panel.config.entities.picker.selected", `${this._targetCount(this._draftTargets)} selected`, { number: this._targetCount(this._draftTargets) }))}</span></header>
-      <nav class="tabs">${Object.entries(targetTypes).map(([key,label]) => `<button class="tab ${key === this._activeTab ? "active" : ""}" data-tab="${key}">${this._escape(label)}</button>`).join("")}</nav>
-      <div class="search-wrap"><input class="search" type="search" placeholder="${this._escape(this._localize("ui.common.search", "Search"))}" value="${this._escape(this._dialogSearch)}"></div>
-      <div class="target-list">${this._dialogRows()}</div>
-      <footer class="dialog-actions"><button data-action="cancel">${this._escape(cancel)}</button><button class="primary" data-action="apply">${this._escape(apply)}</button></footer>
-    </section>`;
-    backdrop.addEventListener("click", (event) => { if (event.target === backdrop) backdrop.remove(); });
-    backdrop.querySelectorAll("[data-tab]").forEach((tab) => tab.addEventListener("click", () => { this._activeTab = tab.dataset.tab; this._dialogSearch = ""; this._renderDialog(); }));
-    const search = backdrop.querySelector(".search");
-    search.addEventListener("input", () => { this._dialogSearch = search.value; backdrop.querySelector(".target-list").innerHTML = this._dialogRows(); this._bindDialogRows(backdrop); });
-    backdrop.querySelector('[data-action="cancel"]').addEventListener("click", () => backdrop.remove());
-    backdrop.querySelector('[data-action="close-dialog"]').addEventListener("click", () => backdrop.remove());
-    backdrop.querySelector('[data-action="apply"]').addEventListener("click", () => {
-      const nextTargets = this._normalizeTargets(this._draftTargets);
-      const clearedAll = Boolean(
-        this._targetCount(this._targets) && !this._targetCount(nextTargets)
-      );
-      if (clearedAll) {
-        backdrop.remove();
-        this._requestClearCurrentChart();
-        return;
-      }
-      this._targets = nextTargets;
-      this._pruneHiddenTargets();
-      this._saveTargets();
-      this._recordChange(null, true);
-      this._notice = "";
-      backdrop.remove();
-      this._render();
-    });
-    this.shadowRoot.append(backdrop);
-    this._bindDialogRows(backdrop);
-    search.focus();
-  }
-
-  _dialogRows() {
-    const search = this._dialogSearch.trim().toLocaleLowerCase();
-    let rows;
-    if (this._activeTab === "area_id") rows = this._areas.map((area) => ({ id: area.area_id, name: area.name, secondary: this._localize("ui.components.target-picker.type.area", "Area"), icon: "mdi:texture-box" }));
-    else if (this._activeTab === "device_id") rows = this._devices.map((device) => ({ id: device.id, name: device.name_by_user || device.name || device.id, secondary: this._areaName(device.area_id), icon: "mdi:devices" }));
-    else rows = this._entities.filter((entity) => !entity.disabled_by && (this.config.include_hidden || !entity.hidden_by)).map((entity) => ({
-      id: entity.entity_id, name: this._entityName(entity.entity_id), secondary: entity.entity_id,
-      icon: this._hass.states[entity.entity_id]?.attributes?.icon || "mdi:checkbox-blank-circle-outline",
-    }));
-    rows = rows.filter((row) => !search || `${row.name} ${row.secondary}`.toLocaleLowerCase().includes(search)).sort((a,b) => a.name.localeCompare(b.name, this._hass.locale?.language));
-    if (!rows.length) return `<div class="no-results">${this._escape(this._localize("ui.components.combo-box.no_match", "No matching items found"))}</div>`;
-    return rows.map((row) => `<label class="target-row"><input type="checkbox" data-target-id="${this._escape(row.id)}" ${this._draftTargets[this._activeTab].includes(row.id) ? "checked" : ""}><ha-icon icon="${this._escape(row.icon)}"></ha-icon><span class="row-name">${this._escape(row.name)}<span class="row-secondary">${this._escape(row.secondary || "")}</span></span></label>`).join("");
-  }
-
-  _bindDialogRows(backdrop) {
-    backdrop.querySelectorAll("[data-target-id]").forEach((checkbox) => checkbox.addEventListener("change", () => {
-      const list = this._draftTargets[this._activeTab];
-      if (checkbox.checked && !list.includes(checkbox.dataset.targetId)) list.push(checkbox.dataset.targetId);
-      if (!checkbox.checked) this._draftTargets[this._activeTab] = list.filter((id) => id !== checkbox.dataset.targetId);
-      const selected = this._targetCount(this._draftTargets);
-      backdrop.querySelector(".dialog-title .count").textContent = this._localize(
-        "ui.panel.config.entities.picker.selected",
-        `${selected} selected`,
-        { number: selected }
-      );
-    }));
-  }
-
-  _removeTarget(kind, id) {
-    if (this._targetCount() === 1) {
-      this._requestClearCurrentChart();
-      return;
-    }
-    this._targets[kind] = this._targets[kind].filter((value) => value !== id);
-    this._pruneHiddenTargets();
-    this._saveTargets();
-    this._recordChange(null, true);
-    this._notice = "";
-    this._render();
-  }
   _areaName(id) { return this._areas.find((area) => area.area_id === id)?.name || id || this._localize("ui.components.device-picker.no_area", "No area"); }
   _deviceName(id) { const device = this._devices.find((item) => item.id === id); return device?.name_by_user || device?.name || id; }
   _entityName(id) { const state = this._hass.states[id]; const registry = this._entities.find((item) => item.entity_id === id); return registry?.name || state?.attributes?.friendly_name || id; }

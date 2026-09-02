@@ -31,7 +31,9 @@ const MORE_INFO_PICKER_BUTTON_CLASS = "advanced-history-more-info-picker-button"
 const MORE_INFO_EDITOR_LINK_CLASS = "advanced-history-more-info-editor-link";
 const MORE_INFO_EDITOR_ACTIONS_CLASS = "advanced-history-more-info-editor-actions";
 const MORE_INFO_EDITOR_RESIZE_OBSERVER = "__advancedHistoryMoreInfoEditorResizeObserver";
-const MORE_INFO_DATE_SYNC_HANDLER = "__advancedHistoryMoreInfoDateSyncHandler";
+// Keep the legacy property name so a hot reload can clean up handlers installed
+// before interval-picker synchronization was added.
+const MORE_INFO_PICKER_SYNC_HANDLER = "__advancedHistoryMoreInfoDateSyncHandler";
 const MORE_INFO_STATE_COLOR_REFRESH = "__advancedHistoryMoreInfoStateColorRefresh";
 const MORE_INFO_CONFIG_TYPE = "advanced_history/more_info/config";
 const MORE_INFO_ENTITY_CONFIG_SET_TYPE = "advanced_history/more_info/entity_config/set";
@@ -410,8 +412,11 @@ function applyPickerMode(historyView, config, preferredMode = null) {
   if (mode === "date") {
     resolved.date_picker_group = config.date_picker_group
       || `advanced-history-more-info:${historyView.entityId}`;
+    delete resolved.interval_picker_group;
   } else {
     delete resolved.date_picker_group;
+    resolved.interval_picker_group = config.interval_picker_group
+      || `advanced-history-more-info-interval:${historyView.entityId}`;
   }
   return resolved;
 }
@@ -527,22 +532,43 @@ function setMoreInfoLogbookTime(historyView, time) {
   return true;
 }
 
-function removeMoreInfoDateSync(historyView, resetLogbook = false) {
-  const installed = historyView[MORE_INFO_DATE_SYNC_HANDLER];
+function copyLogbookTime(time) {
+  if (!time || typeof time !== "object") return null;
+  if ("recent" in time) return { recent: time.recent };
+  if (!Array.isArray(time.range)) return null;
+  return {
+    range: time.range.map((value) => (
+      value instanceof Date ? new Date(value.getTime()) : new Date(value)
+    )),
+  };
+}
+
+function removeMoreInfoPickerSync(historyView, resetLogbook = false) {
+  const installed = historyView[MORE_INFO_PICKER_SYNC_HANDLER];
+  // Clean up the single date handler installed by releases before interval
+  // synchronization was supported as well.
   if (installed?.handler) {
     window.removeEventListener("sgc-datepicker-sync", installed.handler);
+  }
+  for (const [eventName, handler] of installed?.handlers || []) {
+    window.removeEventListener(eventName, handler);
   }
   if (installed?.interactionHandler && installed.card) {
     installed.card.removeEventListener("click", installed.interactionHandler, true);
     installed.card.removeEventListener("change", installed.interactionHandler, true);
   }
   if (installed?.timer) clearTimeout(installed.timer);
-  historyView[MORE_INFO_DATE_SYNC_HANDLER] = null;
-  if (resetLogbook) setMoreInfoLogbookTime(historyView, { recent: 86400 });
+  historyView[MORE_INFO_PICKER_SYNC_HANDLER] = null;
+  if (resetLogbook && installed) {
+    setMoreInfoLogbookTime(
+      historyView,
+      installed.originalLogbookTime || { recent: 86400 },
+    );
+  }
 }
 
-function syncMoreInfoLogbookRange(historyView, card) {
-  const range = card?._computeDatePickerWindow?.(false);
+function syncMoreInfoLogbookRange(historyView, card, requestedRange = null) {
+  const range = requestedRange || card?._computeDatePickerWindow?.(false);
   const start = range?.start instanceof Date ? range.start : new Date(range?.start);
   const end = range?.end instanceof Date ? range.end : new Date(range?.end);
   if (
@@ -554,53 +580,116 @@ function syncMoreInfoLogbookRange(historyView, card) {
   setMoreInfoLogbookTime(historyView, { range: [start, end] });
 }
 
-function scheduleMoreInfoLogbookRangeSync(historyView, card) {
-  const installed = historyView[MORE_INFO_DATE_SYNC_HANDLER];
+function intervalLogbookRange(hoursValue) {
+  const hours = Number(hoursValue);
+  if (!Number.isFinite(hours) || hours <= 0) return null;
+  const end = new Date();
+  return {
+    start: new Date(end.getTime() - hours * 60 * 60 * 1000),
+    end,
+  };
+}
+
+function intervalLogbookRangeFromCard(card) {
+  const selectedHours = card?.shadowRoot
+    ?.querySelector(".sgc-ip-btn.active[data-hours]")
+    ?.dataset?.hours;
+  return intervalLogbookRange(
+    selectedHours
+      ?? card?._overrideHoursToShow
+      ?? card?._config?.hours_to_show,
+  );
+}
+
+function intervalLogbookRangeFromInteraction(event) {
+  const button = event.composedPath?.().find((node) => (
+    node instanceof HTMLElement
+    && node.classList.contains("sgc-ip-btn")
+  ));
+  return intervalLogbookRange(button?.dataset?.hours);
+}
+
+function scheduleMoreInfoLogbookRangeSync(historyView, card, range = null) {
+  const installed = historyView[MORE_INFO_PICKER_SYNC_HANDLER];
   if (!installed || installed.card !== card) return;
+  if (range) installed.pendingRange = range;
   if (installed.timer) clearTimeout(installed.timer);
   installed.timer = setTimeout(() => {
     installed.timer = null;
     if (
-      historyView[MORE_INFO_DATE_SYNC_HANDLER] === installed
+      historyView[MORE_INFO_PICKER_SYNC_HANDLER] === installed
       && historyView.isConnected
       && card.isConnected
     ) {
-      syncMoreInfoLogbookRange(historyView, card);
+      const pendingRange = installed.pendingRange;
+      installed.pendingRange = null;
+      syncMoreInfoLogbookRange(historyView, card, pendingRange);
     }
   });
 }
 
-function installMoreInfoDateSync(historyView, card, config) {
-  const installed = historyView[MORE_INFO_DATE_SYNC_HANDLER];
+function installMoreInfoPickerSync(historyView, card, config) {
+  const dateGroup = config.show_date_picker ? config.date_picker_group : null;
+  const intervalGroup = config.show_interval_picker ? config.interval_picker_group : null;
+  const syncKey = `${dateGroup || ""}\u001f${intervalGroup || ""}`;
+  const installed = historyView[MORE_INFO_PICKER_SYNC_HANDLER];
   if (
     installed?.card === card
-    && installed.group === config.date_picker_group
+    && installed.syncKey === syncKey
   ) {
     return;
   }
-  removeMoreInfoDateSync(historyView);
-  if (!config.show_date_picker || !config.date_picker_group) return;
-  const handler = (event) => {
-    if (event.detail?.group !== config.date_picker_group) return;
-    scheduleMoreInfoLogbookRangeSync(historyView, card);
-  };
-  const interactionHandler = () => scheduleMoreInfoLogbookRangeSync(historyView, card);
-  historyView[MORE_INFO_DATE_SYNC_HANDLER] = {
+  const originalLogbookTime = installed?.originalLogbookTime
+    || copyLogbookTime(moreInfoLogbook(historyView)?._time)
+    || { recent: 86400 };
+  removeMoreInfoPickerSync(historyView);
+  if (!config.show_date_picker && !config.show_interval_picker) return;
+  const handlers = [];
+  for (const [eventName, group] of [
+    ["sgc-datepicker-sync", dateGroup],
+    ["sgc-interval-sync", intervalGroup],
+  ]) {
+    if (!group) continue;
+    const handler = (event) => {
+      if (event.detail?.group !== group) return;
+      scheduleMoreInfoLogbookRangeSync(
+        historyView,
+        card,
+        eventName === "sgc-interval-sync"
+          ? intervalLogbookRange(event.detail?.hours)
+            || intervalLogbookRangeFromCard(card)
+          : null,
+      );
+    };
+    window.addEventListener(eventName, handler);
+    handlers.push([eventName, handler]);
+  }
+  const interactionHandler = (event) => scheduleMoreInfoLogbookRangeSync(
+    historyView,
     card,
-    group: config.date_picker_group,
-    handler,
+    intervalLogbookRangeFromInteraction(event),
+  );
+  historyView[MORE_INFO_PICKER_SYNC_HANDLER] = {
+    card,
+    syncKey,
+    handlers,
     interactionHandler,
+    originalLogbookTime,
+    pendingRange: null,
     timer: null,
   };
-  window.addEventListener("sgc-datepicker-sync", handler);
   card.addEventListener("click", interactionHandler, true);
   card.addEventListener("change", interactionHandler, true);
-  scheduleMoreInfoLogbookRangeSync(historyView, card);
+  scheduleMoreInfoLogbookRangeSync(
+    historyView,
+    card,
+    intervalGroup ? intervalLogbookRangeFromCard(card) : null,
+  );
 }
 
 function restoreNativeChart(historyView) {
   const root = historyView.shadowRoot;
-  removeMoreInfoDateSync(historyView, true);
+  removeMoreInfoPickerSync(historyView, true);
   clearMoreInfoStateColorRefresh(historyView);
   historyView[MORE_INFO_EDITOR_RESIZE_OBSERVER]?.disconnect();
   historyView[MORE_INFO_EDITOR_RESIZE_OBSERVER] = null;
@@ -1127,7 +1216,7 @@ async function replaceMoreInfoChart(historyView) {
     host.dataset.activityStateColors = activityStateColorSignature;
     applyMoreInfoHostLayout(historyView, host);
     card.hass = historyView.hass;
-    installMoreInfoDateSync(historyView, card, config);
+    installMoreInfoPickerSync(historyView, card, config);
     nativeChart.style.display = "none";
     historyView.removeAttribute(MORE_INFO_REPLACING_ATTRIBUTE);
     observeMoreInfoEditorAlignment(historyView, host);
@@ -1169,7 +1258,7 @@ async function installMoreInfoReplacement() {
     return result;
   };
   prototype.disconnectedCallback = function (...args) {
-    removeMoreInfoDateSync(this);
+    removeMoreInfoPickerSync(this);
     clearMoreInfoStateColorRefresh(this);
     return originalDisconnected?.apply(this, args);
   };
@@ -1203,6 +1292,38 @@ function rewriteShowMoreLink(event) {
 
   const targetEntityId = entityId || nativeUrl.searchParams.get("entity_id");
   if (!targetEntityId) return;
+
+  const plainPrimaryClick = event.type === "click"
+    && event.button === 0
+    && !event.metaKey
+    && !event.ctrlKey
+    && !event.shiftKey
+    && !event.altKey;
+  if (plainPrimaryClick) {
+    const root = historyView.shadowRoot;
+    const cardConfig = root
+      ?.querySelector(`.${MORE_INFO_PICKER_BUTTON_CLASS}`)
+      ?.__advancedHistoryCardConfig
+      || root?.querySelector(`.${MORE_INFO_HOST_CLASS} ${CARD_TAG}`)?._config;
+    const openCard = window.advancedHistory?.openCard;
+    if (cardConfig && typeof openCard === "function") {
+      const state = historyView.hass?.states?.[targetEntityId];
+      const opened = openCard({
+        config: cardConfig,
+        newPanel: true,
+        panelName: state?.attributes?.friendly_name || targetEntityId,
+      });
+      if (opened) {
+        event.preventDefault();
+        event.stopPropagation();
+        historyView.dispatchEvent(new CustomEvent("close-dialog", {
+          bubbles: true,
+          composed: true,
+        }));
+        return;
+      }
+    }
+  }
 
   const target = new URL(PANEL_PATH, window.location.origin);
   target.searchParams.set("entity_id", targetEntityId);

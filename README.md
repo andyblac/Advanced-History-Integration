@@ -39,6 +39,7 @@ Advanced History brings those two ideas together: select targets as you would in
 - Display numeric history and state timelines.
 - Navigate dates and compare periods with native Energy controls.
 - Edit the current chart through the Statistics Graph Chart Card visual editor.
+- Add the current panel to any editable dashboard through Home Assistant's native dashboard and view picker.
 - Choose an entity's state, numeric attributes, and categorical attribute timelines from a per-target attribute selector, including multiple attributes from one entity.
 - Preserve selected attributes and their categorical value maps when a compatible card opens in Advanced History.
 - Size state-timeline graphs to their visible row count to avoid unused vertical space.
@@ -82,6 +83,18 @@ New installations create both services automatically. The More Info graph replac
 ### Existing installations from before 0.6.0
 
 After updating, open **Settings → Devices & services → Advanced History**, select **Add service**, and complete **Set up More-Info**. This creates the optional More Info graph replacement without changing the sidebar panel configuration.
+
+## Add the current panel to a dashboard
+
+Open a graph's three-dot menu and select **Add current panel to dashboard**. Home Assistant's native placement flow lets you choose an editable dashboard and view, previews the proposed cards, and applies the normal dashboard permissions. The action exports every graph in the active panel, regardless of which graph's menu opened it.
+
+Advanced History exports independent `custom:statistics-graph-chart-card` snapshots. The snapshot includes the panel's resolved entities and attributes, per-series options, colours, axes, comparisons, grouping, and graph settings. Numeric and state-history graphs are added together and share a new date-picker group so their card-native date pickers remain synchronized. Advanced History's Energy synchronization and panel-only layout values are not exported.
+
+When the panel contains deselected entities, they are exported with `enabled: false` by default so the dashboard card matches the panel. Enable **Hide entities on load** to export those rows with `enabled: true` and `auto_hide: true` instead. Existing legend settings are preserved.
+
+The resulting cards do not use Orbit Cards or link back to Advanced History, and remain editable with the Statistics Graph Chart Card visual editor. If the native placement flow cannot be opened, Advanced History displays copyable dashboard YAML instead.
+
+See [Add the current panel to a dashboard](docs/add-current-panel-to-dashboard.md) for the full export behaviour and fallback instructions.
 
 ## Documentation
 

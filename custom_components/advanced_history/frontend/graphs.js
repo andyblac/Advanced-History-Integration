@@ -14,6 +14,100 @@ import {
 
 const DATA_SOURCE_CACHE = new Map();
 const ENTITY_OPTION_REMOVALS = "__advanced_history_remove_options";
+const EXTENDED_ENTITY_COLORS = Object.freeze([
+  // The card's compact palette already covers red, blue, green, orange,
+  // purple and teal. Start its extension with a visibly separate colour so
+  // the first Y2/overflow series cannot look like the first Y1 series.
+  "#d4e157",
+  "#f06292",
+  "#7986cb",
+  "#4dd0e1",
+  "#ff8a65",
+  "#a1887f",
+  "#aed581",
+  "#9575cd",
+  "#ffd54f",
+  "#90a4ae",
+  "#4fc3f7",
+  "#fff176",
+]);
+
+function extendedEntityPalette(cardPalette, minimumSize = 0) {
+  const colors = [];
+  const seen = new Set();
+  for (const color of [
+    ...(Array.isArray(cardPalette) ? cardPalette : []),
+    ...EXTENDED_ENTITY_COLORS,
+  ]) {
+    if (typeof color !== "string") continue;
+    const key = color.trim().toLowerCase();
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    colors.push(color);
+  }
+  let generatedIndex = 0;
+  while (colors.length < minimumSize) {
+    const hue = Math.round((17 + generatedIndex * 137.508) % 360);
+    const lightness = generatedIndex % 2 ? 62 : 48;
+    const color = `hsl(${hue} 72% ${lightness}%)`;
+    generatedIndex += 1;
+    if (seen.has(color)) continue;
+    seen.add(color);
+    colors.push(color);
+  }
+  return colors;
+}
+
+function graphColorKey(color) {
+  return typeof color === "string" ? color.trim().toLowerCase() : "";
+}
+
+function graphComparisonRows(configured) {
+  const compare = configured?.compare;
+  if (Array.isArray(compare)) return compare;
+  return compare && typeof compare === "object" ? [compare] : [];
+}
+
+function graphColorRgb(color) {
+  const value = graphColorKey(color);
+  const shortHex = value.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
+  if (shortHex) {
+    return shortHex.slice(1).map((part) => Number.parseInt(part + part, 16));
+  }
+  const hex = value.match(/^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (hex) return hex.slice(1).map((part) => Number.parseInt(part, 16));
+  const rgb = value.match(
+    /^rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:\s*[,/]\s*[\d.]+%?)?\s*\)$/i,
+  );
+  return rgb ? rgb.slice(1).map((part) => Number(part)) : null;
+}
+
+function graphColorsAreSimilar(left, right) {
+  if (graphColorKey(left) === graphColorKey(right)) return true;
+  const leftRgb = graphColorRgb(left);
+  const rightRgb = graphColorRgb(right);
+  if (!leftRgb || !rightRgb) return false;
+  const redMean = (leftRgb[0] + rightRgb[0]) / 2;
+  const red = leftRgb[0] - rightRgb[0];
+  const green = leftRgb[1] - rightRgb[1];
+  const blue = leftRgb[2] - rightRgb[2];
+  const distance = Math.sqrt(
+    (2 + redMean / 256) * red * red
+    + 4 * green * green
+    + (2 + (255 - redMean) / 256) * blue * blue,
+  );
+  return distance < 110;
+}
+
+function graphColorIsUsed(color, usedColors) {
+  return [...usedColors].some((used) => graphColorsAreSimilar(color, used));
+}
+
+function nextUnusedGraphColor(palette, usedColors) {
+  const color = palette.find((candidate) => !graphColorIsUsed(candidate, usedColors));
+  if (color) usedColors.add(graphColorKey(color));
+  return color;
+}
 
 function historyTimestamp(value) {
   const numeric = Number(value);
@@ -117,7 +211,7 @@ export class GraphMethods {
       host.innerHTML = `<div class="start"><ha-icon icon="mdi:chart-timeline-variant"></ha-icon><p>${this._escape(prompt)}</p></div>`;
       return;
     }
-    if (this._activeSnapshot?.single_graph) {
+    if (this._usesSingleGraph(series)) {
       const hasNumeric = series.some((item) => this._isNumeric(item));
       const cardOptions = this._cardOptions(hasNumeric ? "timeline" : "state_timeline");
       const mode = hasNumeric
@@ -443,13 +537,38 @@ export class GraphMethods {
       delete cardOptions.chart_mode;
     }
     const resolvedCardOptions = this._resolvedDetailCardOptions(detail, cardOptions);
-    const palette = customElements.get(CARD_TAG)?.PALETTE;
     const entities = series.map((item) => this._entityCardConfig(
       item,
       mode,
       cardOptionsConfig,
     ));
-    const automaticEntityColors = entities.map((configured) => configured.color == null);
+    const palette = extendedEntityPalette(
+      customElements.get(CARD_TAG)?.PALETTE,
+      entities.length + entities.reduce(
+        (count, configured) => count + graphComparisonRows(configured).length,
+        0,
+      ),
+    );
+    const usedColors = new Set();
+    if (mode !== "state_timeline") {
+      // Older scoped editor sessions could persist the first palette colour
+      // independently for Y1 and Y2. Preserve the first resolved occurrence,
+      // then return later duplicates to automatic allocation.
+      entities.forEach((configured) => {
+        const key = graphColorKey(configured.color);
+        if (!key) return;
+        if (graphColorIsUsed(configured.color, usedColors)) delete configured.color;
+        else usedColors.add(key);
+      });
+      entities.forEach((configured) => {
+        for (const comparison of graphComparisonRows(configured)) {
+          const key = graphColorKey(comparison?.color);
+          if (!key) continue;
+          if (graphColorIsUsed(comparison.color, usedColors)) delete comparison.color;
+          else usedColors.add(key);
+        }
+      });
+    }
     entities.forEach((configured, index) => {
       // Keep automatically assigned colors stable when entities are toggled.
       // The card otherwise reindexes its palette after disabled entities are
@@ -460,41 +579,43 @@ export class GraphMethods {
         && Array.isArray(palette)
         && palette.length
       ) {
-        configured.color = palette[index % palette.length];
+        configured.color = nextUnusedGraphColor(palette, usedColors)
+          || palette[index % palette.length];
       }
     });
-    const comparedEntities = entities.filter((configured) => Array.isArray(configured.compare));
-    const soleComparedEntity = comparedEntities.length === 1
-      && (series.length === 1 || this._excludeY2Comparison)
-      ? comparedEntities[0]
-      : null;
+    const enabledEntities = entities.filter((configured) => configured.enabled !== false);
+    // Prefer a sole compared Y1 series for the comparison palette. Y2 keeps
+    // its entity colour in a dual-axis chart, but becomes the palette owner
+    // when every Y1 series is hidden and it is the sole visible Y2 series.
+    const enabledPrimaryEntities = enabledEntities.filter(
+      (configured) => (configured.y_axis || "primary") === "primary"
+    );
+    const enabledSecondaryEntities = enabledEntities.filter(
+      (configured) => configured.y_axis === "secondary"
+    );
+    const soleComparedEntity = (
+      enabledPrimaryEntities.length === 1
+      && Array.isArray(enabledPrimaryEntities[0].compare)
+    )
+      ? enabledPrimaryEntities[0]
+      : enabledPrimaryEntities.length === 0
+        && enabledSecondaryEntities.length === 1
+        && Array.isArray(enabledSecondaryEntities[0].compare)
+        ? enabledSecondaryEntities[0]
+        : null;
     if (soleComparedEntity) {
-      const comparedIndex = entities.indexOf(soleComparedEntity);
-      this._colorAutomaticComparisons(soleComparedEntity, palette, comparedIndex);
-
-      // When Y2 is excluded from comparison, keep the sole Y1 entity's
-      // single-entity comparison palette and place automatic Y2 colours after
-      // every colour already used by Y1 and its comparison periods.
-      if (
-        this._excludeY2Comparison
-        && Array.isArray(palette)
-        && palette.length
-      ) {
-        const usedColors = new Set([
-          soleComparedEntity.color,
-          ...soleComparedEntity.compare.map((comparison) => comparison?.color),
-        ].filter(Boolean));
-        entities.forEach((configured, index) => {
-          if (
-            configured.y_axis !== "secondary"
-            || !automaticEntityColors[index]
-            || Array.isArray(configured.compare)
-          ) return;
-          const available = palette.find((color) => !usedColors.has(color));
-          if (available) configured.color = available;
-          usedColors.add(configured.color);
-        });
+      const comparisonUsedColors = new Set(
+        enabledEntities.map((configured) => graphColorKey(configured.color)).filter(Boolean)
+      );
+      for (const comparison of graphComparisonRows(soleComparedEntity)) {
+        const key = graphColorKey(comparison?.color);
+        if (key) comparisonUsedColors.add(key);
       }
+      this._colorAutomaticComparisons(
+        soleComparedEntity,
+        palette,
+        comparisonUsedColors,
+      );
     }
     const hasSecondaryAxis = mode !== "state_timeline"
       && entities.some((entity) => entity.y_axis === "secondary");
@@ -847,6 +968,38 @@ export class GraphMethods {
       const windowStart = Number(args[3]);
       const windowEnd = Number(args[4]);
       const offsetHours = Number(entity?.offset);
+      const now = Date.now();
+      const currentWindowExtendsIntoFuture = (
+        Number.isFinite(windowStart)
+        && Number.isFinite(windowEnd)
+        && windowStart <= now
+        && now < windowEnd
+      );
+
+      if (
+        card?._config?.chart_mode === "timeline"
+        && card?._config?.stacked === true
+        && entity?._compareOf == null
+        && (!Number.isFinite(offsetHours) || offsetHours === 0)
+        && currentWindowExtendsIntoFuture
+        && Array.isArray(result?.points)
+      ) {
+        // TODO: Remove this compatibility workaround once Statistics Graph
+        // Chart Card fixes stacked live endpoints in future-visible periods.
+        // Live states arrive at slightly different times for each entity. If
+        // the visible window continues into the future, stacked fills expose
+        // those different endpoints as diagonal wedges. Carry every current
+        // series to the same minute boundary so the stack ends vertically,
+        // while the remainder of the requested future axis stays empty.
+        const cutoff = Math.floor(now / 60_000) * 60_000;
+        const currentPoints = result.points.filter((point) => point?.t <= now);
+        const lastPoint = currentPoints.at(-1);
+        const points = currentPoints.filter((point) => point?.t < cutoff);
+        if (lastPoint?.v != null) {
+          points.push({ ...lastPoint, t: cutoff });
+        }
+        result = { ...result, points };
+      }
 
       if (
         card?._config?.chart_mode === "state_timeline"
@@ -855,7 +1008,6 @@ export class GraphMethods {
         && Number.isFinite(windowStart)
         && Number.isFinite(windowEnd)
       ) {
-        const now = Date.now();
         if (windowStart <= now && now < windowEnd && Array.isArray(result?.points)) {
           const points = result.points.filter((point) => point?.t <= now);
           const lastPoint = points.at(-1);
@@ -1071,6 +1223,13 @@ export class GraphMethods {
       attribute,
       key: value?.key || this._seriesKey(entity, attribute),
     };
+  }
+
+  _usesSingleGraph(series) {
+    if (!this._activeSnapshot?.single_graph) return false;
+    const hasNumeric = series.some((item) => this._isNumeric(item));
+    const hasState = series.some((item) => !this._isNumeric(item));
+    return !(hasNumeric && hasState);
   }
 
   _nativeHistorySeries(entity) {
@@ -1300,7 +1459,7 @@ export class GraphMethods {
     return Array.isArray(compare) ? compare.map(withLayout) : withLayout(compare);
   }
 
-  _colorAutomaticComparisons(configured, palette, entityIndex = 0) {
+  _colorAutomaticComparisons(configured, palette, usedColors = new Set()) {
     if (
       !Array.isArray(this._energyCompare)
       || this._effectiveCompare() !== this._energyCompare
@@ -1308,11 +1467,13 @@ export class GraphMethods {
       || !Array.isArray(palette)
       || palette.length < 2
     ) return configured;
-    const configuredIndex = palette.indexOf(configured.color);
-    const baseIndex = configuredIndex >= 0 ? configuredIndex : entityIndex % palette.length;
     configured.compare = configured.compare.map((comparison, index) => (
       comparison && typeof comparison === "object" && comparison.color == null
-        ? { ...comparison, color: palette[(baseIndex + index + 1) % palette.length] }
+        ? {
+            ...comparison,
+            color: nextUnusedGraphColor(palette, usedColors)
+              || palette[index % palette.length],
+          }
         : comparison
     ));
     return configured;
@@ -1366,7 +1527,7 @@ export class GraphMethods {
     const numeric = series.filter((item) => this._isNumeric(item));
     const editorEntities = Array.isArray(scopedSeries)
       ? scopedSeries
-      : this._activeSnapshot?.single_graph
+      : this._usesSingleGraph(series)
         ? series
         : (numeric.length ? numeric : series);
     const editorHasNumeric = editorEntities.some((item) => this._isNumeric(item));
@@ -1377,7 +1538,10 @@ export class GraphMethods {
     const editorHeader = scopedHeader
       ?? this._customLocalize(editorHasNumeric ? "numeric_history" : "state_history");
     const cardOptions = this._cardOptions(editorMode, cardOptionsConfig);
-    const palette = customElements.get(CARD_TAG)?.PALETTE;
+    const palette = extendedEntityPalette(
+      customElements.get(CARD_TAG)?.PALETTE,
+      editorEntities.length,
+    );
     this._editorAutoColors = new Map();
     const entities = editorEntities.map((item, index) => {
       const entityConfig = this._entityCardConfig(
@@ -1494,7 +1658,7 @@ export class GraphMethods {
       .filter((item) => item.entity);
     const editorHasNumeric = editorSeries.some((item) => this._isNumeric(item));
     const allSeries = this._seriesDescriptors(this._resolvedEntityIds());
-    const hasMultipleCharts = !this._activeSnapshot?.single_graph
+    const hasMultipleCharts = !this._usesSingleGraph(allSeries)
       && allSeries.some((item) => this._isNumeric(item))
       && allSeries.some((item) => !this._isNumeric(item));
     const automaticHeader = hasMultipleCharts
@@ -1780,7 +1944,7 @@ export class GraphMethods {
     const allSeries = this._seriesDescriptors(this._resolvedEntityIds());
     const numeric = allSeries.filter((item) => this._isNumeric(item));
     const states = allSeries.filter((item) => !this._isNumeric(item));
-    const combinedEditor = !this._activeSnapshot?.single_graph && numeric.length && states.length;
+    const combinedEditor = !this._usesSingleGraph(allSeries) && numeric.length && states.length;
     const entries = combinedEditor
       ? [
         {

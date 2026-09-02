@@ -12,6 +12,10 @@ import { panelStyles as css } from "./styles.js";
 import { PanelTabsMethods } from "./panel-tabs.js";
 import { TargetPickerMethods } from "./target-picker.js";
 import { customLocalize, loadTranslations } from "./translations.js";
+import {
+  addCardsToDashboard,
+  dashboardCardSnapshots,
+} from "./panel-export.js";
 
 class AdvancedHistoryPanel extends HTMLElement {
   constructor() {
@@ -27,9 +31,6 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._excludeY2Comparison = false;
-    this._draftTargets = null;
-    this._activeTab = "area_id";
-    this._dialogSearch = "";
     this._loaded = false;
     this._initialized = false;
     this._cards = [];
@@ -85,6 +86,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._activePanelTabId = initialPanelTabId;
     this._panelTabsStorageInspected = false;
     this._panelTabsPersistenceSuppressed = false;
+    this._pendingPanelTabHandoff = null;
     this._persistPanelsOnPageHide = () => this._persistPanelTabs();
     this._refreshAliasOnVisibility = () => {
       if (document.visibilityState === "visible") {
@@ -158,6 +160,36 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._renderGraphs();
   }
 
+  async _addCurrentPanelToDashboard(button) {
+    const cards = dashboardCardSnapshots(this._graphCards, {
+      start: this._energyCollection?.start,
+      end: this._energyCollection?.end,
+      rollingHours: this._panelRollingHours,
+    });
+    if (!cards.length) return;
+    if (button) button.disabled = true;
+    try {
+      await addCardsToDashboard({
+        hass: this._hass,
+        container: this,
+        cards,
+        ensureNativeHistory: () => this._loadNativeHistoryPicker(true),
+        labels: {
+          dialogTitle: this._customLocalize("add_current_panel_to_dashboard"),
+          fallbackTitle: this._customLocalize("dashboard_yaml_fallback_title"),
+          copyYaml: this._customLocalize("copy_dashboard_yaml"),
+          copied: this._customLocalize("dashboard_yaml_copied"),
+          copyFailed: this._customLocalize("dashboard_yaml_copy_error"),
+          hideEntitiesOnLoad: this._customLocalize("hide_entities_on_load"),
+          hideEntitiesOnLoadNote: this._customLocalize("hide_entities_on_load_note"),
+          close: this._localize("ui.common.close", "Close"),
+        },
+      });
+    } finally {
+      if (button?.isConnected) button.disabled = false;
+    }
+  }
+
   _localize(key, fallback, replacements) {
     return this._hass?.localize?.(key, replacements) || fallback;
   }
@@ -221,7 +253,8 @@ class AdvancedHistoryPanel extends HTMLElement {
     ]);
     this._initialized = true;
     const restoredPanels = this._restorePersistedPanelTabs();
-    if (this.isConnected && !restoredPanels) this._render();
+    const openedHandoffPanel = this._openPendingPanelTabHandoff?.();
+    if (this.isConnected && !restoredPanels && !openedHandoffPanel) this._render();
     this._scheduleExternalBookmarkRefresh?.();
   }
 

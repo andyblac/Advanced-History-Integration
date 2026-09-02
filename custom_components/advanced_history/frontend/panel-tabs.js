@@ -136,7 +136,7 @@ export class PanelTabsMethods {
     const params = new URLSearchParams(location.search);
     if (
       params.has(SHARE_QUERY_PARAM)
-      || params.has(CARD_HANDOFF_QUERY_PARAM)
+      || (params.has(CARD_HANDOFF_QUERY_PARAM) && !this._pendingPanelTabHandoff)
       || this._incomingTargetOverride
     ) {
       // The incoming view intentionally replaces the active panel for this
@@ -289,6 +289,44 @@ export class PanelTabsMethods {
     this._persistPanelTabs();
   }
 
+  _openPendingPanelTabHandoff() {
+    const pending = this._pendingPanelTabHandoff;
+    this._pendingPanelTabHandoff = null;
+    if (!pending?.snapshot) return false;
+
+    if (!this._panelTabsDependencySupported()) {
+      this._applySnapshot(this._clone(pending.snapshot), false, true);
+      return true;
+    }
+    if (this._panelTabs.length >= this.maxTabs) {
+      this._saveTargets();
+      this.dispatchEvent(new CustomEvent("hass-notification", {
+        detail: { message: this._customLocalize("panel_limit_reached") },
+        bubbles: true,
+        composed: true,
+      }));
+      return false;
+    }
+
+    this._panelTabsStorageInspected = true;
+    this._saveActivePanelTab();
+    const id = this._panelTabId();
+    const state = this._blankPanelTabState();
+    state.snapshot = this._clone(pending.snapshot);
+    state.current_snapshot = this._clone(pending.snapshot);
+    const tab = {
+      id,
+      name: String(pending.name || "").trim().slice(0, 40),
+      energy_collection_key: this._panelEnergyCollectionKeyForId(id),
+      state,
+    };
+    this._panelTabs.push(tab);
+    this._activePanelTabId = tab.id;
+    this._restorePanelTab(tab);
+    this._persistPanelTabs();
+    return true;
+  }
+
   _switchPanelTab(id) {
     if (!this._desktopPanelTabsEnabled() || id === this._activePanelTabId) return;
     const tab = this._panelTabs.find((item) => item.id === id);
@@ -325,11 +363,12 @@ export class PanelTabsMethods {
     const close = this._localize("ui.common.close", "Close");
     const previous = this._localize("ui.common.previous", "Previous");
     const next = this._localize("ui.common.next", "Next");
+    const tabHelp = this._customLocalize("panel_tab_help");
     return `<div class="panel-tabs-shell">
       <button class="panel-tabs-scroll" data-scroll-panels="-1" title="${this._escape(previous)}" aria-label="${this._escape(previous)}" hidden><ha-icon icon="mdi:chevron-left"></ha-icon></button>
       <nav class="panel-tabs" aria-label="${this._escape(this._customLocalize("panels"))}">
         ${this._panelTabs.map((tab, index) => `<span class="panel-tab${tab.id === this._activePanelTabId ? " active" : ""}" draggable="true" data-panel-tab-item="${this._escape(tab.id)}">
-          <button class="panel-tab-select" data-panel-tab="${this._escape(tab.id)}" ${tab.id === this._activePanelTabId ? 'aria-current="page"' : ""}>${this._escape(this._panelTabDisplayLabel(tab, index))}</button>
+          <button class="panel-tab-select" data-panel-tab="${this._escape(tab.id)}" title="${this._escape(tabHelp)}" ${tab.id === this._activePanelTabId ? 'aria-current="page"' : ""}>${this._escape(this._panelTabDisplayLabel(tab, index))}</button>
           <button class="panel-tab-close" data-close-panel="${this._escape(tab.id)}" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button>
         </span>`).join("")}
       </nav>
