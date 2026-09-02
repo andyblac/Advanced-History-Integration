@@ -106,5 +106,6 @@ export default {
   "compare_previous_day": "Giorno precedente",
   "compare_previous_week": "Settimana precedente",
   "compare_previous_month": "Mese precedente",
-  "compare_previous_year": "Anno precedente"
+  "compare_previous_year": "Anno precedente",
+  "auto_hide_date_picker": "Nascondi automaticamente"
 };

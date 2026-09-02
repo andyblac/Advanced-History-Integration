@@ -374,9 +374,17 @@ export class GraphMethods {
       const viewportHeight = window.visualViewport?.height || window.innerHeight;
       const controller = this.shadowRoot?.getElementById("date-controller");
       const controllerRect = controller?.getBoundingClientRect?.();
-      const bottom = controllerRect?.height > 0
-        ? Math.min(viewportHeight, controllerRect.top)
-        : viewportHeight;
+      const controllerBottom = Number.parseFloat(
+        controller ? getComputedStyle(controller).bottom : "",
+      );
+      const controllerTop = Number.isFinite(controllerBottom) && controllerRect?.height > 0
+        ? viewportHeight - controllerBottom - controllerRect.height
+        : controllerRect?.top;
+      const bottom = this._datePickerAutoHide
+        ? viewportHeight
+        : controllerRect?.height > 0
+          ? Math.min(viewportHeight, controllerTop)
+          : viewportHeight;
       const top = Math.max(0, host.getBoundingClientRect().top);
       const available = Math.max(240, Math.floor(bottom - top - 16));
       const numericShell = host.querySelector(".graph-shell.numeric-graph");

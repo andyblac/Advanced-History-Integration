@@ -106,5 +106,6 @@ export default {
   "compare_previous_day": "Vorige dag",
   "compare_previous_week": "Vorige week",
   "compare_previous_month": "Vorige maand",
-  "compare_previous_year": "Vorig jaar"
+  "compare_previous_year": "Vorig jaar",
+  "auto_hide_date_picker": "Automatisch verbergen"
 };

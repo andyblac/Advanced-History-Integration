@@ -1,3 +1,5 @@
+import { DATE_PICKER_AUTO_HIDE_STORAGE_KEY } from "./constants.js";
+
 const PANEL_EXPORT_ICON_PATH = "M3 3H11V11H3V3M5 5V9H9V5H5M13 3H21V11H13V3M15 5V9H19V5H15M3 13H11V21H3V13M5 15V19H9V15H5M18 13V16H21V18H18V21H16V18H13V16H16V13H18Z";
 
 export class EnergyMethods {
@@ -1084,6 +1086,87 @@ export class EnergyMethods {
     discoverRenderedRoots();
   }
 
+  _syncEnergyDatePickerAutoHideAction(dropdown = null) {
+    const item = dropdown?.querySelector?.("[data-advanced-history-auto-hide]")
+      || this.shadowRoot
+        ?.getElementById("date-controller")
+        ?.querySelector(".energy-date-controller")
+        ?.shadowRoot?.querySelector("hui-energy-period-selector")
+        ?.shadowRoot?.querySelector("[data-advanced-history-auto-hide]");
+    if (!item) return;
+    item.setAttribute("aria-checked", String(Boolean(this._datePickerAutoHide)));
+    const icon = item.querySelector("ha-icon");
+    if (icon) {
+      icon.setAttribute(
+        "icon",
+        this._datePickerAutoHide ? "mdi:checkbox-marked-outline" : "mdi:checkbox-blank-outline",
+      );
+    }
+  }
+
+  _setEnergyDatePickerAutoHide(enabled) {
+    this._datePickerAutoHide = Boolean(enabled);
+    try {
+      localStorage.setItem(
+        DATE_PICKER_AUTO_HIDE_STORAGE_KEY,
+        String(this._datePickerAutoHide),
+      );
+    } catch (_) { /* Ignore unavailable local storage. */ }
+    if (this._datePickerAutoHideTimer) window.clearTimeout(this._datePickerAutoHideTimer);
+    this._datePickerAutoHideTimer = null;
+    const host = this.shadowRoot?.getElementById("date-controller");
+    host?.classList.toggle("auto-hide", this._datePickerAutoHide);
+    host?.classList.remove("revealed");
+    this.shadowRoot
+      ?.querySelector("main.content")
+      ?.classList.toggle("date-picker-auto-hide", this._datePickerAutoHide);
+    const zone = this.shadowRoot?.getElementById("date-controller-reveal");
+    if (zone) zone.hidden = !this._datePickerAutoHide;
+    this._syncEnergyDatePickerAutoHideAction();
+    this._graphLayoutSchedule?.();
+  }
+
+  _revealEnergyDatePicker() {
+    if (!this._datePickerAutoHide) return;
+    if (this._datePickerAutoHideTimer) window.clearTimeout(this._datePickerAutoHideTimer);
+    this._datePickerAutoHideTimer = null;
+    this.shadowRoot?.getElementById("date-controller")?.classList.add("revealed");
+  }
+
+  _scheduleEnergyDatePickerHide() {
+    if (!this._datePickerAutoHide) return;
+    if (this._datePickerAutoHideTimer) window.clearTimeout(this._datePickerAutoHideTimer);
+    this._datePickerAutoHideTimer = window.setTimeout(() => {
+      this._datePickerAutoHideTimer = null;
+      const host = this.shadowRoot?.getElementById("date-controller");
+      const zone = this.shadowRoot?.getElementById("date-controller-reveal");
+      if (
+        host?.matches(":hover")
+        || host?.matches(":focus-within")
+        || zone?.matches(":hover")
+        || zone?.matches(":focus")
+      ) return;
+      host?.classList.remove("revealed");
+    }, 300);
+  }
+
+  _bindEnergyDatePickerAutoHide() {
+    const host = this.shadowRoot?.getElementById("date-controller");
+    const zone = this.shadowRoot?.getElementById("date-controller-reveal");
+    if (!host || !zone) return;
+    const reveal = () => this._revealEnergyDatePicker();
+    const hide = () => this._scheduleEnergyDatePickerHide();
+    host.addEventListener("pointerenter", reveal);
+    host.addEventListener("pointerleave", hide);
+    host.addEventListener("focusin", reveal);
+    host.addEventListener("focusout", hide);
+    zone.addEventListener("pointerenter", reveal);
+    zone.addEventListener("pointerleave", hide);
+    zone.addEventListener("focus", reveal);
+    zone.addEventListener("blur", hide);
+    zone.addEventListener("click", reveal);
+  }
+
   async _renderEnergyController() {
     const host = this.shadowRoot.getElementById("date-controller");
     const compareHost = this.shadowRoot.getElementById("compare-banner");
@@ -1264,22 +1347,41 @@ export class EnergyMethods {
 
   _installEnergyPanelExportAction(selector) {
     const dropdown = selector?.shadowRoot?.querySelector("ha-dropdown");
-    if (!dropdown || dropdown.querySelector("[data-advanced-history-panel-export]")) return;
+    if (!dropdown) return;
 
-    const label = this._customLocalize("add_current_panel_to_dashboard");
-    const item = document.createElement("ha-dropdown-item");
-    item.dataset.advancedHistoryPanelExport = "";
-    const icon = document.createElement("ha-svg-icon");
-    icon.slot = "icon";
-    icon.path = PANEL_EXPORT_ICON_PATH;
-    item.append(icon, document.createTextNode(label));
-    item.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      dropdown.open = false;
-      void this._addCurrentPanelToDashboard(item);
-    });
-    dropdown.append(item);
+    if (!dropdown.querySelector("[data-advanced-history-panel-export]")) {
+      const label = this._customLocalize("add_current_panel_to_dashboard");
+      const item = document.createElement("ha-dropdown-item");
+      item.dataset.advancedHistoryPanelExport = "";
+      const icon = document.createElement("ha-svg-icon");
+      icon.slot = "icon";
+      icon.path = PANEL_EXPORT_ICON_PATH;
+      item.append(icon, document.createTextNode(label));
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dropdown.open = false;
+        void this._addCurrentPanelToDashboard(item);
+      });
+      dropdown.append(item);
+    }
+
+    if (!dropdown.querySelector("[data-advanced-history-auto-hide]")) {
+      const item = document.createElement("ha-dropdown-item");
+      item.dataset.advancedHistoryAutoHide = "";
+      item.setAttribute("role", "menuitemcheckbox");
+      const icon = document.createElement("ha-icon");
+      icon.slot = "icon";
+      item.append(icon, document.createTextNode(this._customLocalize("auto_hide_date_picker")));
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        dropdown.open = false;
+        this._setEnergyDatePickerAutoHide(!this._datePickerAutoHide);
+      });
+      dropdown.append(item);
+    }
+    this._syncEnergyDatePickerAutoHideAction(dropdown);
   }
 
   _replaceEnergyDownloadAction(controller) {

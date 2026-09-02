@@ -15,6 +15,7 @@ export const CURRENT_SNAPSHOT_STORAGE_KEY = "advanced-history-panel.current-snap
 export const UNDO_STORAGE_KEY = "advanced-history-panel.undo.v1";
 export const REDO_STORAGE_KEY = "advanced-history-panel.redo.v1";
 export const PANEL_TABS_STORAGE_KEY = "advanced-history-panel.tabs.v1";
+export const DATE_PICKER_AUTO_HIDE_STORAGE_KEY = "advanced-history-panel.date-picker-auto-hide.v1";
 // Schema 1 shipped with 2.0-beta.1 and used one shared Energy collection.
 // Schema 2 gives every persisted panel its own collection key.
 export const PANEL_TABS_SCHEMA = 2;

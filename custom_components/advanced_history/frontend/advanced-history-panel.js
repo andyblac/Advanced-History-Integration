@@ -2,6 +2,7 @@ import {
   CARD_DEFAULT_MODULE_URLS,
   CARD_RESOURCE_MATCH,
   CARD_TAG,
+  DATE_PICKER_AUTO_HIDE_STORAGE_KEY,
 } from "./constants.js";
 import { EnergyMethods } from "./energy.js";
 import { DiagnosticsMethods } from "./diagnostics.js";
@@ -76,6 +77,12 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._periodRestoreTimer = null;
     this._energyInteractionLoading = false;
     this._energyResetPending = false;
+    try {
+      this._datePickerAutoHide = localStorage.getItem(DATE_PICKER_AUTO_HIDE_STORAGE_KEY) === "true";
+    } catch (_) {
+      this._datePickerAutoHide = false;
+    }
+    this._datePickerAutoHideTimer = null;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
     this._largeRangeDetailDismissedKey = null;
@@ -226,6 +233,8 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._panelRollingTimer = null;
     if (this._periodRestoreTimer) window.clearTimeout(this._periodRestoreTimer);
     this._periodRestoreTimer = null;
+    if (this._datePickerAutoHideTimer) window.clearTimeout(this._datePickerAutoHideTimer);
+    this._datePickerAutoHideTimer = null;
   }
 
   async _initialize() {
@@ -332,6 +341,10 @@ class AdvancedHistoryPanel extends HTMLElement {
     const redo = this._localize("ui.common.redo", "Redo");
     const addPanel = this._customLocalize("add_panel");
     const addPanelRequiresVersion = this._customLocalize("add_panel_requires_version");
+    const showDatePicker = this._localize(
+      "ui.components.date-range-picker.select_date_range",
+      "Select time period",
+    );
     const dependencyMissing = Boolean(this._cardLoadError);
     const secondaryAxisEditable = this._secondaryAxisEditable();
     const hasY1Targets = Boolean(this._targetCount(this._targets));
@@ -353,7 +366,7 @@ class AdvancedHistoryPanel extends HTMLElement {
         <button id="redo" class="icon-button" title="${this._escape(redo)}"><ha-icon icon="mdi:redo"></ha-icon></button>
         <button id="remove-all" class="icon-button" title="${this._escape(removeAll)}" ${this._targetCount() ? "" : "hidden"}><ha-icon icon="mdi:filter-remove-outline"></ha-icon></button>
       </header>
-      <main class="content">
+      <main class="content${this._datePickerAutoHide ? " date-picker-auto-hide" : ""}">
         ${dependencyMissing ? "" : `<section class="filters axis-targets">
           <div class="axis-target-group axis-target-primary${y1TargetClass}">
             <div class="axis-target-label"><span class="axis-badge">Y1</span><span>${this._escape(this._customLocalize("primary_axis"))}</span></div>
@@ -381,7 +394,8 @@ class AdvancedHistoryPanel extends HTMLElement {
         ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
         <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>
       </main>
-      ${dependencyMissing ? "" : `<div id="date-controller" class="energy-nav-floating"></div>`}`;
+      ${dependencyMissing ? "" : `<button id="date-controller-reveal" class="energy-nav-reveal-zone" type="button" title="${this._escape(showDatePicker)}" aria-label="${this._escape(showDatePicker)}" ${this._datePickerAutoHide ? "" : "hidden"}></button>
+      <div id="date-controller" class="energy-nav-floating${this._datePickerAutoHide ? " auto-hide" : ""}"></div>`}`;
     const menu = this.shadowRoot.getElementById("menu");
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
     this.shadowRoot.getElementById("remove-all")?.addEventListener(
@@ -397,6 +411,7 @@ class AdvancedHistoryPanel extends HTMLElement {
       () => this._toggleY2Comparison(),
     );
     this._syncY2ComparisonToggle();
+    this._bindEnergyDatePickerAutoHide?.();
     this._bindPanelTabs();
     this._updateUndoRedoButtons();
     if (!dependencyMissing) {
