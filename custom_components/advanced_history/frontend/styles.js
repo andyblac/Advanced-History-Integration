@@ -78,13 +78,14 @@ export const panelStyles = `
   .axis-target-secondary .axis-badge { background:var(--primary-color); }
   .axis-target-secondary .axis-target-label { justify-content:flex-end; }
   .axis-compare-toggle, .axis-running-total-toggle {
-    width:34px; height:24px; padding:3px 7px; display:grid; place-items:center;
-    color:var(--switch-unchecked-button-color);
-    background:var(--switch-unchecked-track-color);
-    border:1px solid var(--switch-unchecked-button-color);
+    width:36px; height:24px; padding:3px 8px; display:grid; place-items:center;
+    box-sizing:border-box; appearance:none; line-height:0;
+    color:var(--secondary-text-color);
+    background:rgba(127,127,127,.28);
+    border:1px solid rgba(127,127,127,.46);
     border-radius:12px; cursor:pointer;
   }
-  .axis-compare-toggle:hover, .axis-running-total-toggle:hover { color:var(--primary-text-color); }
+  .axis-compare-toggle:hover, .axis-running-total-toggle:hover { color:var(--primary-text-color); background:rgba(127,127,127,.38); }
   .axis-compare-toggle.active { color:var(--text-primary-color,var(--primary-text-color)); background:var(--primary-color); border-color:var(--primary-color); }
   .axis-running-total-primary.active {
     color:var(--text-primary-color,var(--primary-text-color));
