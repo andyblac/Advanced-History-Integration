@@ -158,6 +158,7 @@ export class TargetPickerMethods {
     const removeAll = this.shadowRoot.getElementById("remove-all");
     if (removeAll) removeAll.hidden = !this._targetCount();
     this._syncAxisTargetLayout();
+    this._syncY2ComparisonToggle();
     this._syncNativeTargetVisibility(axis);
     this._syncNativeTargetVisibility(secondary ? "primary" : "secondary");
     this.shadowRoot.querySelector(".notice")?.remove();
