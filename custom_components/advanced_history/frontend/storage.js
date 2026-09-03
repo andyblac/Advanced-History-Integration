@@ -486,6 +486,8 @@ export class StorageMethods {
       "source_graph_height",
       "single_graph",
       "attribute_selection",
+      "series_transforms",
+      "running_total_axes",
       "compare",
       "remove_card_options",
     ].forEach(copyChartValue);

@@ -11,6 +11,7 @@ import {
   mergeStateMaps,
   nativeStateMap,
 } from "./state-colors.js";
+import { cumulativeRunningTotalSeries } from "./running-total.js";
 
 const DATA_SOURCE_CACHE = new Map();
 const ENTITY_OPTION_REMOVALS = "__advanced_history_remove_options";
@@ -550,6 +551,33 @@ export class GraphMethods {
       mode,
       cardOptionsConfig,
     ));
+    const runningTotalEntities = new Set();
+    const runningTotalExportAggregates = {};
+    if (mode !== "state_timeline") {
+      const transforms = this._activeSnapshot?.series_transforms || {};
+      const axisTransforms = this._activeSnapshot?.running_total_axes || {};
+      entities.forEach((configured) => {
+        const axis = configured.y_axis === "secondary" ? "secondary" : "primary";
+        if (
+          configured.attribute == null
+          && (
+            transforms[configured.entity] === "running_total"
+            || axisTransforms[axis] === true
+          )
+        ) {
+          runningTotalEntities.add(configured.entity);
+          runningTotalExportAggregates[configured.entity] = {
+            defined: Object.prototype.hasOwnProperty.call(configured, "aggregate_func"),
+            value: configured.aggregate_func,
+          };
+          // Let the card calculate accurate per-bucket usage first. Its
+          // bucketing hook below then turns those changes into a running total.
+          configured.aggregate_func = "change";
+        }
+      });
+    }
+    card.__advancedHistoryRunningTotalEntities = runningTotalEntities;
+    card.__advancedHistoryRunningTotalExportAggregates = runningTotalExportAggregates;
     const palette = extendedEntityPalette(
       customElements.get(CARD_TAG)?.PALETTE,
       entities.length + entities.reduce(
@@ -973,6 +1001,13 @@ export class GraphMethods {
     card._bucketSeries = (...args) => {
       let result = bucketSeries.apply(card, args);
       const entity = args[1];
+      const entityId = entity?.entity || entity?.statistic_id;
+      if (
+        card.__advancedHistoryRunningTotalEntities?.has(entityId)
+        && Array.isArray(result?.points)
+      ) {
+        result = cumulativeRunningTotalSeries(result);
+      }
       const windowStart = Number(args[3]);
       const windowEnd = Number(args[4]);
       const offsetHours = Number(entity?.offset);
@@ -1868,6 +1903,8 @@ export class GraphMethods {
     const compare = this._activeSnapshot?.compare;
     const singleGraph = Boolean(this._activeSnapshot?.single_graph);
     const attributeSelection = this._clone(this._activeSnapshot?.attribute_selection);
+    const seriesTransforms = this._clone(this._activeSnapshot?.series_transforms);
+    const runningTotalAxes = this._clone(this._activeSnapshot?.running_total_axes);
     const currentCardOptions = this._activeSnapshot?.card_options;
     const currentTypedOptions = currentCardOptions
       && typeof currentCardOptions === "object"
@@ -1915,6 +1952,12 @@ export class GraphMethods {
     if (singleGraph) this._activeSnapshot.single_graph = true;
     if (attributeSelection && Object.keys(attributeSelection).length) {
       this._activeSnapshot.attribute_selection = attributeSelection;
+    }
+    if (seriesTransforms && Object.keys(seriesTransforms).length) {
+      this._activeSnapshot.series_transforms = seriesTransforms;
+    }
+    if (runningTotalAxes && Object.keys(runningTotalAxes).length) {
+      this._activeSnapshot.running_total_axes = runningTotalAxes;
     }
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
     if (this._hasDetailResolutionOverride()) this._largeRangeFineDetail = false;

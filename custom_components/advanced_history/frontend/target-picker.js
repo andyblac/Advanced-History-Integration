@@ -285,6 +285,7 @@ export class TargetPickerMethods {
   }
 
   _syncNativeTargetVisibility(axis = "primary") {
+    this._syncRunningTotalAxisButtons();
     const secondary = axis === "secondary";
     const picker = secondary ? this._nativeY2TargetPicker : this._nativeTargetPicker;
     const targets = secondary ? this._y2Targets : this._targets;
@@ -337,8 +338,14 @@ export class TargetPickerMethods {
         ...picker.shadowRoot.querySelectorAll("ha-target-picker-value-chip"),
       ];
       picker.shadowRoot
-        .querySelectorAll("[data-advanced-history-series]")
+        .querySelectorAll(
+          "[data-advanced-history-series], [data-advanced-history-running-total]"
+        )
         .forEach((button) => button.remove());
+      chips.forEach((chip) => chip.shadowRoot?.querySelectorAll(
+        "[data-advanced-history-controls], [data-advanced-history-series], [data-advanced-history-running-total]"
+      ).forEach((button) => button.remove()));
+      const axisRunningTotalActive = this._axisRunningTotalActive(axis);
       chips.forEach((chip) => {
         const kind = `${chip.type}_id`;
         const hidden = Boolean(hiddenTargets[kind]?.includes(chip.itemId));
@@ -376,19 +383,59 @@ export class TargetPickerMethods {
           }
         };
         void applyAxisColor();
-        if (
+        const explicitEntity = (
           kind === "entity_id"
           && entityIds.has(chip.itemId)
-          && this._seriesChoices(chip.itemId).length > 1
-        ) {
-          this._syncSeriesButton(chip, name);
+        );
+        const showSeries = explicitEntity && this._seriesChoices(chip.itemId).length > 1;
+        const showRunningTotal = (
+          !axisRunningTotalActive
+          && explicitEntity
+          && this._runningTotalEligible(chip.itemId)
+        );
+        if (showSeries || showRunningTotal) {
+          void this._syncTargetChipControls(
+            chip,
+            name,
+            axis,
+            showSeries,
+            showRunningTotal,
+          );
         }
       });
     };
     void apply();
   }
 
-  _syncSeriesButton(chip, name) {
+  async _syncTargetChipControls(
+    chip,
+    name,
+    axis,
+    showSeries,
+    showRunningTotal,
+  ) {
+    await chip.updateComplete;
+    const host = chip.shadowRoot?.querySelector("wa-tag");
+    if (!host) return;
+    host.querySelectorAll(
+      "[data-advanced-history-controls], [data-advanced-history-series], [data-advanced-history-running-total]"
+    ).forEach((button) => button.remove());
+    const controls = document.createElement("span");
+    controls.dataset.advancedHistoryControls = "";
+    controls.style.cssText = [
+      "display:inline-flex",
+      "align-items:center",
+      "gap:0",
+      "margin-inline:-5px -3px",
+      "padding:0",
+      "line-height:0",
+    ].join(";");
+    if (showSeries) this._syncSeriesButton(chip, name, controls);
+    if (showRunningTotal) this._syncRunningTotalButton(chip, name, axis, controls);
+    host.append(controls);
+  }
+
+  _syncSeriesButton(chip, name, host = null) {
     const entity = chip.itemId;
     const button = document.createElement("button");
     button.type = "button";
@@ -400,27 +447,154 @@ export class TargetPickerMethods {
     button.title = this._customLocalize("configure_attributes", { target: name });
     button.innerHTML = '<ha-icon icon="mdi:tune-variant"></ha-icon>';
     button.style.cssText = [
-      "width:28px",
-      "height:28px",
-      "margin-inline:-6px 4px",
-      "padding:4px",
-      "display:inline-flex",
-      "align-items:center",
-      "justify-content:center",
+      "width:24px",
+      "height:24px",
+      "margin:0",
+      "padding:3px 4px",
+      "display:inline-grid",
+      "place-items:center",
       "align-self:center",
       "border:0",
-      "border-radius:50%",
+      "border-radius:12px",
       "color:var(--secondary-text-color)",
       "background:transparent",
       "cursor:pointer",
     ].join(";");
-    button.querySelector("ha-icon").style.cssText = "width:18px;height:18px";
+    button.querySelector("ha-icon").style.cssText = "display:block;width:18px;height:18px;line-height:0;--mdc-icon-size:18px";
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
       this._openSeriesDialog(entity);
     });
-    chip.insertAdjacentElement("afterend", button);
+    if (host) host.append(button);
+    else chip.insertAdjacentElement("afterend", button);
+  }
+
+  _runningTotalEligible(entity) {
+    const stateClass = this._hass.states[entity]?.attributes?.state_class;
+    if (!["total", "total_increasing"].includes(stateClass)) return false;
+    return this._seriesDescriptors([entity]).some((item) => !item.attribute);
+  }
+
+  _runningTotalActive(entity) {
+    return this._activeSnapshot?.series_transforms?.[entity] === "running_total";
+  }
+
+  _axisRunningTotalActive(axis = "primary") {
+    return this._activeSnapshot?.running_total_axes?.[axis] === true;
+  }
+
+  _syncRunningTotalButton(chip, name, axis = "primary", host = null) {
+    const entity = chip.itemId;
+    const active = this._runningTotalActive(entity);
+    const secondary = axis === "secondary";
+    const activeColor = secondary
+      ? "var(--primary-color)"
+      : "var(--ha-color-green-80,var(--success-color))";
+    const label = this._customLocalize(
+      active ? "disable_running_total" : "enable_running_total",
+      { target: name },
+    );
+    const button = document.createElement("button");
+    button.type = "button";
+    button.dataset.advancedHistoryRunningTotal = entity;
+    button.setAttribute("role", "switch");
+    button.setAttribute("aria-label", label);
+    button.setAttribute("aria-checked", String(active));
+    button.title = label;
+    button.innerHTML = '<ha-icon icon="mdi:sigma"></ha-icon>';
+    button.style.cssText = [
+      "width:24px",
+      "height:24px",
+      "margin:0",
+      "padding:3px 4px",
+      "display:inline-grid",
+      "place-items:center",
+      "align-self:center",
+      `color:${active ? "var(--text-primary-color,var(--primary-text-color))" : "var(--secondary-text-color)"}!important`,
+      `background:${active ? activeColor : "transparent"}!important`,
+      `border:1px solid ${active ? activeColor : "transparent"}!important`,
+      "border-radius:12px",
+      "box-shadow:none!important",
+      "cursor:pointer",
+    ].join(";");
+    button.querySelector("ha-icon").style.cssText = "display:block;width:18px;height:18px;line-height:0;transform:translateY(-1px);--mdc-icon-size:18px";
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this._toggleRunningTotal(entity);
+    });
+    if (host) host.append(button);
+    else chip.insertAdjacentElement("afterend", button);
+  }
+
+  _toggleRunningTotal(entity) {
+    if (!this._runningTotalEligible(entity)) return;
+    const chart = this._activeSnapshot
+      ? this._clone(this._activeSnapshot)
+      : this._captureSnapshot().chart;
+    const transforms = { ...(chart.series_transforms || {}) };
+    if (transforms[entity] === "running_total") delete transforms[entity];
+    else transforms[entity] = "running_total";
+    if (Object.keys(transforms).length) chart.series_transforms = transforms;
+    else delete chart.series_transforms;
+    this._activeSnapshot = chart;
+    this._recordChange(null, true);
+    this._syncNativeTargetVisibility("primary");
+    this._syncNativeTargetVisibility("secondary");
+    this._renderGraphs();
+  }
+
+  _axisRunningTotalEntities(axis = "primary") {
+    const secondary = axis === "secondary";
+    const resolved = this._resolvedEntityIds();
+    const secondaryEntities = this._y2ResolvedEntityIds || new Set();
+    return resolved.filter((entity) => (
+      (secondary ? secondaryEntities.has(entity) : !secondaryEntities.has(entity))
+      && this._runningTotalEligible(entity)
+    ));
+  }
+
+  _syncRunningTotalAxisButtons() {
+    for (const axis of ["primary", "secondary"]) {
+      const button = this.shadowRoot?.getElementById(
+        axis === "secondary"
+          ? "toggle-y2-running-total"
+          : "toggle-y1-running-total"
+      );
+      if (!button) continue;
+      const entities = this._axisRunningTotalEntities(axis);
+      const active = Boolean(entities.length && this._axisRunningTotalActive(axis));
+      const axisName = axis === "secondary" ? "Y2" : "Y1";
+      const label = this._customLocalize(
+        active ? "disable_axis_running_total" : "enable_axis_running_total",
+        { axis: axisName },
+      );
+      button.hidden = !entities.length;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-checked", String(active));
+      button.setAttribute("aria-label", label);
+      button.title = label;
+    }
+  }
+
+  _toggleAxisRunningTotal(axis = "primary") {
+    const entities = this._axisRunningTotalEntities(axis);
+    if (!entities.length) return;
+    const chart = this._activeSnapshot
+      ? this._clone(this._activeSnapshot)
+      : this._captureSnapshot().chart;
+    const axes = { ...(chart.running_total_axes || {}) };
+    if (axes[axis] === true) delete axes[axis];
+    else axes[axis] = true;
+    if (Object.keys(axes).length) chart.running_total_axes = axes;
+    else delete chart.running_total_axes;
+    this._activeSnapshot = chart;
+    this._recordChange(null, true);
+    this._syncRunningTotalAxisButtons();
+    this._syncNativeTargetVisibility("primary");
+    this._syncNativeTargetVisibility("secondary");
+    this._renderGraphs();
   }
 
   _seriesChoiceValue(entity, attribute) {

@@ -5,6 +5,7 @@ const SUGGEST_DIALOG_TAG = "hui-dialog-suggest-card";
 const WIDE_PREVIEW_MARKER = Symbol("advanced-history-wide-dashboard-preview");
 const DIALOG_TITLE_MARKER = Symbol("advanced-history-dashboard-dialog-title");
 const DESELECTED_OPTIONS_MARKER = Symbol("advanced-history-deselected-export-options");
+const EXPORT_WARNING_MARKER = Symbol("advanced-history-dashboard-export-warning");
 const WIDE_PREVIEW_PATCH = "__advancedHistoryWidePreviewPatched";
 const OMITTED_RUNTIME_KEYS = new Set([
   "energy_date_sync",
@@ -76,6 +77,14 @@ export function dashboardCardSnapshots(cards, period = {}) {
     const source = card?.__advancedHistoryConfig || card?._config;
     if (!source || typeof source !== "object" || Array.isArray(source)) return null;
     const config = clone(source);
+    const exportAggregates = card?.__advancedHistoryRunningTotalExportAggregates || {};
+    for (const row of config.entities || []) {
+      if (!row || typeof row !== "object" || row.attribute != null) continue;
+      const original = exportAggregates[entityId(row)];
+      if (!original) continue;
+      if (original.defined) row.aggregate_func = clone(original.value);
+      else delete row.aggregate_func;
+    }
     for (const key of OMITTED_RUNTIME_KEYS) delete config[key];
     if (config.chart_mode === "state_timeline") delete config.height;
     config.type = `custom:${CARD_TAG}`;
@@ -193,6 +202,8 @@ function showYamlFallback(container, cards, labels) {
       .deselected-choice input { width:20px; height:20px; margin:1px 0 0; accent-color:var(--primary-color); }
       .deselected-choice strong, .deselected-choice small { display:block; }
       .deselected-choice small { margin-top:3px; color:var(--secondary-text-color); line-height:1.35; }
+      .export-warning { margin:16px 16px 0; padding:12px; display:flex; align-items:flex-start; gap:10px; border-left:4px solid var(--warning-color,#ffa600); border-radius:6px; background:var(--secondary-background-color); line-height:1.4; }
+      .export-warning ha-icon { flex:0 0 20px; width:20px; height:20px; color:var(--warning-color,#ffa600); --mdc-icon-size:20px; }
       textarea { display:block; width:calc(100% - 32px); min-height:360px; margin:16px; padding:12px; resize:vertical; color:var(--primary-text-color); background:var(--secondary-background-color); border:1px solid var(--divider-color); border-radius:6px; font:13px/1.45 monospace; }
       button { min-height:40px; padding:0 16px; border:0; border-radius:8px; color:var(--primary-color); background:transparent; cursor:pointer; font:inherit; font-weight:500; }
       button.primary { color:var(--text-primary-color,white); background:var(--primary-color); }
@@ -200,6 +211,7 @@ function showYamlFallback(container, cards, labels) {
     </style>
     <dialog aria-label="${escapeHtml(labels.fallbackTitle)}">
       <header><h2>${escapeHtml(labels.fallbackTitle)}</h2></header>
+      ${labels.exportWarning ? `<div class="export-warning" role="note"><ha-icon icon="mdi:alert-outline"></ha-icon><span>${escapeHtml(labels.exportWarning)}</span></div>` : ""}
       ${choices ? `<label class="deselected-choice"><input type="checkbox"><span><strong>${escapeHtml(choices.label)}</strong><small>${escapeHtml(choices.note)}</small></span></label>` : ""}
       <textarea readonly></textarea>
       <footer><span class="status"></span><button data-close>${escapeHtml(labels.close)}</button><button class="primary" data-copy>${escapeHtml(labels.copyYaml)}</button></footer>
@@ -252,7 +264,8 @@ function installWideNativePreview() {
   prototype.showDialog = function showAdvancedHistoryDashboardPreview(params) {
     const result = showDialog.call(this, params);
     const choices = params?.[DESELECTED_OPTIONS_MARKER];
-    if (!params?.[WIDE_PREVIEW_MARKER] && !choices) return result;
+    const exportWarning = params?.[EXPORT_WARNING_MARKER];
+    if (!params?.[WIDE_PREVIEW_MARKER] && !choices && !exportWarning) return result;
     Promise.resolve(this.updateComplete).then(() => {
       if (!this.shadowRoot) return;
       const dialog = this.shadowRoot.querySelector("ha-dialog");
@@ -281,12 +294,34 @@ function installWideNativePreview() {
         .advanced-history-deselected-choice small {
           margin-top:3px; color:var(--secondary-text-color); line-height:1.35;
         }
+        .advanced-history-export-warning {
+          width:100%; margin:0 auto 12px; padding:12px; box-sizing:border-box;
+          display:flex; align-items:flex-start; gap:10px; line-height:1.4;
+          border-left:4px solid var(--warning-color,#ffa600); border-radius:6px;
+          background:var(--secondary-background-color);
+        }
+        .advanced-history-export-warning ha-icon {
+          flex:0 0 20px; width:20px; height:20px;
+          color:var(--warning-color,#ffa600); --mdc-icon-size:20px;
+        }
       `;
         this.shadowRoot.append(style);
       }
+      this.shadowRoot.querySelector(".advanced-history-export-warning")?.remove();
       this.shadowRoot.querySelector(".advanced-history-deselected-choice")?.remove();
+      const preview = this.shadowRoot.querySelector(".element-preview");
+      if (exportWarning && preview) {
+        const warning = document.createElement("div");
+        warning.className = "advanced-history-export-warning";
+        warning.setAttribute("role", "note");
+        const icon = document.createElement("ha-icon");
+        icon.setAttribute("icon", "mdi:alert-outline");
+        const message = document.createElement("span");
+        message.textContent = exportWarning;
+        warning.append(icon, message);
+        preview.parentElement?.before(warning);
+      }
       if (choices) {
-        const preview = this.shadowRoot.querySelector(".element-preview");
         if (preview) {
           const choice = document.createElement("label");
           choice.className = "advanced-history-deselected-choice";
@@ -381,6 +416,9 @@ export async function addCardsToDashboard({ hass, container, cards, labels, ensu
         detail.dialogParams[WIDE_PREVIEW_MARKER] = true;
         detail.dialogParams[DIALOG_TITLE_MARKER] = labels.dialogTitle;
         if (choices) detail.dialogParams[DESELECTED_OPTIONS_MARKER] = choices;
+        if (labels.exportWarning) {
+          detail.dialogParams[EXPORT_WARNING_MARKER] = labels.exportWarning;
+        }
         installWideNativePreview();
         queueMicrotask(cleanup);
       } else if (detail?.dialogTag === "dialog-box") {

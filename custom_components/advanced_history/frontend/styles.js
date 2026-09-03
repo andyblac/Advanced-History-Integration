@@ -75,17 +75,23 @@ export const panelStyles = `
   .axis-target-primary .axis-badge { background:var(--ha-color-green-80,var(--success-color)); }
   .axis-target-secondary .axis-badge { background:var(--primary-color); }
   .axis-target-secondary .axis-target-label { justify-content:flex-end; }
-  .axis-compare-toggle {
+  .axis-compare-toggle, .axis-running-total-toggle {
     width:34px; height:24px; padding:3px 7px; display:grid; place-items:center;
     color:var(--switch-unchecked-button-color);
     background:var(--switch-unchecked-track-color);
     border:1px solid var(--switch-unchecked-button-color);
     border-radius:12px; cursor:pointer;
   }
-  .axis-compare-toggle:hover { color:var(--primary-text-color); }
+  .axis-compare-toggle:hover, .axis-running-total-toggle:hover { color:var(--primary-text-color); }
   .axis-compare-toggle.active { color:var(--text-primary-color,var(--primary-text-color)); background:var(--primary-color); border-color:var(--primary-color); }
-  .axis-compare-toggle ha-icon { width:18px; height:18px; --mdc-icon-size:18px; }
-  .axis-compare-toggle[hidden] { display:none; }
+  .axis-running-total-primary.active {
+    color:var(--text-primary-color,var(--primary-text-color));
+    background:var(--ha-color-green-80,var(--success-color));
+    border-color:var(--ha-color-green-80,var(--success-color));
+  }
+  .axis-running-total-secondary.active { color:var(--text-primary-color,var(--primary-text-color)); background:var(--primary-color); border-color:var(--primary-color); }
+  .axis-compare-toggle ha-icon, .axis-running-total-toggle ha-icon { width:18px; height:18px; --mdc-icon-size:18px; }
+  .axis-compare-toggle[hidden], .axis-running-total-toggle[hidden] { display:none; }
   .axis-target-divider { flex:0 0 1px; align-self:stretch; margin-top:28px; background:var(--divider-color); }
   .energy-nav-floating {
     position:fixed; z-index:20; left:16px; right:16px; bottom:max(12px,env(safe-area-inset-bottom));

@@ -175,6 +175,11 @@ class AdvancedHistoryPanel extends HTMLElement {
       rollingHours: this._panelRollingHours,
     });
     if (!cards.length) return;
+    const runningTotalEnabled = Object.values(
+      this._activeSnapshot?.series_transforms || {}
+    ).includes("running_total") || Object.values(
+      this._activeSnapshot?.running_total_axes || {}
+    ).includes(true);
     if (button) button.disabled = true;
     try {
       await addCardsToDashboard({
@@ -190,6 +195,9 @@ class AdvancedHistoryPanel extends HTMLElement {
           copyFailed: this._customLocalize("dashboard_yaml_copy_error"),
           hideEntitiesOnLoad: this._customLocalize("hide_entities_on_load"),
           hideEntitiesOnLoadNote: this._customLocalize("hide_entities_on_load_note"),
+          exportWarning: runningTotalEnabled
+            ? this._customLocalize("running_total_export_warning")
+            : "",
           close: this._localize("ui.common.close", "Close"),
         },
       });
@@ -370,7 +378,10 @@ class AdvancedHistoryPanel extends HTMLElement {
       <main class="content${this._datePickerAutoHide ? " date-picker-auto-hide" : ""}">
         ${dependencyMissing ? "" : `<section class="filters axis-targets">
           <div class="axis-target-group axis-target-primary${y1TargetClass}">
-            <div class="axis-target-label"><span class="axis-badge">Y1</span><span>${this._escape(this._customLocalize("primary_axis"))}</span></div>
+            <div class="axis-target-label">
+              <span class="axis-badge">Y1</span><span>${this._escape(this._customLocalize("primary_axis"))}</span>
+              <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
+            </div>
             <div id="target-picker-host" class="native-target-picker">
               <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
             </div>
@@ -378,6 +389,7 @@ class AdvancedHistoryPanel extends HTMLElement {
           ${secondaryAxisEditable ? `<div class="axis-target-divider" aria-hidden="true"></div>
           <div class="axis-target-group axis-target-secondary${y2TargetClass}">
             <div class="axis-target-label">
+              <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
               <button id="toggle-y2-comparison" class="axis-compare-toggle${this._excludeY2Comparison ? "" : " active"}" type="button" hidden aria-pressed="${this._excludeY2Comparison ? "false" : "true"}"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
               <span class="axis-badge">Y2</span><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
             </div>
@@ -411,7 +423,16 @@ class AdvancedHistoryPanel extends HTMLElement {
       "click",
       () => this._toggleY2Comparison(),
     );
+    this.shadowRoot.getElementById("toggle-y1-running-total")?.addEventListener(
+      "click",
+      () => this._toggleAxisRunningTotal("primary"),
+    );
+    this.shadowRoot.getElementById("toggle-y2-running-total")?.addEventListener(
+      "click",
+      () => this._toggleAxisRunningTotal("secondary"),
+    );
     this._syncY2ComparisonToggle();
+    this._syncRunningTotalAxisButtons();
     this._bindEnergyDatePickerAutoHide?.();
     this._bindPanelTabs();
     this._updateUndoRedoButtons();
