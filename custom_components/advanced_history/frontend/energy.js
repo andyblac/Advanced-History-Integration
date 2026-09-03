@@ -644,6 +644,8 @@ export class EnergyMethods {
     const period = this._panelDayPeriod();
     if (!period) return;
     this._closePanelTimeRangeDialog?.();
+    this._panelTimeRangeDialogOpen = true;
+    this._revealEnergyDatePicker();
     const cancel = this._localize("ui.common.cancel", "Cancel");
     const select = this._localize("ui.common.select", "Select");
     const reset = this._localize("ui.common.reset", "Reset");
@@ -781,6 +783,8 @@ export class EnergyMethods {
       picker.remove();
       if (this._closePanelTimeRangeDialog === close) {
         this._closePanelTimeRangeDialog = undefined;
+        this._panelTimeRangeDialogOpen = false;
+        this._hideEnergyDatePickerAfterClose();
       }
     };
     const close = () => {
@@ -1133,11 +1137,25 @@ export class EnergyMethods {
     this.shadowRoot?.getElementById("date-controller")?.classList.add("revealed");
   }
 
+  _hideEnergyDatePicker() {
+    if (!this._datePickerAutoHide) return;
+    if (this._datePickerAutoHideTimer) window.clearTimeout(this._datePickerAutoHideTimer);
+    this._datePickerAutoHideTimer = null;
+    this.shadowRoot?.getElementById("date-controller")?.classList.remove("revealed");
+  }
+
+  _hideEnergyDatePickerAfterClose() {
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      this._hideEnergyDatePicker();
+    }));
+  }
+
   _scheduleEnergyDatePickerHide() {
     if (!this._datePickerAutoHide) return;
     if (this._datePickerAutoHideTimer) window.clearTimeout(this._datePickerAutoHideTimer);
     this._datePickerAutoHideTimer = window.setTimeout(() => {
       this._datePickerAutoHideTimer = null;
+      if (this._panelTimeRangeDialogOpen) return;
       const host = this.shadowRoot?.getElementById("date-controller");
       const zone = this.shadowRoot?.getElementById("date-controller-reveal");
       if (
@@ -1312,6 +1330,9 @@ export class EnergyMethods {
           const datePicker = selector.shadowRoot?.querySelector("ha-date-range-picker");
           if (!datePicker || datePicker.__advancedHistoryDetailListener) return;
           datePicker.__advancedHistoryDetailListener = true;
+          datePicker.addEventListener("picker-closed", () => {
+            this._hideEnergyDatePickerAfterClose();
+          });
           datePicker.addEventListener("value-changed", () => {
             const hadPanelTimeRange = Boolean(this._panelTimeRange);
             if (hadPanelTimeRange) {
