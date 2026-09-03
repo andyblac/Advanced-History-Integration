@@ -9,12 +9,15 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    BUILD_CHANNEL,
+    BUILD_NUMBER,
     CONF_CARD_MODULE_URL,
     CONF_NUMERIC_CARD_OPTIONS,
     CONF_REQUIRE_ADMIN,
     CONF_SIDEBAR_ICON,
     CONF_STATE_CARD_OPTIONS,
     CONF_TITLE,
+    DISPLAY_VERSION,
     DOMAIN,
     FRONTEND_BASE_URL,
     MORE_INFO_MODULE_URL,
@@ -79,6 +82,9 @@ def _panel_config(entry: ConfigEntry) -> tuple[dict, dict]:
     panel_config["config_entry_id"] = entry.entry_id
     panel_config["settings_path"] = f"/config/integrations/integration/{DOMAIN}"
     panel_config["integration_version"] = VERSION
+    panel_config["integration_display_version"] = DISPLAY_VERSION
+    panel_config["integration_build_channel"] = BUILD_CHANNEL
+    panel_config["integration_build_number"] = BUILD_NUMBER
 
     if not panel_config.get(CONF_CARD_MODULE_URL):
         panel_config.pop(CONF_CARD_MODULE_URL, None)

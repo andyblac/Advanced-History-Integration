@@ -7,7 +7,9 @@ export const panelStyles = `
     color:var(--app-header-text-color,white); background:var(--app-header-background-color,var(--primary-color));
     box-shadow:0 2px 4px rgba(0,0,0,.18); position:sticky; top:0; z-index:5;
   }
-  .appbar h1 { margin:0 10px 0 0; font-size:20px; font-weight:500; }
+  .app-title { min-width:0; margin-right:10px; display:flex; flex-direction:column; justify-content:center; line-height:1; white-space:nowrap; }
+  .appbar h1 { margin:0; overflow:hidden; font-size:20px; font-weight:500; line-height:1.15; text-overflow:ellipsis; }
+  .app-version { margin-top:3px; overflow:hidden; color:inherit; opacity:.68; font-size:10px; font-weight:500; line-height:1; letter-spacing:.02em; text-overflow:ellipsis; }
   .appbar .spacer { flex:1; min-width:0; }
   .icon-button { width:40px; height:40px; padding:8px; border:0; border-radius:50%; display:grid; place-items:center; flex:0 0 40px; cursor:pointer; color:inherit; background:transparent; }
   .icon-button:hover { background:rgba(255,255,255,.12); }

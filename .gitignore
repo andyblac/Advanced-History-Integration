@@ -1,1 +1,4 @@
 .DS_Store
+.dev-build-number
+custom_components/advanced_history/build.json
+dist/

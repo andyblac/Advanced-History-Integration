@@ -106,7 +106,9 @@ export class DiagnosticsMethods {
       schema_version: 1,
       generated_at: new Date().toISOString(),
       software: {
-        advanced_history: this.config.integration_version || "unknown",
+        advanced_history: this.config.integration_display_version
+          || this.config.integration_version
+          || "unknown",
         home_assistant: this._hass?.config?.version || "unknown",
         statistics_graph_chart_card: {
           loaded: Boolean(customElements.get(CARD_TAG)),

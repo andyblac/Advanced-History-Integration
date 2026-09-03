@@ -15,6 +15,35 @@ VERSION = json.loads(
 )["version"]
 
 
+def _build_metadata() -> dict[str, str]:
+    """Return optional metadata injected by a packaged development build."""
+    path = _INTEGRATION_DIR / "build.json"
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+    if not isinstance(value, dict):
+        return {}
+    return {
+        key: str(value[key]).strip()
+        for key in ("channel", "number", "commit")
+        if value.get(key) is not None and str(value[key]).strip()
+    }
+
+
+BUILD_METADATA = _build_metadata()
+BUILD_CHANNEL = BUILD_METADATA.get("channel", "")
+BUILD_NUMBER = BUILD_METADATA.get("number", "")
+
+
+def _display_version(version: str, channel: str, number: str) -> str:
+    """Return the user-facing integration version."""
+    return f"{version}-{channel}.{number}" if channel and number else version
+
+
+DISPLAY_VERSION = _display_version(VERSION, BUILD_CHANNEL, BUILD_NUMBER)
+
+
 def _frontend_build_id() -> str:
     """Return a stable fingerprint for the complete frontend module tree."""
     digest = hashlib.sha256()

@@ -120,7 +120,9 @@ class AdvancedHistoryPanel extends HTMLElement {
   set panel(value) {
     this._panel = value;
     if (!this._versionLogged && this.config.integration_version) {
-      console.info(`%c ADVANCED-HISTORY-PANEL %c v${this.config.integration_version} `, "color:white;background:#03a9f4;font-weight:700", "color:#03a9f4;background:white");
+      const version = this.config.integration_display_version
+        || this.config.integration_version;
+      console.info(`%c ADVANCED-HISTORY-PANEL %c v${version} `, "color:white;background:#03a9f4;font-weight:700", "color:#03a9f4;background:white");
       this._versionLogged = true;
     }
     if (!this._loaded && this._hass) this._initialize();
@@ -336,13 +338,19 @@ class AdvancedHistoryPanel extends HTMLElement {
   }
 
   _loadingView() {
-    const history = this._localize("panel.history", "History");
+    const title = this.config.title || this._localize("panel.history", "History");
+    const displayVersion = this.config.integration_display_version
+      || this.config.integration_version
+      || "";
     const loading = this._localize("ui.common.loading", "Loading");
-    this.shadowRoot.innerHTML = `<style>${css}</style><div class="appbar"><h1>${this._escape(history)}</h1></div><main class="content"><div class="start"><p>${this._escape(loading)}…</p></div></main>`;
+    this.shadowRoot.innerHTML = `<style>${css}</style><div class="appbar"><div class="app-title"><h1>${this._escape(title)}</h1>${displayVersion ? `<span class="app-version">v${this._escape(displayVersion)}</span>` : ""}</div></div><main class="content"><div class="start"><p>${this._escape(loading)}…</p></div></main>`;
   }
 
   _render() {
     const title = this.config.title || this._localize("panel.history", "History");
+    const displayVersion = this.config.integration_display_version
+      || this.config.integration_version
+      || "";
     const removeAll = this._localize("ui.panel.history.remove_all", "Remove all selections");
     const bookmarks = this._customLocalize("bookmarks");
     const chartHistory = this._customLocalize("chart_history");
@@ -365,7 +373,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this.shadowRoot.innerHTML = `
       <style>${css}</style>
       <header class="appbar">
-        <ha-menu-button id="menu"></ha-menu-button><h1>${this._escape(title)}</h1>
+        <ha-menu-button id="menu"></ha-menu-button><div class="app-title"><h1>${this._escape(title)}</h1>${displayVersion ? `<span class="app-version">v${this._escape(displayVersion)}</span>` : ""}</div>
         ${this._renderPanelTabs()}
         <span class="spacer"></span>
         ${this._desktopPanelLayoutAvailable() ? `<button id="add-panel" class="icon-button desktop-panel-only" title="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" aria-label="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" ${this._panelTabs.length >= this.maxTabs ? "disabled" : ""}><ha-icon icon="mdi:plus"></ha-icon></button>` : ""}

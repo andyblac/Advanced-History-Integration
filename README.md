@@ -80,6 +80,14 @@ New installations create both services automatically. The More Info graph replac
 3. Restart Home Assistant.
 4. Add **Advanced History** from **Settings → Devices & services**.
 
+### Development builds
+
+Run `python3 scripts/build_dev.py` from the repository root before uploading a local development build. Each run increments a local build counter, writes `build.json` into the integration folder, and creates `dist/advanced_history-dev-<build>.zip`. The counter automatically resets to `1` when the version in `manifest.json` changes. You can upload either that ZIP’s contents or the updated `custom_components/advanced_history` folder.
+
+Local development builds display versions such as `v2.1.0-dev.42` beneath the Advanced History title, making it easy to confirm which build is installed. The version-aware counter in `dev-build.json` is tracked so numbering survives a fresh clone. The generated integration metadata and ZIP files are ignored by Git. Stable installations display the manifest version only.
+
+The repository development instructions make this the automatic final step whenever Advanced History code is changed through Codex, so a manual build-number reminder is not required.
+
 ### Existing installations from before 0.6.0
 
 After updating, open **Settings → Devices & services → Advanced History**, select **Add service**, and complete **Set up More-Info**. This creates the optional More Info graph replacement without changing the sidebar panel configuration.
