@@ -1352,7 +1352,12 @@ export class StorageMethods {
   _snapshotSummary(snapshot) {
     const count = this._snapshotTargetCount(snapshot);
     const hours = Number(snapshot.chart?.default_hours ?? this.config.default_hours) || 24;
-    const height = Number(snapshot.chart?.graph_height ?? this.config.graph_height) || 300;
+    const savedCompare = snapshot.chart?.compare !== undefined
+      ? snapshot.chart.compare
+      : snapshot.period?.compare;
+    const comparison = this._customLocalize(
+      this._comparisonIsActive(savedCompare) ? "comparison_on" : "comparison_off",
+    );
     const periodStart = snapshot.period?.start ? new Date(snapshot.period.start) : null;
     const periodEnd = snapshot.period?.end ? new Date(snapshot.period.end) : null;
     const dateFormatter = new Intl.DateTimeFormat(this._hass.locale?.language, { dateStyle: "medium" });
@@ -1368,7 +1373,7 @@ export class StorageMethods {
       `${count} ${count === 1 ? "target" : "targets"}`,
       { count }
     );
-    return `${targetCount} · ${period} · ${height}px · ${this._formatSnapshotTime(snapshot.saved_at)}`;
+    return `${targetCount} · ${period} · ${comparison} · ${this._formatSnapshotTime(snapshot.saved_at)}`;
   }
 
   _libraryRows(items, isBookmarks = false, options = {}) {

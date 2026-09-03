@@ -102,6 +102,8 @@ export default {
   "data_source_help": "De gegevensbron die Statistics Graph Chart Card daadwerkelijk heeft aangevraagd.",
   "comparison_period": "Vergelijkingsperiode",
   "comparison_count": "Aantal vergelijkingen",
+  "comparison_on": "Vergelijking ingeschakeld",
+  "comparison_off": "Vergelijking uitgeschakeld",
   "compare_previous_period": "Vorige periode",
   "compare_previous_day": "Vorige dag",
   "compare_previous_week": "Vorige week",

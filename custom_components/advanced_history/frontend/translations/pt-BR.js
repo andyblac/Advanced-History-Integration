@@ -102,6 +102,8 @@ export default {
   "data_source_help": "A fonte de dados realmente solicitada pelo Statistics Graph Chart Card.",
   "comparison_period": "Período de comparação",
   "comparison_count": "Número de comparações",
+  "comparison_on": "Comparação ativada",
+  "comparison_off": "Comparação desativada",
   "compare_previous_period": "Período anterior",
   "compare_previous_day": "Dia anterior",
   "compare_previous_week": "Semana anterior",
