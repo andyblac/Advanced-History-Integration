@@ -342,6 +342,126 @@ export class EnergyMethods {
     }));
   }
 
+  _comparisonSeriesPeriodReplacements(collection = this._energyCollection) {
+    if (!collection?.compare) return [];
+    const start = collection.start;
+    const end = collection.end;
+    if (!(start instanceof Date) || !(end instanceof Date)) return [];
+    const choice = this._energyCompareChoice
+      || this._energyCompareChoiceFromNative(collection.compare)
+      || "previous_period";
+    const count = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._energyCompareCount)) || 1),
+    );
+    const ranges = this._energyCompareRanges(start, end, choice, count);
+    if (ranges.length !== count) return [];
+    const translationKeys = {
+      previous_period: "compare_previous_period",
+      yesterday: "compare_previous_day",
+      last_week: "compare_previous_week",
+      last_month: "compare_previous_month",
+      last_year: "compare_previous_year",
+    };
+    const fallbackKey = translationKeys[choice];
+    if (!fallbackKey) return [];
+    const genericLabel = this._energyCompareLabel(choice, fallbackKey);
+    const periodKind = this._energyPeriodKind(start, end);
+    const includeTime = Boolean(this._panelTimeRange);
+    return Array.from({ length: count }, (_, index) => {
+      const periodsBack = index + 1;
+      const range = ranges[count - periodsBack];
+      const inclusiveEnd = new Date(Math.max(
+        range.start.getTime(),
+        range.end.getTime() - 1,
+      ));
+      return {
+        genericLabel,
+        periodsBack,
+        periodLabel: this._energyCompactCompareRangeLabel(
+          range.start,
+          inclusiveEnd,
+          periodKind,
+          includeTime,
+        ),
+      };
+    });
+  }
+
+  _energyCompactCompareRangeLabel(
+    start,
+    end,
+    periodKind = "other",
+    includeTime = false,
+    currentDate = new Date(),
+  ) {
+    const language = this._hass?.locale?.language || this._hass?.language;
+    const timeZone = this._resolvedTimeZone?.() || this._hass?.config?.time_zone;
+    const zone = timeZone ? { timeZone } : {};
+    const yearFormatter = new Intl.DateTimeFormat("en", { year: "numeric", ...zone });
+    const yearOf = (value) => yearFormatter.format(value);
+    if (!includeTime && periodKind === "year") {
+      return new Intl.DateTimeFormat(language, { year: "numeric", ...zone }).format(start);
+    }
+    if (!includeTime && periodKind === "month") {
+      const includeYear = yearOf(start) !== yearOf(currentDate);
+      return new Intl.DateTimeFormat(language, {
+        month: "short",
+        ...(includeYear ? { year: "numeric" } : {}),
+        ...zone,
+      }).format(start);
+    }
+    const includeYear = yearOf(start) !== yearOf(currentDate)
+      || yearOf(end) !== yearOf(currentDate);
+    const formatter = new Intl.DateTimeFormat(language, includeTime
+      ? { dateStyle: "medium", timeStyle: "short", ...zone }
+      : {
+          day: "numeric",
+          month: "short",
+          ...(includeYear ? { year: "numeric" } : {}),
+          ...zone,
+        });
+    if (!includeTime && periodKind === "day") return formatter.format(start);
+    return typeof formatter.formatRange === "function"
+      ? formatter.formatRange(start, end)
+      : `${formatter.format(start)} – ${formatter.format(end)}`;
+  }
+
+  _replaceComparisonSeriesPeriodLabel(value, replacements) {
+    let result = String(value || "");
+    for (const replacement of replacements || []) {
+      const { genericLabel, genericLabels, periodsBack, periodLabel } = replacement;
+      for (const label of genericLabels || [genericLabel]) {
+        const escapedLabel = label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        const multiplier = periodsBack > 1 ? `\\s*×\\s*${periodsBack}` : "";
+        const suffix = new RegExp(`\\s*\\(${escapedLabel}${multiplier}\\)$`, "iu");
+        if (suffix.test(result)) {
+          result = result.replace(suffix, ` (${periodLabel})`);
+          return result;
+        }
+      }
+    }
+    return result;
+  }
+
+  _applyComparisonSeriesPeriodLabels(card) {
+    const root = card?.shadowRoot;
+    if (
+      !root
+      || typeof document === "undefined"
+      || typeof document.createTreeWalker !== "function"
+    ) return;
+    const replacements = this._comparisonSeriesPeriodReplacements();
+    if (!replacements.length) return;
+    const walker = document.createTreeWalker(root, 4);
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    for (const node of textNodes) {
+      const next = this._replaceComparisonSeriesPeriodLabel(node.nodeValue, replacements);
+      if (next !== node.nodeValue) node.nodeValue = next;
+    }
+  }
+
   _energyCompareMode(dataMode, collectionMode) {
     return collectionMode ? (dataMode || collectionMode) : "";
   }

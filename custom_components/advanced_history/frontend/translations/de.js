@@ -113,10 +113,10 @@ export default {
   "comparison_count": "Anzahl der Vergleiche",
   "comparison_on": "Vergleich ein",
   "comparison_off": "Vergleich aus",
-  "compare_previous_period": "Vorheriger Zeitraum",
-  "compare_previous_day": "Vorheriger Tag",
-  "compare_previous_week": "Vorherige Woche",
-  "compare_previous_month": "Vorheriger Monat",
-  "compare_previous_year": "Vorheriges Jahr",
+  "compare_previous_period": "Vorherige Periode",
+  "compare_previous_day": "Gestern",
+  "compare_previous_week": "Letzte Woche",
+  "compare_previous_month": "Letzter Monat",
+  "compare_previous_year": "Letztes Jahr",
   "auto_hide_date_picker": "Automatisch ausblenden"
 };

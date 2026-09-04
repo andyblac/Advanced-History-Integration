@@ -366,6 +366,9 @@ export class GraphMethods {
     }
     const resize = () => {
       if (!this.isConnected || this.shadowRoot?.getElementById("charts") !== host) return;
+      for (const card of this._graphCards || []) {
+        this._applyComparisonSeriesPeriodLabels?.(card);
+      }
       if (hasState) {
         for (const stateCard of host.querySelectorAll(".state-graph > statistics-graph-chart-card")) {
           this._fitStateTimelineCard(stateCard);

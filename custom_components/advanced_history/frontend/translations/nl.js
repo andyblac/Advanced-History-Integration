@@ -114,7 +114,7 @@ export default {
   "comparison_on": "Vergelijking ingeschakeld",
   "comparison_off": "Vergelijking uitgeschakeld",
   "compare_previous_period": "Vorige periode",
-  "compare_previous_day": "Vorige dag",
+  "compare_previous_day": "Gisteren",
   "compare_previous_week": "Vorige week",
   "compare_previous_month": "Vorige maand",
   "compare_previous_year": "Vorig jaar",

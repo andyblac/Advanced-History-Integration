@@ -114,9 +114,9 @@ export default {
   "comparison_on": "Comparação ativada",
   "comparison_off": "Comparação desativada",
   "compare_previous_period": "Período anterior",
-  "compare_previous_day": "Dia anterior",
-  "compare_previous_week": "Semana anterior",
-  "compare_previous_month": "Mês anterior",
-  "compare_previous_year": "Ano anterior",
+  "compare_previous_day": "Ontem",
+  "compare_previous_week": "Semana passada",
+  "compare_previous_month": "Mês passado",
+  "compare_previous_year": "Ano passado",
   "auto_hide_date_picker": "Ocultar automaticamente"
 };

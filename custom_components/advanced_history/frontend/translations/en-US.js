@@ -114,9 +114,9 @@ export default {
   "comparison_on": "Comparison on",
   "comparison_off": "Comparison off",
   "compare_previous_period": "Previous period",
-  "compare_previous_day": "Previous day",
-  "compare_previous_week": "Previous week",
-  "compare_previous_month": "Previous month",
-  "compare_previous_year": "Previous year",
+  "compare_previous_day": "Yesterday",
+  "compare_previous_week": "Last week",
+  "compare_previous_month": "Last month",
+  "compare_previous_year": "Last year",
   "auto_hide_date_picker": "Auto hide"
 };

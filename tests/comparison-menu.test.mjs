@@ -49,3 +49,90 @@ test("comparison menu clamps count and refreshes an active comparison", () => {
   assert.equal(context._energyCompareCount, 10);
   assert.deepEqual(calls, ["cycle", ["previous", true], "record"]);
 });
+
+test("calendar comparison legends use their actual year", () => {
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _hass: { locale: { language: "en-GB" } },
+    _energyCompareChoice: "previous_period",
+    _energyCompareCount: 4,
+    _energyCollection: {
+      compare: "previous",
+      start: new Date(2026, 0, 1),
+      end: new Date(2027, 0, 1),
+    },
+    _resolvedTimeZone: () => "Europe/London",
+    _customLocalize: (key) => ({
+      compare_previous_period: "Previous period",
+    })[key] || key,
+  });
+
+  const replacements = context._comparisonSeriesPeriodReplacements();
+
+  assert.deepEqual(
+    replacements.map((item) => item.periodLabel),
+    ["2025", "2024", "2023", "2022"],
+  );
+  assert.equal(
+    context._replaceComparisonSeriesPeriodLabel(
+      "GAS (previous period ×2)",
+      replacements,
+    ),
+    "GAS (2024)",
+  );
+});
+
+test("comparison legend relabeling supports other comparison types", () => {
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _hass: { locale: { language: "en-GB" } },
+    _energyCompareChoice: "last_year",
+    _energyCompareCount: 2,
+    _energyCollection: {
+      compare: "yoy",
+      start: new Date(2026, 8, 1),
+      end: new Date(2026, 9, 1),
+    },
+    _resolvedTimeZone: () => "Europe/London",
+    _customLocalize: (key) => ({
+      compare_previous_year: "Last year",
+    })[key] || key,
+  });
+
+  const replacements = context._comparisonSeriesPeriodReplacements();
+
+  assert.equal(
+    context._replaceComparisonSeriesPeriodLabel(
+      "GAS (last year ×2)",
+      replacements,
+    ),
+    `GAS (${replacements[1].periodLabel})`,
+  );
+  assert.match(replacements[1].periodLabel, /2024/);
+});
+
+test("comparison date ranges use abbreviated month names", () => {
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _hass: { locale: { language: "en-GB" } },
+    _resolvedTimeZone: () => "Europe/London",
+  });
+
+  const label = context._energyCompactCompareRangeLabel(
+    new Date(2026, 7, 24),
+    new Date(2026, 7, 30, 23, 59),
+    "week",
+    false,
+    new Date(2026, 8, 1),
+  );
+
+  assert.match(label, /Aug/);
+  assert.doesNotMatch(label, /August/);
+  assert.doesNotMatch(label, /2026/);
+
+  const historicalLabel = context._energyCompactCompareRangeLabel(
+    new Date(2025, 7, 4),
+    new Date(2025, 7, 10, 23, 59),
+    "week",
+    false,
+    new Date(2026, 8, 1),
+  );
+  assert.match(historicalLabel, /2025/);
+});
