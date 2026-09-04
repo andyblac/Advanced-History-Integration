@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { EnergyMethods } from "../custom_components/advanced_history/frontend/energy.js";
+import { GraphMethods } from "../custom_components/advanced_history/frontend/graphs.js";
 
 test("comparison menu enables the selected comparison type", () => {
   const calls = [];
@@ -72,6 +73,26 @@ test("dashboard comparison refresh keeps the chart mounted", () => {
   assert.equal(elements.charts.hidden, false);
 });
 
+test("panel date refresh keeps the current chart visible", () => {
+  const elements = {
+    "period-loading-banner": { hidden: true },
+    "period-loading-text": { textContent: "" },
+    "compare-banner": { hidden: false },
+    charts: { hidden: true },
+  };
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _dashboardCardMode: false,
+    _periodRestoreLoading: false,
+    _customLocalize: () => "Loading requested range",
+    shadowRoot: { getElementById: (id) => elements[id] },
+  });
+
+  context._beginEnergyInteractionLoading();
+
+  assert.equal(elements["period-loading-banner"].hidden, false);
+  assert.equal(elements.charts.hidden, false);
+});
+
 test("dashboard date control formats a compact range with a separate year", () => {
   const context = Object.assign(Object.create(EnergyMethods.prototype), {
     _hass: { locale: { language: "en-GB" }, config: { time_zone: "UTC" } },
@@ -103,6 +124,93 @@ test("dashboard date control shifts the complete selected period", () => {
 
   assert.equal(shifted.start.getDate(), 11);
   assert.equal(shifted.end.getDate(), 17);
+});
+
+test("dashboard navigation starts SGCC loading before the Energy refresh", () => {
+  const calls = [];
+  const graphCard = {
+    _handleEnergyDate: (start, end) => calls.push(["graph", start, end]),
+  };
+  const collection = {
+    setPeriod(start, end) {
+      this.start = start;
+      this.end = end;
+      calls.push(["period"]);
+    },
+    refresh: () => calls.push(["refresh"]),
+  };
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _energyCollection: collection,
+    _graphCards: [graphCard],
+    _setPanelRollingHours: () => {},
+    _beginGraphDataSourceCycle: () => {},
+    _beginEnergyInteractionLoading: () => {},
+    _syncDashboardEnergyController: () => {},
+  });
+
+  context._setDashboardEnergyPeriod(
+    new Date(2026, 7, 3),
+    new Date(2026, 7, 9),
+  );
+
+  assert.deepEqual(calls.map(([name]) => name), ["period", "graph", "refresh"]);
+  assert.equal(calls[1][1].getTime(), collection.start.getTime());
+  assert.equal(calls[1][2].getTime(), collection.end.getTime());
+});
+
+test("date navigation keeps graphs mounted when detail resolution is unchanged", () => {
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _largeRangeDetailProfile: () => ({
+      automatic: true,
+      groupBy: "6h",
+      key: "2026-08-01|2026-09-01",
+    }),
+  });
+  const first = context._largeRangeDetailRenderKey();
+  context._largeRangeDetailProfile = () => ({
+    automatic: true,
+    groupBy: "6h",
+    key: "2026-09-01|2026-10-01",
+  });
+
+  assert.equal(context._largeRangeDetailRenderKey(), first);
+  context._largeRangeDetailProfile = () => ({
+    automatic: false,
+    groupBy: "date",
+    key: "2026-09-01|2026-10-01",
+  });
+  assert.notEqual(context._largeRangeDetailRenderKey(), first);
+});
+
+test("day navigation updates existing SGCC cards without rebuilding them", () => {
+  let graphUpdates = 0;
+  let graphRenders = 0;
+  let refreshes = 0;
+  const collection = {
+    start: new Date(2026, 8, 4, 0, 0, 0, 0),
+    end: new Date(2026, 8, 4, 23, 59, 59, 999),
+    setPeriod(start, end) {
+      this.start = start;
+      this.end = end;
+    },
+    refresh: () => { refreshes += 1; },
+  };
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _energyCollection: collection,
+    _panelTimeRange: null,
+    _graphCards: [{}],
+    _beginGraphDataSourceCycle: () => {},
+    _beginEnergyInteractionLoading: () => {},
+    _updateGraphHourOptionsInPlace: () => { graphUpdates += 1; },
+    _renderGraphs: () => { graphRenders += 1; },
+    _syncPanelTimeRangeControl: () => {},
+  });
+
+  context._applyPanelTimeRangePeriod(new Date(2026, 8, 3));
+
+  assert.equal(graphUpdates, 1);
+  assert.equal(graphRenders, 0);
+  assert.equal(refreshes, 1);
 });
 
 test("calendar comparison legends use their actual year", () => {

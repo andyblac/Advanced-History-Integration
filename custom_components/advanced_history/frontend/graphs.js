@@ -839,8 +839,8 @@ export class GraphMethods {
     const profile = this._largeRangeDetailProfile();
     if (!profile) return "off";
     return profile.automatic
-      ? `detail|auto|${profile.key}`
-      : `fine|${profile.groupBy}|${profile.key}`;
+      ? "detail|auto"
+      : `fine|${profile.groupBy}`;
   }
 
   _renderLargeRangeDetailBanner(profile = this._largeRangeDetailProfile()) {

@@ -854,17 +854,15 @@ export class EnergyMethods {
     const compareBanner = this.shadowRoot?.getElementById("compare-banner");
     if (compareBanner) compareBanner.hidden = true;
     const charts = this.shadowRoot?.getElementById("charts");
-    // A dashboard card participates in Home Assistant's masonry/grid sizing.
-    // Hiding its chart while comparison data reloads briefly collapses the
-    // card and makes the dashboard scroll position jump. Keep the existing
-    // chart in place until its replacement is ready.
+    // Keep the existing chart mounted and visible while SGCC reloads its
+    // Energy data. This matches the native card, avoids unnecessary layout
+    // work in the panel, and prevents dashboard masonry/grid position jumps.
+    if (charts) charts.hidden = false;
     if (this._dashboardCardMode) {
       if (banner) banner.hidden = true;
-      if (charts) charts.hidden = false;
       return;
     }
     if (banner) banner.hidden = false;
-    if (charts) charts.hidden = true;
   }
 
   _finishEnergyInteractionLoading(compareHost, compareCard) {
@@ -963,6 +961,19 @@ export class EnergyMethods {
     };
   }
 
+  _syncGraphCardsToEnergyPeriod(collection = this._energyCollection) {
+    const start = collection?.start;
+    const end = collection?.end;
+    if (!(start instanceof Date) || !(end instanceof Date)) return false;
+    let synced = false;
+    for (const card of this._graphCards || []) {
+      if (typeof card?._handleEnergyDate !== "function") continue;
+      card._handleEnergyDate(start, end);
+      synced = true;
+    }
+    return synced;
+  }
+
   _setDashboardEnergyPeriod(startValue, endValue) {
     const collection = this._energyCollection;
     if (!collection) return;
@@ -977,6 +988,10 @@ export class EnergyMethods {
     this._beginEnergyInteractionLoading();
     collection.setPeriod(start, end);
     this._syncDashboardEnergyController(collection);
+    // SGCC's Energy subscription normally receives these dates only after
+    // Home Assistant has finished fetching the complete Energy collection.
+    // Forward them immediately so its own graph query can run in parallel.
+    this._syncGraphCardsToEnergyPeriod(collection);
     collection.refresh?.();
   }
 
@@ -1444,7 +1459,10 @@ export class EnergyMethods {
     const changed = collection.start?.getTime?.() !== start.getTime()
       || collection.end?.getTime?.() !== end.getTime();
     if (quiet) {
-      if (changed) collection.setPeriod(start, end);
+      if (changed) {
+        collection.setPeriod(start, end);
+        this._syncGraphCardsToEnergyPeriod(collection);
+      }
       this._updateGraphHourOptionsInPlace?.();
       this._syncPanelTimeRangeControl();
       if (!deferRefresh && (changed || forceRefresh)) collection.refresh?.();
@@ -1454,10 +1472,14 @@ export class EnergyMethods {
     if (changed) {
       this._beginEnergyInteractionLoading();
       collection.setPeriod(start, end);
+      this._syncGraphCardsToEnergyPeriod(collection);
     }
-    // Mount the cards against the final period before a changed collection
-    // publishes its fresh payload.
-    this._renderGraphs();
+    // Existing SGCC cards already subscribe to this Energy collection, so
+    // keep them mounted and only update the hour-filter configuration. This
+    // matches native SGCC navigation and avoids rebuilding the complete chart
+    // before every Day/partial-day refresh.
+    if (this._graphCards?.length) this._updateGraphHourOptionsInPlace?.();
+    else this._renderGraphs();
     this._syncPanelTimeRangeControl();
     if (changed || forceRefresh) collection.refresh?.();
     else this._recordChange(null, true);
@@ -1824,6 +1846,7 @@ export class EnergyMethods {
             }
             this._beginEnergyInteractionLoading();
             requestAnimationFrame(() => {
+              this._syncGraphCardsToEnergyPeriod();
               const nextDetailKey = this._largeRangeDetailRenderKey();
               if (nextDetailKey !== this._largeRangeDetailStateKey) {
                 this._largeRangeDetailStateKey = nextDetailKey;
@@ -2168,14 +2191,13 @@ export class EnergyMethods {
     }
     const syncAfterInteraction = () => {
       queueMicrotask(() => {
+        this._syncGraphCardsToEnergyPeriod(collection);
         applyMode(collection.compare);
         this._syncPanelTimeRangeControl();
-        this._recordChange(null, true);
       });
       setTimeout(() => {
         applyMode(collection.compare);
         this._syncPanelTimeRangeControl();
-        this._recordChange(null, true);
       }, 150);
     };
     this._bindPanelTimeNavigation(host);
