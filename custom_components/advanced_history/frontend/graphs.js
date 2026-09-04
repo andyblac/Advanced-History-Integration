@@ -462,7 +462,13 @@ export class GraphMethods {
       }
     }
     if (typeof MutationObserver !== "undefined") {
-      this._graphLayoutMutationObserver = new MutationObserver(schedule);
+      this._graphLayoutMutationObserver = new MutationObserver((mutations) => {
+        // SGCC rewrites tooltip rows continuously while the pointer moves.
+        // Relabel those new text nodes in this mutation microtask, before the
+        // browser can paint SGCC's generic comparison name for one frame.
+        this._applyComparisonLabelsForMutations(mutations);
+        schedule();
+      });
       this._graphLayoutObservedRoots = new WeakSet();
     }
     this._graphLayoutObserveCard = (card) => {
@@ -487,6 +493,15 @@ export class GraphMethods {
     };
     resize();
     schedule();
+  }
+
+  _applyComparisonLabelsForMutations(mutations) {
+    const cards = new Set();
+    for (const mutation of mutations || []) {
+      const card = mutation?.target?.getRootNode?.()?.host;
+      if (card) cards.add(card);
+    }
+    for (const card of cards) this._applyComparisonSeriesPeriodLabels?.(card);
   }
 
   _guardDashboardLegendLayout(card) {

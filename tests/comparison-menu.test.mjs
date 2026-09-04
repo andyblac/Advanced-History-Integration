@@ -406,6 +406,26 @@ test("comparison legend relabeling supports other comparison types", () => {
   assert.match(replacements[1].periodLabel, /2024/);
 });
 
+test("tooltip mutations relabel comparisons before the layout frame", () => {
+  const firstCard = {};
+  const secondCard = {};
+  const relabeled = [];
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _applyComparisonSeriesPeriodLabels: (card) => relabeled.push(card),
+  });
+  const mutation = (card) => ({
+    target: { getRootNode: () => ({ host: card }) },
+  });
+
+  context._applyComparisonLabelsForMutations([
+    mutation(firstCard),
+    mutation(firstCard),
+    mutation(secondCard),
+  ]);
+
+  assert.deepEqual(relabeled, [firstCard, secondCard]);
+});
+
 test("comparison date ranges use abbreviated month names", () => {
   const context = Object.assign(Object.create(EnergyMethods.prototype), {
     _hass: { locale: { language: "en-GB" } },
