@@ -759,6 +759,9 @@ export class GraphMethods {
       host.append(shell);
       this._cards.push(card);
       this._graphCards.push(card);
+      if (this._dashboardCardMode) {
+        this._syncGraphCardsToEnergyPeriod?.();
+      }
       this._graphLayoutObserveCard?.(card);
       card.updateComplete?.then(() => {
         this._graphLayoutSchedule?.();
@@ -1192,8 +1195,19 @@ export class GraphMethods {
       }
       return recordResponse(message, result);
     };
+    const dashboardCollectionKey = this._dashboardCardMode
+      ? this._panelEnergyCollectionKey?.()
+      : null;
+    const dashboardCollectionProperty = dashboardCollectionKey
+      ? `_${dashboardCollectionKey}`
+      : null;
     const connection = hass.connection ? new Proxy(hass.connection, {
       get: (target, property) => {
+        if (
+          dashboardCollectionProperty
+          && property === dashboardCollectionProperty
+          && this._energyCollection
+        ) return this._energyCollection;
         const value = Reflect.get(target, property, target);
         if (typeof value !== "function") return value;
         if (!["subscribeMessage", "sendMessage", "sendMessagePromise"].includes(property)) {

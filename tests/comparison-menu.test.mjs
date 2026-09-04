@@ -123,6 +123,78 @@ test("dashboard navigation locks the rendered card height", () => {
   assert.equal(values.size, 0);
 });
 
+test("dashboard period store publishes local state without an Energy request", async () => {
+  const context = Object.create(EnergyMethods.prototype);
+  const store = context._createDashboardPeriodStore();
+  const updates = [];
+  store.subscribe((data) => updates.push(data));
+  const start = new Date(2026, 7, 3, 0, 0, 0, 0);
+  const end = new Date(2026, 7, 9, 23, 59, 59, 999);
+
+  store.setPeriod(start, end);
+  store.setCompare("previous");
+  store.refresh();
+  store.refresh();
+  await Promise.resolve();
+
+  assert.equal(updates.length, 1);
+  assert.equal(updates[0].start.getTime(), start.getTime());
+  assert.equal(updates[0].end.getTime(), end.getTime());
+  assert.equal(updates[0].compareMode, "previous");
+
+  const remounted = context._createDashboardPeriodStore();
+  assert.equal(remounted.start.getTime(), start.getTime());
+  assert.equal(remounted.end.getTime(), end.getTime());
+  assert.equal(remounted.compare, "previous");
+});
+
+test("dashboard controller binds local state after its date picker loads", async () => {
+  const host = {
+    isConnected: true,
+    innerHTML: "",
+    replaceChildren() { this.innerHTML = ""; },
+  };
+  const compareHost = {};
+  let bound = false;
+  let pickerLoaded = false;
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _dashboardCardMode: true,
+    _escape: (value) => value,
+    _localize: (_key, fallback) => fallback,
+    _ensureDashboardDatePickerLoaded: async () => { pickerLoaded = true; },
+    _bindDashboardPeriodStore: (_token, boundHost, boundCompareHost) => {
+      bound = boundHost === host && boundCompareHost === compareHost;
+    },
+    shadowRoot: {
+      getElementById: (id) => id === "date-controller" ? host : compareHost,
+    },
+  });
+
+  await context._renderEnergyController();
+
+  assert.equal(pickerLoaded, true);
+  assert.equal(bound, true);
+});
+
+test("dashboard SGCC receives the local period store through its sync key", () => {
+  const store = { start: new Date(), end: new Date() };
+  const connection = {
+    sendMessagePromise: async () => [],
+  };
+  const hass = { connection };
+  const card = { __advancedHistorySourceTracker: { record() {} } };
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _dashboardCardMode: true,
+    _energyCollection: store,
+    _panelEnergyCollectionKey: () => "advanced_history_test",
+  });
+
+  context._setGraphCardHass(card, hass);
+
+  assert.equal(card.hass.connection._advanced_history_test, store);
+  assert.equal(connection._advanced_history_test, undefined);
+});
+
 test("dashboard date control formats a compact range with a separate year", () => {
   const context = Object.assign(Object.create(EnergyMethods.prototype), {
     _hass: { locale: { language: "en-GB" }, config: { time_zone: "UTC" } },
@@ -172,7 +244,10 @@ test("dashboard navigation starts SGCC loading before the Energy refresh", () =>
   const context = Object.assign(Object.create(EnergyMethods.prototype), {
     _energyCollection: collection,
     _graphCards: [graphCard],
+    _panelTimeRange: { start: 600, end: 840 },
+    _panelRollingHours: 4,
     _setPanelRollingHours: () => {},
+    _updateGraphHourOptionsInPlace: () => calls.push(["hours"]),
     _beginGraphDataSourceCycle: () => {},
     _beginEnergyInteractionLoading: () => {},
     _syncDashboardEnergyController: () => {},
@@ -183,9 +258,10 @@ test("dashboard navigation starts SGCC loading before the Energy refresh", () =>
     new Date(2026, 7, 9),
   );
 
-  assert.deepEqual(calls.map(([name]) => name), ["period", "graph", "refresh"]);
-  assert.equal(calls[1][1].getTime(), collection.start.getTime());
-  assert.equal(calls[1][2].getTime(), collection.end.getTime());
+  assert.deepEqual(calls.map(([name]) => name), ["hours", "period", "graph", "refresh"]);
+  assert.equal(calls[2][1].getTime(), collection.start.getTime());
+  assert.equal(calls[2][2].getTime(), collection.end.getTime());
+  assert.equal(context._panelTimeRange, null);
 });
 
 test("date navigation keeps graphs mounted when detail resolution is unchanged", () => {

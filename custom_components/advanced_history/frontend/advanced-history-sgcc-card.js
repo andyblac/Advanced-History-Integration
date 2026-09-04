@@ -400,6 +400,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     this._dashboardCardMode = true;
     this._datePickerAutoHide = false;
     this._dashboardConfig = null;
+    this._dashboardPeriodState = null;
     this._panelTabsPersistenceSuppressed = true;
   }
 
@@ -412,6 +413,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     ) {
       throw new Error("Advanced History SGCC Card requires a valid panel snapshot");
     }
+    this._dashboardPeriodState = null;
     this._dashboardConfig = clone(config);
     this._panel = {
       config: {

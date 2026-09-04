@@ -25,6 +25,10 @@ export class EnergyMethods {
   _syncComparisonBannerVisibility() {
     const host = this.shadowRoot?.getElementById("compare-banner");
     const card = host?.querySelector("hui-energy-compare-card");
+    if (this._dashboardCardMode && host && !card) {
+      this._renderDashboardComparisonBanner(host);
+      return;
+    }
     if (host) host.hidden = this._comparisonBannerHidden(card);
   }
 
@@ -1008,6 +1012,182 @@ export class EnergyMethods {
     return synced;
   }
 
+  _createDashboardPeriodStore() {
+    const owner = this;
+    const listeners = new Set();
+    const savedStart = this._dashboardPeriodState?.start;
+    const savedEnd = this._dashboardPeriodState?.end;
+    const today = savedStart ? new Date(savedStart) : new Date();
+    if (!savedStart) today.setHours(0, 0, 0, 0);
+    const end = savedEnd ? new Date(savedEnd) : new Date(today);
+    if (!savedEnd) end.setHours(23, 59, 59, 999);
+    let publishPending = false;
+    const remember = (store) => {
+      owner._dashboardPeriodState = {
+        start: new Date(store.start),
+        end: new Date(store.end),
+        compare: store.compare || "",
+      };
+    };
+    const store = {
+      start: today,
+      end,
+      compare: this._dashboardPeriodState?.compare || "",
+      setPeriod(startValue, endValue) {
+        this.start = new Date(startValue);
+        this.end = new Date(endValue);
+        remember(this);
+      },
+      setCompare(mode) {
+        this.compare = mode || "";
+        remember(this);
+      },
+      subscribe(listener) {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      refresh() {
+        if (publishPending) return;
+        publishPending = true;
+        queueMicrotask(() => {
+          publishPending = false;
+          const data = {
+            start: new Date(store.start),
+            end: new Date(store.end),
+            compareMode: store.compare,
+          };
+          for (const listener of listeners) listener(data);
+        });
+      },
+    };
+    remember(store);
+    return store;
+  }
+
+  _renderDashboardComparisonBanner(host, store = this._energyCollection) {
+    if (!host) return;
+    const active = Boolean(store?.compare && this._comparisonBannerVisible);
+    host.hidden = !active;
+    if (!active) {
+      host.replaceChildren();
+      return;
+    }
+    const choice = this._energyCompareChoice
+      || this._energyCompareChoiceFromNative(store.compare)
+      || "previous_period";
+    const ranges = this._energyCompareRanges(
+      store.start,
+      store.end,
+      choice,
+      this._energyCompareCount,
+    );
+    if (!ranges.length) {
+      host.hidden = true;
+      return;
+    }
+    const periodKind = this._energyPeriodKind(store.start, store.end);
+    const includeTime = Boolean(this._panelTimeRange);
+    const currentLabel = this._energyCompareRangeLabel(
+      store.start,
+      store.end,
+      includeTime,
+      periodKind,
+    );
+    const comparisonLabels = ranges.map((range) => this._energyCompareRangeLabel(
+      range.start,
+      range.end,
+      includeTime,
+      periodKind,
+    ));
+    const language = this._hass?.locale?.language || this._hass?.language;
+    const comparisonLabel = comparisonLabels.length > 1
+      ? new Intl.ListFormat(language, { style: "long", type: "conjunction" })
+        .format(comparisonLabels)
+      : comparisonLabels[0];
+    const startMarker = "__ADVANCED_HISTORY_START__";
+    const endMarker = "__ADVANCED_HISTORY_END__";
+    const message = this._localize(
+      "ui.panel.lovelace.cards.energy.energy_compare.info",
+      `You are comparing the period ${startMarker} with the period ${endMarker}`,
+      { start: startMarker, end: endMarker },
+    );
+    const alert = document.createElement("ha-alert");
+    const markerPattern = new RegExp(`(${startMarker}|${endMarker})`, "g");
+    for (const part of message.split(markerPattern)) {
+      if (!part) continue;
+      if (part === startMarker || part === endMarker) {
+        const strong = document.createElement("b");
+        strong.textContent = part === startMarker ? currentLabel : comparisonLabel;
+        alert.append(strong);
+      } else {
+        alert.append(document.createTextNode(part));
+      }
+    }
+    host.replaceChildren(alert);
+  }
+
+  _bindDashboardPeriodStore(token, host, compareHost) {
+    const store = this._createDashboardPeriodStore();
+    this._energyCollection = store;
+    if (this._panelRollingHours && this._pendingRollingCompareRestore) {
+      const restore = this._pendingRollingCompareRestore;
+      this._pendingRollingCompareRestore = null;
+      this._energyCompareChoice = restore.choice;
+      this._energyCompareCount = restore.count;
+      store.setCompare(restore.compare);
+    }
+    if (this._panelRollingHours) {
+      this._refreshPanelRollingRange(true);
+    } else if (this._pendingPeriodRestore?.start) {
+      this._restorePendingPeriod(store, false);
+      this._finishPeriodRestore();
+    } else if (this._energyResetPending || !this._targetCount()) {
+      this._resetEnergySelection(store);
+    }
+    this._activateGraphDataSourceTracking();
+    this._renderDashboardEnergyController(host, store);
+    this._renderPanelTimeRangeControl(host);
+
+    const applyMode = (mode = store.compare, force = false) => {
+      if (this._energyRenderToken !== token) return;
+      const nativeChoice = this._energyCompareChoiceFromNative(mode);
+      const next = mode
+        ? this._energyCompareValue(
+          this._energyCompareChoice || nativeChoice,
+          this._energyCompareCount,
+        )
+        : null;
+      this._syncY2ComparisonToggle(Boolean(next));
+      this._syncY1ComparisonToggle(Boolean(next));
+      const nextDetailKey = this._largeRangeDetailRenderKey();
+      if (
+        !force
+        && JSON.stringify(next) === JSON.stringify(this._energyCompare)
+        && nextDetailKey === this._largeRangeDetailStateKey
+      ) return;
+      this._energyCompare = next;
+      this._largeRangeDetailStateKey = nextDetailKey;
+      this._renderGraphs();
+      this._syncGraphCardsToEnergyPeriod(store);
+      this._renderDashboardComparisonBanner(compareHost, store);
+    };
+    this._energyApplyCompareMode = applyMode;
+    this._energyUnsubscribe = store.subscribe(() => {
+      if (this._energyRenderToken !== token) return;
+      this._syncDashboardEnergyController(store);
+      applyMode(store.compare);
+      this._syncGraphCardsToEnergyPeriod(store);
+      this._renderDashboardComparisonBanner(compareHost, store);
+      this._finishEnergyInteractionLoading();
+      this._syncPanelTimeRangeControl();
+      this._recordChange(null, true);
+    });
+    applyMode(store.compare, true);
+    this._syncGraphCardsToEnergyPeriod(store);
+    this._renderDashboardComparisonBanner(compareHost, store);
+    this._recordChange();
+  }
+
   _setDashboardEnergyPeriod(startValue, endValue) {
     const collection = this._energyCollection;
     if (!collection) return;
@@ -1016,8 +1196,16 @@ export class EnergyMethods {
     if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return;
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
+    if (
+      collection.start?.getTime?.() === start.getTime()
+      && collection.end?.getTime?.() === end.getTime()
+      && !this._panelTimeRange
+      && !this._panelRollingHours
+    ) return;
     this._setPanelRollingHours(null);
     this._panelTimeRange = null;
+    this._closePanelTimeRangeDialog?.();
+    this._updateGraphHourOptionsInPlace?.();
     this._beginGraphDataSourceCycle();
     this._beginEnergyInteractionLoading();
     collection.setPeriod(start, end);
@@ -1120,6 +1308,7 @@ export class EnergyMethods {
       controller.querySelector(".dashboard-period-nav.previous")?.addEventListener("click", () => this._shiftDashboardEnergyPeriod(-1));
       controller.querySelector(".dashboard-period-nav.next")?.addEventListener("click", () => this._shiftDashboardEnergyPeriod(1));
       picker.addEventListener("value-changed", (event) => {
+        if (picker.__advancedHistorySyncing) return;
         const value = event.detail?.value;
         if (value?.startDate && value?.endDate) {
           this._setDashboardEnergyPeriod(value.startDate, value.endDate);
@@ -1134,8 +1323,10 @@ export class EnergyMethods {
     if (!controller || !(collection?.start instanceof Date) || !(collection?.end instanceof Date)) return;
     const parts = this._dashboardEnergyPeriodParts(collection.start, collection.end);
     const picker = controller.querySelector(".dashboard-date-picker");
+    picker.__advancedHistorySyncing = true;
     picker.startDate = collection.start;
     picker.endDate = collection.end;
+    queueMicrotask(() => { picker.__advancedHistorySyncing = false; });
     const nativeSelector = this.shadowRoot
       ?.getElementById("date-controller")
       ?.querySelector(".dashboard-energy-bridge")
@@ -1733,6 +1924,19 @@ export class EnergyMethods {
     const dateRange = this._localize("ui.components.date-range-picker.select_date_range", "Select time period");
     const loading = this._localize("ui.common.loading", "Loading");
     host.innerHTML = `<div class="target-picker" style="cursor:default"><span class="target-label">${this._escape(dateRange)}</span><span style="padding:3px 4px;color:var(--secondary-text-color)">${this._escape(loading)}…</span></div>`;
+    if (this._dashboardCardMode) {
+      try {
+        await this._ensureDashboardDatePickerLoaded();
+        if (this._energyRenderToken !== token || !host.isConnected) return;
+        host.replaceChildren();
+        this._bindDashboardPeriodStore(token, host, compareHost);
+      } catch (error) {
+        if (this._energyRenderToken !== token || !host.isConnected) return;
+        console.error("Advanced History: dashboard date picker failed to load", error);
+        host.innerHTML = `<div class="error" style="padding:10px">${this._escape(this._customLocalize("energy_selector_error"))}</div>`;
+      }
+      return;
+    }
     try {
       const helpers = await this._loadCardHelpers();
       if (this._energyRenderToken !== token || !host.isConnected) return;
@@ -1833,6 +2037,18 @@ export class EnergyMethods {
       return this._waitForCustomElement(tag);
     });
     await Promise.all(waits);
+  }
+
+  async _ensureDashboardDatePickerLoaded() {
+    if (customElements.get("ha-date-range-picker")) return;
+    const helpers = await this._loadCardHelpers();
+    if (!customElements.get("hui-energy-date-selection-card")) {
+      // Import the module only. The temporary element is never connected or
+      // given hass, so it cannot create or subscribe to an Energy collection.
+      helpers.createCardElement({ type: "energy-date-selection" });
+    }
+    await this._waitForCustomElement("hui-energy-date-selection-card");
+    await this._waitForCustomElement("ha-date-range-picker");
   }
 
   async _waitForCustomElement(tag, timeout = 10000) {
