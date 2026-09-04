@@ -90,6 +90,8 @@ export default {
   "share_link_copied": "Link de compartilhamento copiado",
   "share_link_error": "Não foi possível copiar o link de compartilhamento",
   "add_current_panel_to_dashboard": "Adicionar painel atual ao painel de controle",
+  "add_current_chart_to_dashboard": "Adicionar gráfico atual ao painel de controle",
+  "dashboard_card_editor_unavailable": "O editor do Statistics Graph Chart Card não está disponível.",
   "dashboard_yaml_fallback_title": "YAML do painel de controle",
   "copy_dashboard_yaml": "Copiar YAML",
   "dashboard_yaml_copied": "YAML do painel de controle copiado",

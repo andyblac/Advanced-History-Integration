@@ -1,4 +1,8 @@
-import { CARD_TAG } from "./constants.js";
+import {
+  ADVANCED_HISTORY_CARD_SCHEMA,
+  ADVANCED_HISTORY_CARD_TYPE,
+  CARD_TAG,
+} from "./constants.js";
 
 const BRIDGE_TAG = "ha-panel-history";
 const SUGGEST_DIALOG_TAG = "hui-dialog-suggest-card";
@@ -23,6 +27,44 @@ function clone(value) {
   return typeof structuredClone === "function"
     ? structuredClone(value)
     : JSON.parse(JSON.stringify(value));
+}
+
+function compactPanelSettings(config = {}) {
+  const keys = [
+    "card_module_url",
+    "card_options",
+    "entity_options",
+    "default_hours",
+    "graph_height",
+    "large_range_automatic_detail",
+    "large_range_detail_threshold_days",
+  ];
+  return Object.fromEntries(keys.flatMap((key) => (
+    config[key] === undefined ? [] : [[key, clone(config[key])]]
+  )));
+}
+
+export function advancedHistoryDashboardCard(
+  snapshot,
+  panelConfig = {},
+  title = "",
+  entities = [],
+  graphConfigs = [],
+) {
+  if (!snapshot?.targets || !snapshot?.chart) return null;
+  const config = {
+    type: ADVANCED_HISTORY_CARD_TYPE,
+    schema: ADVANCED_HISTORY_CARD_SCHEMA,
+    snapshot: clone(snapshot),
+    settings: compactPanelSettings(panelConfig),
+    entities: [...new Set(entities.filter((entity) => typeof entity === "string"))],
+    sgcc_configs: graphConfigs
+      .filter((config) => config && typeof config === "object" && !Array.isArray(config))
+      .map((config) => clone(config)),
+  };
+  const normalizedTitle = String(title || "").trim();
+  if (normalizedTitle) config.title = normalizedTitle;
+  return config;
 }
 
 function escapeHtml(value) {

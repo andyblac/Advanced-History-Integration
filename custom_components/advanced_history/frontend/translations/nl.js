@@ -90,6 +90,8 @@ export default {
   "share_link_copied": "Deellink gekopieerd",
   "share_link_error": "Deellink kon niet worden gekopieerd",
   "add_current_panel_to_dashboard": "Huidig paneel aan dashboard toevoegen",
+  "add_current_chart_to_dashboard": "Huidige grafiek aan dashboard toevoegen",
+  "dashboard_card_editor_unavailable": "De editor van Statistics Graph Chart Card is niet beschikbaar.",
   "dashboard_yaml_fallback_title": "Dashboard-YAML",
   "copy_dashboard_yaml": "YAML kopiëren",
   "dashboard_yaml_copied": "Dashboard-YAML gekopieerd",

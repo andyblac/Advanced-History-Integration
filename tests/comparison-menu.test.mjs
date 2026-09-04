@@ -50,6 +50,61 @@ test("comparison menu clamps count and refreshes an active comparison", () => {
   assert.deepEqual(calls, ["cycle", ["previous", true], "record"]);
 });
 
+test("dashboard comparison refresh keeps the chart mounted", () => {
+  const elements = {
+    "period-loading-banner": { hidden: false },
+    "period-loading-text": { textContent: "" },
+    "compare-banner": { hidden: false },
+    charts: { hidden: false },
+  };
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _dashboardCardMode: true,
+    _periodRestoreLoading: false,
+    _customLocalize: () => "Loading requested range",
+    shadowRoot: { getElementById: (id) => elements[id] },
+  });
+
+  context._beginEnergyInteractionLoading();
+
+  assert.equal(context._energyInteractionLoading, true);
+  assert.equal(elements["period-loading-banner"].hidden, true);
+  assert.equal(elements["compare-banner"].hidden, true);
+  assert.equal(elements.charts.hidden, false);
+});
+
+test("dashboard date control formats a compact range with a separate year", () => {
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _hass: { locale: { language: "en-GB" }, config: { time_zone: "UTC" } },
+    _resolvedTimeZone: () => "UTC",
+  });
+  const parts = context._dashboardEnergyPeriodParts(
+    new Date("2020-08-04T00:00:00.000Z"),
+    new Date("2020-08-11T00:00:00.000Z"),
+  );
+
+  assert.match(parts.primary, /4/);
+  assert.match(parts.primary, /10/);
+  assert.match(parts.primary, /Aug/);
+  assert.equal(parts.secondary, "2020");
+});
+
+test("dashboard date control shifts the complete selected period", () => {
+  let shifted;
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _energyCollection: {
+      start: new Date(2026, 7, 4, 0, 0, 0, 0),
+      end: new Date(2026, 7, 10, 23, 59, 59, 999),
+    },
+    _panelTimeRange: null,
+    _setDashboardEnergyPeriod: (start, end) => { shifted = { start, end }; },
+  });
+
+  context._shiftDashboardEnergyPeriod(1);
+
+  assert.equal(shifted.start.getDate(), 11);
+  assert.equal(shifted.end.getDate(), 17);
+});
+
 test("calendar comparison legends use their actual year", () => {
   const context = Object.assign(Object.create(EnergyMethods.prototype), {
     _hass: { locale: { language: "en-GB" } },

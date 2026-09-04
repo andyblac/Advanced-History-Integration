@@ -1,4 +1,7 @@
 export const CARD_TAG = "statistics-graph-chart-card";
+export const ADVANCED_HISTORY_CARD_TAG = "advanced-history-sgcc-card";
+export const ADVANCED_HISTORY_CARD_TYPE = `custom:${ADVANCED_HISTORY_CARD_TAG}`;
+export const ADVANCED_HISTORY_CARD_SCHEMA = 1;
 export const CARD_RESOURCE_MATCH = "statistics-graph-chart-card";
 export const CARD_DEFAULT_MODULE_URLS = [
   "/hacsfiles/Statistics-Graph-Chart-Card/statistics-graph-chart-card.js",

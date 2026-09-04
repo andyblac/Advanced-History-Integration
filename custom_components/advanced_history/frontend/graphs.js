@@ -408,6 +408,9 @@ export class GraphMethods {
       observe(cardElement);
       observe(detailLegend);
       const numericRequirement = this._numericCardRequiredHeight(numericCard);
+      const layoutHeight = this._dashboardCardMode
+        ? Math.max(240, numericRequirement)
+        : available;
       if (hasState) {
         host.style.removeProperty("height");
         // Do not give the grid a viewport-sized minimum: an auto state row is
@@ -418,7 +421,7 @@ export class GraphMethods {
         const stateHeight = Math.ceil(stateShell?.getBoundingClientRect().height || 0);
         const numericHeight = `${Math.max(
           240,
-          available - stateHeight - 16,
+          layoutHeight - stateHeight - 16,
           numericRequirement,
         )}px`;
         if (host.style.getPropertyValue("--numeric-graph-height") !== numericHeight) {
@@ -427,7 +430,7 @@ export class GraphMethods {
       } else {
         host.style.removeProperty("min-height");
         host.style.removeProperty("--numeric-graph-height");
-        const next = `${Math.max(available, numericRequirement)}px`;
+        const next = `${Math.max(layoutHeight, numericRequirement)}px`;
         if (host.style.height !== next) host.style.height = next;
       }
     };
@@ -914,15 +917,19 @@ export class GraphMethods {
         }
       }
       indicator.className = `data-source-indicator ${source}`;
-      indicator.textContent = this._customLocalize(
+      const label = this._customLocalize(
         source === "pending"
           ? "data_source_pending"
           : source === "mixed"
             ? "data_source_mixed"
             : source === "statistics"
               ? "data_source_statistics"
-              : "data_source_history"
+              : "data_source_history",
       );
+      indicator.textContent = this._dashboardCardMode && source === "statistics"
+        ? "LTS"
+        : label;
+      indicator.setAttribute("aria-label", label);
     };
     const tracker = {
       get source() {

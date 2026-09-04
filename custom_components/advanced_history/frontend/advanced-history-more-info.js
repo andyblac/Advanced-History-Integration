@@ -14,6 +14,7 @@ import {
 } from "./history-series.js";
 import { mergeStateMaps, nativeStateMap } from "./state-colors.js";
 import { customLocalize, loadTranslations } from "./translations.js";
+import "./advanced-history-sgcc-card.js";
 
 // Keep the legacy global value so an update cannot install duplicate listeners
 // in a browser session that still has the previous module loaded.

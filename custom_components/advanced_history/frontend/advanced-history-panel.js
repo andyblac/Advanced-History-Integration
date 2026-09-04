@@ -15,10 +15,11 @@ import { TargetPickerMethods } from "./target-picker.js";
 import { customLocalize, loadTranslations } from "./translations.js";
 import {
   addCardsToDashboard,
+  advancedHistoryDashboardCard,
   dashboardCardSnapshots,
 } from "./panel-export.js";
 
-class AdvancedHistoryPanel extends HTMLElement {
+export class AdvancedHistoryPanel extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
@@ -187,6 +188,49 @@ class AdvancedHistoryPanel extends HTMLElement {
   }
 
   async _addCurrentPanelToDashboard(button) {
+    const activeTab = this._panelTabs?.find((tab) => tab.id === this._activePanelTabId);
+    const activeTabIndex = Math.max(0, this._panelTabs?.indexOf(activeTab));
+    const title = activeTab
+      ? this._panelTabDisplayLabel(activeTab, activeTabIndex)
+      : "";
+    const card = advancedHistoryDashboardCard(
+      this._captureSnapshot(title),
+      this.config,
+      title,
+      this._graphCards.flatMap((graphCard) => (
+        graphCard?.__advancedHistoryConfig?.entities || graphCard?._config?.entities || []
+      )).map((row) => typeof row === "string" ? row : row?.entity || row?.statistic_id)
+        .filter(Boolean),
+      this._graphCards.map((graphCard) => (
+        graphCard?.__advancedHistoryConfig || graphCard?._config
+      )).filter(Boolean),
+    );
+    if (!card) return;
+    if (button) button.disabled = true;
+    try {
+      await addCardsToDashboard({
+        hass: this._hass,
+        container: this,
+        cards: [card],
+        ensureNativeHistory: () => this._loadNativeHistoryPicker(true),
+        labels: {
+          dialogTitle: this._customLocalize("add_current_panel_to_dashboard"),
+          fallbackTitle: this._customLocalize("dashboard_yaml_fallback_title"),
+          copyYaml: this._customLocalize("copy_dashboard_yaml"),
+          copied: this._customLocalize("dashboard_yaml_copied"),
+          copyFailed: this._customLocalize("dashboard_yaml_copy_error"),
+          hideEntitiesOnLoad: this._customLocalize("hide_entities_on_load"),
+          hideEntitiesOnLoadNote: this._customLocalize("hide_entities_on_load_note"),
+          exportWarning: "",
+          close: this._localize("ui.common.close", "Close"),
+        },
+      });
+    } finally {
+      if (button?.isConnected) button.disabled = false;
+    }
+  }
+
+  async _addCurrentPanelAsNativeCard(button) {
     const cards = dashboardCardSnapshots(this._graphCards, {
       start: this._energyCollection?.start,
       end: this._energyCollection?.end,
@@ -206,7 +250,7 @@ class AdvancedHistoryPanel extends HTMLElement {
         cards,
         ensureNativeHistory: () => this._loadNativeHistoryPicker(true),
         labels: {
-          dialogTitle: this._customLocalize("add_current_panel_to_dashboard"),
+          dialogTitle: this._customLocalize("add_current_chart_to_dashboard"),
           fallbackTitle: this._customLocalize("dashboard_yaml_fallback_title"),
           copyYaml: this._customLocalize("copy_dashboard_yaml"),
           copied: this._customLocalize("dashboard_yaml_copied"),
