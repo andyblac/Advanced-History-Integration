@@ -93,6 +93,36 @@ test("panel date refresh keeps the current chart visible", () => {
   assert.equal(elements.charts.hidden, false);
 });
 
+test("dashboard navigation locks the rendered card height", () => {
+  const values = new Map();
+  const card = {
+    getBoundingClientRect: () => ({ height: 487.2 }),
+    style: {
+      getPropertyValue: (property) => values.get(property) || "",
+      setProperty: (property, value) => values.set(property, value),
+      removeProperty: (property) => values.delete(property),
+    },
+  };
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _dashboardCardMode: true,
+    _periodRestoreLoading: false,
+    _customLocalize: () => "Loading requested range",
+    shadowRoot: {
+      querySelector: (selector) => selector === "ha-card.dashboard-card" ? card : null,
+      getElementById: () => null,
+    },
+  });
+
+  context._beginEnergyInteractionLoading();
+
+  assert.equal(values.get("height"), "488px");
+  assert.equal(values.get("min-height"), "488px");
+  assert.equal(values.get("max-height"), "488px");
+
+  context._releaseDashboardCardLayout();
+  assert.equal(values.size, 0);
+});
+
 test("dashboard date control formats a compact range with a separate year", () => {
   const context = Object.assign(Object.create(EnergyMethods.prototype), {
     _hass: { locale: { language: "en-GB" }, config: { time_zone: "UTC" } },

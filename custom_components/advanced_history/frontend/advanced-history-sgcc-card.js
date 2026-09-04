@@ -504,6 +504,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
 
   _render() {
     if (!this._dashboardConfig) return;
+    this._releaseDashboardCardLayout();
     const title = String(this._dashboardConfig.title || "").trim();
     const cardOptions = this._activeSnapshot?.card_options || {};
     const hasGraphHeader = [

@@ -78,6 +78,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._periodRestoreExpected = null;
     this._periodRestoreTimer = null;
     this._energyInteractionLoading = false;
+    this._dashboardCardLayoutLock = null;
     this._energyResetPending = false;
     try {
       this._datePickerAutoHide = localStorage.getItem(DATE_PICKER_AUTO_HIDE_STORAGE_KEY) === "true";
@@ -296,6 +297,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._panelTabsResizeObserver?.disconnect();
     this._panelTabsResizeObserver = null;
     this._disconnectDynamicGraphLayout?.();
+    this._releaseDashboardCardLayout?.();
     this._energyRenderToken = null;
     this._energyUnsubscribe?.();
     this._energyUnsubscribe = null;

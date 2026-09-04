@@ -845,8 +845,42 @@ export class EnergyMethods {
     return `${time(collection?.start)}|${time(collection?.end)}|${collection?.compare || ""}`;
   }
 
+  _lockDashboardCardLayout() {
+    if (!this._dashboardCardMode || this._dashboardCardLayoutLock) return false;
+    const card = this.shadowRoot?.querySelector?.("ha-card.dashboard-card");
+    const height = Math.ceil(card?.getBoundingClientRect?.().height || 0);
+    if (!card || height < 1) return false;
+    const properties = ["height", "min-height", "max-height"];
+    this._dashboardCardLayoutLock = {
+      card,
+      previous: Object.fromEntries(
+        properties.map((property) => [property, card.style.getPropertyValue(property)]),
+      ),
+    };
+    const value = `${height}px`;
+    for (const property of properties) card.style.setProperty(property, value);
+    return true;
+  }
+
+  _releaseDashboardCardLayout() {
+    const lock = this._dashboardCardLayoutLock;
+    this._dashboardCardLayoutLock = null;
+    if (!lock?.card) return;
+    for (const [property, value] of Object.entries(lock.previous || {})) {
+      if (value) lock.card.style.setProperty(property, value);
+      else lock.card.style.removeProperty(property);
+    }
+  }
+
   _beginEnergyInteractionLoading() {
     if (this._periodRestoreLoading) return;
+    // SGCC temporarily changes the size of its plot and legend while fetching
+    // a new period. In a dashboard that transient size is observable by the
+    // masonry/sections layout and moves the page under the user's pointer.
+    // Preserve the fully-rendered card height for subsequent interactions;
+    // a card configuration render releases it so SGCC height changes still
+    // take effect normally.
+    this._lockDashboardCardLayout();
     this._energyInteractionLoading = true;
     const banner = this.shadowRoot?.getElementById("period-loading-banner");
     const text = this.shadowRoot?.getElementById("period-loading-text");
