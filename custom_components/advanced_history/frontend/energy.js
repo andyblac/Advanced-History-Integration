@@ -958,7 +958,9 @@ export class EnergyMethods {
   }
 
   _dashboardEnergyPeriodParts(start, end) {
-    if (!(start instanceof Date) || !(end instanceof Date)) return { primary: "—", secondary: "" };
+    if (!(start instanceof Date) || !(end instanceof Date)) {
+      return { primary: "—", secondary: "", kind: "other" };
+    }
     const language = this._hass?.locale?.language || this._hass?.language;
     const timeZone = this._resolvedTimeZone?.() || this._hass?.config?.time_zone;
     const zone = timeZone ? { timeZone } : {};
@@ -968,11 +970,12 @@ export class EnergyMethods {
     const startYear = year.format(start);
     const endYear = year.format(inclusiveEnd);
     const currentYear = year.format(new Date());
-    if (kind === "year") return { primary: startYear, secondary: "" };
+    if (kind === "year") return { primary: startYear, secondary: "", kind };
     if (kind === "month") {
       return {
         primary: new Intl.DateTimeFormat(language, { month: "long", ...zone }).format(start),
         secondary: startYear === currentYear ? "" : startYear,
+        kind,
       };
     }
     if (startYear !== endYear) {
@@ -984,6 +987,7 @@ export class EnergyMethods {
           ? formatter.formatRange(start, inclusiveEnd)
           : `${formatter.format(start)} – ${formatter.format(inclusiveEnd)}`,
         secondary: "",
+        kind,
       };
     }
     const formatter = new Intl.DateTimeFormat(language, {
@@ -996,6 +1000,7 @@ export class EnergyMethods {
           ? formatter.formatRange(start, inclusiveEnd)
           : `${formatter.format(start)} – ${formatter.format(inclusiveEnd)}`,
       secondary: startYear === currentYear ? "" : startYear,
+      kind,
     };
   }
 
@@ -1322,6 +1327,7 @@ export class EnergyMethods {
     const controller = this.shadowRoot?.querySelector(".dashboard-energy-controller");
     if (!controller || !(collection?.start instanceof Date) || !(collection?.end instanceof Date)) return;
     const parts = this._dashboardEnergyPeriodParts(collection.start, collection.end);
+    controller.dataset.periodKind = parts.kind;
     const picker = controller.querySelector(".dashboard-date-picker");
     picker.__advancedHistorySyncing = true;
     picker.startDate = collection.start;

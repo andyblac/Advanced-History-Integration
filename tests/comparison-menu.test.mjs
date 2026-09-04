@@ -209,6 +209,7 @@ test("dashboard date control formats a compact range with a separate year", () =
   assert.match(parts.primary, /10/);
   assert.match(parts.primary, /Aug/);
   assert.equal(parts.secondary, "2020");
+  assert.equal(parts.kind, "week");
 });
 
 test("dashboard date control shifts the complete selected period", () => {

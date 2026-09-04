@@ -84,6 +84,11 @@ const cardStyles = `
   .dashboard-period-primary { font-size:15px; font-weight:500; line-height:18px; }
   .dashboard-period-secondary { color:var(--secondary-text-color); font-size:11px; line-height:14px; }
   .dashboard-period-secondary:empty { display:none; }
+  .dashboard-energy-controller[data-period-kind="day"] .dashboard-period-label { min-width:72px; }
+  .dashboard-energy-controller[data-period-kind="week"] .dashboard-period-label { min-width:112px; }
+  .dashboard-energy-controller[data-period-kind="month"] .dashboard-period-label { min-width:96px; }
+  .dashboard-energy-controller[data-period-kind="year"] .dashboard-period-label { min-width:64px; }
+  .dashboard-energy-controller[data-period-kind="other"] .dashboard-period-label { min-width:128px; }
   .dashboard-now-button {
     min-width:52px; height:30px; padding:0 10px; color:var(--primary-color);
     background:color-mix(in srgb,var(--primary-color) 16%,transparent);
