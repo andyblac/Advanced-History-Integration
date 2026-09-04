@@ -8,6 +8,7 @@ import {
 import { TargetPickerMethods } from "../custom_components/advanced_history/frontend/target-picker.js";
 import {
   advancedHistoryDashboardCard,
+  dashboardConfigWithNewView,
   dashboardCardSnapshots,
 } from "../custom_components/advanced_history/frontend/panel-export.js";
 
@@ -162,6 +163,26 @@ test("Advanced History dashboard card preserves the complete panel snapshot", ()
     card_options: { numeric: { show_fill: true } },
     graph_height: 420,
   });
+});
+
+test("dashboard export can add a uniquely named destination view", () => {
+  const original = {
+    views: [
+      { title: "Energy", path: "energy", cards: [] },
+      { title: "Energy 2", path: "energy-2", cards: [] },
+    ],
+  };
+
+  const result = dashboardConfigWithNewView(original, "Energy", "sections");
+
+  assert.equal(result.viewIndex, 2);
+  assert.deepEqual(result.config.views[2], {
+    title: "Energy",
+    path: "energy-3",
+    type: "sections",
+    sections: [],
+  });
+  assert.equal(original.views.length, 2);
 });
 
 test("SGCC editor changes retain Advanced History options and native height", async () => {

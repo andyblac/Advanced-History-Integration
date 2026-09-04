@@ -10,7 +10,9 @@ const WIDE_PREVIEW_MARKER = Symbol("advanced-history-wide-dashboard-preview");
 const DIALOG_TITLE_MARKER = Symbol("advanced-history-dashboard-dialog-title");
 const DESELECTED_OPTIONS_MARKER = Symbol("advanced-history-deselected-export-options");
 const EXPORT_WARNING_MARKER = Symbol("advanced-history-dashboard-export-warning");
+const CREATE_VIEW_MARKER = Symbol("advanced-history-create-dashboard-view");
 const WIDE_PREVIEW_PATCH = "__advancedHistoryWidePreviewPatched";
+const SELECT_VIEW_PATCH = "__advancedHistoryCreateViewPatched";
 const OMITTED_RUNTIME_KEYS = new Set([
   "energy_date_sync",
   "energy_collection_key",
@@ -27,6 +29,32 @@ function clone(value) {
   return typeof structuredClone === "function"
     ? structuredClone(value)
     : JSON.parse(JSON.stringify(value));
+}
+
+function viewPath(title) {
+  const slug = String(title || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "view";
+  return /^\d+$/.test(slug) ? `view-${slug}` : slug;
+}
+
+export function dashboardConfigWithNewView(config, title, layout = "sections") {
+  const next = clone(config);
+  const existingPaths = new Set((next.views || []).map((view) => view?.path).filter(Boolean));
+  const basePath = viewPath(title);
+  let path = basePath;
+  let suffix = 2;
+  while (existingPaths.has(path)) path = `${basePath}-${suffix++}`;
+  const view = { title: String(title || "").trim(), path };
+  if (layout === "sections") view.type = "sections";
+  else if (layout !== "masonry") view.type = layout;
+  if (layout === "sections") view.sections = [];
+  else view.cards = [];
+  next.views = [...(next.views || []), view];
+  return { config: next, viewIndex: next.views.length - 1 };
 }
 
 function compactPanelSettings(config = {}) {
@@ -407,6 +435,100 @@ function installWideNativePreview() {
   };
 }
 
+function showCreateDashboardView(dialog, hass) {
+  const params = dialog?._params;
+  const createView = params?.[CREATE_VIEW_MARKER];
+  const config = dialog?._config;
+  if (typeof createView !== "function" || !config) return;
+
+  const host = document.createElement("advanced-history-create-dashboard-view");
+  document.body.append(host);
+  const root = host.attachShadow({ mode: "open" });
+  const addView = hass.localize("ui.panel.lovelace.editor.edit_view.add") || "Add view";
+  const titleLabel = hass.localize("ui.panel.lovelace.editor.card.generic.title") || "Title";
+  const layoutLabel = hass.localize("ui.panel.lovelace.editor.edit_view.type") || "Layout";
+  const sectionsLabel = hass.localize("ui.panel.lovelace.editor.edit_view.types.sections") || "Sections (default)";
+  const masonryLabel = hass.localize("ui.panel.lovelace.editor.edit_view.types.masonry") || "Masonry";
+  const cancel = hass.localize("ui.common.cancel") || "Cancel";
+  const create = hass.localize("ui.common.create") || "Create";
+  root.innerHTML = `
+    <style>
+      :host { color:var(--primary-text-color); }
+      dialog { width:min(460px,calc(100vw - 32px)); padding:0; border:0; border-radius:12px; color:inherit; background:var(--card-background-color); }
+      dialog::backdrop { background:rgba(0,0,0,.56); }
+      header, footer { min-height:64px; padding:12px 20px; box-sizing:border-box; display:flex; align-items:center; gap:12px; }
+      header { border-bottom:1px solid var(--divider-color); }
+      footer { justify-content:flex-end; border-top:1px solid var(--divider-color); }
+      h2 { margin:0; font-size:20px; font-weight:500; }
+      main { padding:20px; display:grid; gap:18px; }
+      label, label span { display:block; }
+      label span { margin-bottom:7px; color:var(--secondary-text-color); font-size:13px; }
+      input, select { width:100%; min-height:48px; padding:0 12px; box-sizing:border-box; border:1px solid var(--divider-color); border-radius:6px; color:var(--primary-text-color); background:var(--secondary-background-color); font:inherit; }
+      input:focus, select:focus { border-color:var(--primary-color); outline:1px solid var(--primary-color); }
+      button { min-height:40px; padding:0 16px; border:0; border-radius:8px; color:var(--primary-color); background:transparent; cursor:pointer; font:inherit; font-weight:500; }
+      button.primary { color:var(--text-primary-color,white); background:var(--primary-color); }
+      button.primary:disabled { opacity:.45; cursor:default; }
+    </style>
+    <dialog aria-label="${escapeHtml(addView)}">
+      <header><h2>${escapeHtml(addView)}</h2></header>
+      <main>
+        <label><span>${escapeHtml(titleLabel)}</span><input name="title" autocomplete="off" autofocus></label>
+        <label><span>${escapeHtml(layoutLabel)}</span><select name="layout"><option value="sections">${escapeHtml(sectionsLabel)}</option><option value="masonry">${escapeHtml(masonryLabel)}</option></select></label>
+      </main>
+      <footer><button data-cancel>${escapeHtml(cancel)}</button><button class="primary" data-create disabled>${escapeHtml(create)}</button></footer>
+    </dialog>`;
+  const createDialog = root.querySelector("dialog");
+  const input = root.querySelector("input[name=title]");
+  const createButton = root.querySelector("[data-create]");
+  const close = () => {
+    createDialog.close();
+    host.remove();
+  };
+  input.addEventListener("input", () => {
+    createButton.disabled = !input.value.trim();
+  });
+  root.querySelector("[data-cancel]").addEventListener("click", close);
+  createButton.addEventListener("click", () => {
+    const result = dashboardConfigWithNewView(
+      config,
+      input.value,
+      root.querySelector("select[name=layout]").value,
+    );
+    createView(dialog._urlPath ?? null, result.config, result.viewIndex);
+    dialog.closeDialog?.();
+    close();
+  });
+  createDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    close();
+  });
+  createDialog.showModal();
+  input.focus();
+}
+
+function installNativeCreateView() {
+  const dialogClass = customElements.get("hui-dialog-select-view");
+  const prototype = dialogClass?.prototype;
+  if (!prototype || prototype[SELECT_VIEW_PATCH]) return;
+  const updated = prototype.updated;
+  prototype[SELECT_VIEW_PATCH] = true;
+  prototype.updated = function updateAdvancedHistoryViewChooser(changedProperties) {
+    updated?.call(this, changedProperties);
+    Promise.resolve(this.updateComplete).then(() => {
+      if (!this._params?.[CREATE_VIEW_MARKER] || !this.shadowRoot) return;
+      const footer = this.shadowRoot.querySelector("ha-dialog-footer");
+      if (!footer || footer.querySelector("[data-advanced-history-create-view]")) return;
+      const button = document.createElement("ha-button");
+      button.dataset.advancedHistoryCreateView = "";
+      button.slot = "secondaryAction";
+      button.appearance = "plain";
+      button.textContent = this.hass.localize("ui.panel.lovelace.editor.edit_view.add") || "Add view";
+      button.addEventListener("click", () => showCreateDashboardView(this, this.hass));
+      footer.prepend(button);
+    }).catch(() => undefined);
+  };
+}
+
 export async function addCardsToDashboard({ hass, container, cards, labels, ensureNativeHistory }) {
   if (!cards.length) return false;
   try {
@@ -442,6 +564,7 @@ export async function addCardsToDashboard({ hass, container, cards, labels, ensu
           try {
             const result = await nativeImport();
             installWideNativePreview();
+            installNativeCreateView();
             return result;
           } catch (error) {
             fallback();
@@ -463,6 +586,11 @@ export async function addCardsToDashboard({ hass, container, cards, labels, ensu
         }
         installWideNativePreview();
         queueMicrotask(cleanup);
+      } else if (detail?.dialogTag === "hui-dialog-select-view") {
+        detail.dialogParams[CREATE_VIEW_MARKER] = (urlPath, config, viewIndex) => {
+          detail.dialogParams.viewSelectedCallback(urlPath, config, viewIndex);
+        };
+        installNativeCreateView();
       } else if (detail?.dialogTag === "dialog-box") {
         // The native flow uses an alert instead of YAML when all storage
         // dashboards are generated or contain no editable views.
