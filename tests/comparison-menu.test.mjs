@@ -123,6 +123,33 @@ test("dashboard navigation locks the rendered card height", () => {
   assert.equal(values.size, 0);
 });
 
+test("dashboard legend clicks lock the card before SGCC redraws", () => {
+  const listeners = new Map();
+  const card = {
+    shadowRoot: {
+      addEventListener: (type, listener, capture) => listeners.set(type, { listener, capture }),
+    },
+  };
+  let locks = 0;
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _dashboardCardMode: true,
+    _lockDashboardCardLayout: () => { locks += 1; },
+  });
+
+  context._guardDashboardLegendLayout(card);
+  assert.equal(listeners.get("pointerdown").capture, true);
+  assert.equal(listeners.get("click").capture, true);
+
+  listeners.get("pointerdown").listener({
+    target: { closest: (selector) => selector.includes("sgc-detail-legend-entity") },
+  });
+  assert.equal(locks, 1);
+
+  listeners.get("click").listener({ target: { closest: () => null } });
+  assert.equal(locks, 1);
+  assert.equal(card.__advancedHistoryLegendLayoutGuard, true);
+});
+
 test("dashboard period store publishes local state without an Energy request", async () => {
   const context = Object.create(EnergyMethods.prototype);
   const store = context._createDashboardPeriodStore();

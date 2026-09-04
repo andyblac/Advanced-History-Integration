@@ -469,6 +469,7 @@ export class GraphMethods {
       const observeRoot = () => {
         const root = card?.shadowRoot;
         if (!root || this._graphLayoutObservedRoots?.has(root)) return Boolean(root);
+        this._guardDashboardLegendLayout(card);
         this._graphLayoutMutationObserver?.observe(root, {
           childList: true,
           characterData: true,
@@ -486,6 +487,22 @@ export class GraphMethods {
     };
     resize();
     schedule();
+  }
+
+  _guardDashboardLegendLayout(card) {
+    if (!this._dashboardCardMode || card?.__advancedHistoryLegendLayoutGuard) return;
+    const root = card?.shadowRoot;
+    if (!root) return;
+    const lock = (event) => {
+      if (!event.target?.closest?.(".sgc-detail-legend-entity, .sgc-legend-item")) return;
+      this._lockDashboardCardLayout?.();
+    };
+    // Lock before SGCC handles the click and redraws its plot/legend. Waiting
+    // for ResizeObserver is too late because Lovelace can already have seen
+    // the transient size and repositioned the dashboard.
+    root.addEventListener("pointerdown", lock, true);
+    root.addEventListener("click", lock, true);
+    card.__advancedHistoryLegendLayoutGuard = true;
   }
 
   _detailCardOptions(detail = null) {
