@@ -369,6 +369,7 @@ export class GraphMethods {
       for (const card of this._graphCards || []) {
         this._applyComparisonSeriesPeriodLabels?.(card);
       }
+      this._syncAxisVisibilityButtons?.();
       if (hasState) {
         for (const stateCard of host.querySelectorAll(".state-graph > statistics-graph-chart-card")) {
           this._fitStateTimelineCard(stateCard);
@@ -518,6 +519,62 @@ export class GraphMethods {
     root.addEventListener("pointerdown", lock, true);
     root.addEventListener("click", lock, true);
     card.__advancedHistoryLegendLayoutGuard = true;
+  }
+
+  _axisLegendEntries(axis) {
+    const entries = [];
+    for (const card of this._graphCards || []) {
+      const root = card?.shadowRoot;
+      const entities = card?._entities;
+      if (!root || !Array.isArray(entities)) continue;
+
+      // SGCC renders either its detailed or compact legend depending on the
+      // available width. Use whichever is active and address its entries with
+      // the same stable id SGCC assigns to each configured main series.
+      const detailed = [...root.querySelectorAll(".sgc-detail-legend-entity[data-id]")];
+      const compact = [...root.querySelectorAll(".sgc-legend-item[data-id]")];
+      const rendered = detailed.length ? detailed : compact;
+      const byId = new Map(rendered.map((entry) => [entry.dataset.id, entry]));
+
+      entities.forEach((entity, index) => {
+        if (!entity || entity._compareOf != null) return;
+        const entityAxis = entity.y_axis === "secondary" ? "secondary" : "primary";
+        if (entityAxis !== axis) return;
+        const entityId = entity.entity || entity.statistic_id;
+        const entry = entityId ? byId.get(`${entityId}__${index}`) : null;
+        if (entry) entries.push(entry);
+      });
+    }
+    return entries;
+  }
+
+  _legendEntryHidden(entry) {
+    return Boolean(
+      entry?.classList?.contains("legend-hidden")
+      || entry?.classList?.contains("hidden")
+    );
+  }
+
+  _syncAxisVisibilityButtons() {
+    for (const [axis, id] of [["primary", "toggle-y1-visibility"], ["secondary", "toggle-y2-visibility"]]) {
+      const entries = this._axisLegendEntries(axis);
+      const allHidden = entries.length > 0
+        && entries.every((entry) => this._legendEntryHidden(entry));
+      const button = this.shadowRoot?.getElementById(id);
+      if (!button) continue;
+      button.classList.toggle("all-hidden", allHidden);
+      button.setAttribute("aria-pressed", String(!allHidden));
+    }
+  }
+
+  _toggleAxisLegendVisibility(axis) {
+    const entries = this._axisLegendEntries(axis);
+    if (!entries.length) return;
+    const hide = entries.some((entry) => !this._legendEntryHidden(entry));
+    for (const entry of entries) {
+      if (this._legendEntryHidden(entry) !== hide) entry.click();
+    }
+    this._syncAxisVisibilityButtons();
   }
 
   _detailCardOptions(detail = null) {

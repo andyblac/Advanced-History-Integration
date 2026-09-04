@@ -449,7 +449,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
         ${dependencyMissing ? "" : `<section class="filters axis-targets">
           <div class="axis-target-group axis-target-primary${y1TargetClass}">
             <div class="axis-target-label">
-              <span class="axis-badge">Y1</span><span>${this._escape(this._customLocalize("primary_axis"))}</span>
+              <button id="toggle-y1-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("primary_axis"))}" aria-label="${this._escape(this._customLocalize("primary_axis"))}" aria-pressed="true">Y1</button><span>${this._escape(this._customLocalize("primary_axis"))}</span>
               <div class="axis-comparison-menu-shell">
                 <button id="toggle-y1-comparison" class="axis-compare-toggle axis-compare-primary" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-pressed="false"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
                 <ha-dropdown id="y1-comparison-menu" class="axis-comparison-menu" placement="bottom-start" distance="7"></ha-dropdown>
@@ -465,7 +465,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
             <div class="axis-target-label">
               <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
               <button id="toggle-y2-comparison" class="axis-compare-toggle${this._excludeY2Comparison ? "" : " active"}" type="button" hidden aria-pressed="${this._excludeY2Comparison ? "false" : "true"}"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
-              <span class="axis-badge">Y2</span><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
+              <button id="toggle-y2-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("secondary_axis"))}" aria-label="${this._escape(this._customLocalize("secondary_axis"))}" aria-pressed="true">Y2</button><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
             </div>
             <div id="y2-target-picker-host" class="native-target-picker">
               <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
@@ -496,6 +496,14 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
       "click",
       () => this._toggleY2Comparison(),
+    );
+    this.shadowRoot.getElementById("toggle-y1-visibility")?.addEventListener(
+      "click",
+      () => this._toggleAxisLegendVisibility("primary"),
+    );
+    this.shadowRoot.getElementById("toggle-y2-visibility")?.addEventListener(
+      "click",
+      () => this._toggleAxisLegendVisibility("secondary"),
     );
     this.shadowRoot.getElementById("toggle-y1-comparison")?.addEventListener(
       "click",

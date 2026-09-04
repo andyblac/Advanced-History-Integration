@@ -150,6 +150,68 @@ test("dashboard legend clicks lock the card before SGCC redraws", () => {
   assert.equal(card.__advancedHistoryLegendLayoutGuard, true);
 });
 
+test("axis badges hide and restore every main legend series on their axis", () => {
+  const legendEntry = (id, hidden = false) => {
+    const classes = new Set(hidden ? ["legend-hidden"] : []);
+    return {
+      dataset: { id },
+      classList: {
+        contains: (name) => classes.has(name),
+      },
+      click: () => {
+        if (classes.has("legend-hidden")) classes.delete("legend-hidden");
+        else classes.add("legend-hidden");
+      },
+    };
+  };
+  const gas = legendEntry("sensor.gas__0", true);
+  const power = legendEntry("sensor.power__1");
+  const temperature = legendEntry("sensor.temperature__2");
+  const entries = [gas, power, temperature];
+  const buttonState = new Map();
+  const button = (id) => ({
+    classList: {
+      toggle: (name, active) => buttonState.set(`${id}:${name}`, active),
+    },
+    setAttribute: (name, value) => buttonState.set(`${id}:${name}`, value),
+  });
+  const buttons = {
+    "toggle-y1-visibility": button("y1"),
+    "toggle-y2-visibility": button("y2"),
+  };
+  const card = {
+    _entities: [
+      { entity: "sensor.gas" },
+      { entity: "sensor.power", y_axis: "primary" },
+      { entity: "sensor.temperature", y_axis: "secondary" },
+      { entity: "sensor.gas", _compareOf: 0 },
+    ],
+    shadowRoot: {
+      querySelectorAll: (selector) => selector.startsWith(".sgc-detail") ? entries : [],
+    },
+  };
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _graphCards: [card],
+    shadowRoot: { getElementById: (id) => buttons[id] },
+  });
+
+  // A mixed axis is treated as visible: clicking it hides only the remaining
+  // visible entries, just like individually clicking each legend item.
+  context._toggleAxisLegendVisibility("primary");
+  assert.equal(context._legendEntryHidden(gas), true);
+  assert.equal(context._legendEntryHidden(power), true);
+  assert.equal(context._legendEntryHidden(temperature), false);
+  assert.equal(buttonState.get("y1:all-hidden"), true);
+  assert.equal(buttonState.get("y1:aria-pressed"), "false");
+
+  context._toggleAxisLegendVisibility("primary");
+  assert.equal(context._legendEntryHidden(gas), false);
+  assert.equal(context._legendEntryHidden(power), false);
+  assert.equal(context._legendEntryHidden(temperature), false);
+  assert.equal(buttonState.get("y1:all-hidden"), false);
+  assert.equal(buttonState.get("y1:aria-pressed"), "true");
+});
+
 test("dashboard period store publishes local state without an Energy request", async () => {
   const context = Object.create(EnergyMethods.prototype);
   const store = context._createDashboardPeriodStore();

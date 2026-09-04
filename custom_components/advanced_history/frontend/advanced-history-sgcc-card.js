@@ -707,7 +707,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
         <div class="dashboard-card-content">
           ${dependencyMissing ? "" : `<div class="dashboard-axis-strip">
             <div class="dashboard-axis-group primary axis-target-primary">
-              <span class="axis-badge">Y1</span><span>${this._escape(this._customLocalize("primary_axis"))}</span>
+              <button id="toggle-y1-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("primary_axis"))}" aria-label="${this._escape(this._customLocalize("primary_axis"))}" aria-pressed="true">Y1</button><span>${this._escape(this._customLocalize("primary_axis"))}</span>
               <div class="axis-comparison-menu-shell">
                 <button id="toggle-y1-comparison" class="axis-compare-toggle axis-compare-primary" type="button" ${hasY1Targets ? "" : "hidden"} aria-haspopup="menu" aria-expanded="false" aria-pressed="false"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
                 <ha-dropdown id="y1-comparison-menu" class="axis-comparison-menu" placement="bottom-start" distance="7"></ha-dropdown>
@@ -721,7 +721,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
             <div class="dashboard-axis-group secondary axis-target-secondary" ${hasY2Targets ? "" : "hidden"}>
               <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
               <button id="toggle-y2-comparison" class="axis-compare-toggle" type="button" aria-pressed="true"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
-              <span class="axis-badge">Y2</span><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
+              <button id="toggle-y2-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("secondary_axis"))}" aria-label="${this._escape(this._customLocalize("secondary_axis"))}" aria-pressed="true">Y2</button><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
             </div>
           </div>`}
           <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
@@ -737,6 +737,14 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
       "click",
       () => this._toggleY2Comparison(),
+    );
+    this.shadowRoot.getElementById("toggle-y1-visibility")?.addEventListener(
+      "click",
+      () => this._toggleAxisLegendVisibility("primary"),
+    );
+    this.shadowRoot.getElementById("toggle-y2-visibility")?.addEventListener(
+      "click",
+      () => this._toggleAxisLegendVisibility("secondary"),
     );
     this.shadowRoot.getElementById("toggle-y1-comparison")?.addEventListener(
       "click",

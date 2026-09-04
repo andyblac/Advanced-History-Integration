@@ -76,6 +76,15 @@ export const panelStyles = `
   }
   .axis-target-primary .axis-badge { background:var(--ha-color-green-80,var(--success-color)); }
   .axis-target-secondary .axis-badge { background:var(--primary-color); }
+  .axis-visibility-toggle {
+    appearance:none; border:0; font:inherit; line-height:inherit; cursor:pointer;
+    transition:background-color .15s ease,color .15s ease,filter .15s ease;
+  }
+  .axis-visibility-toggle:hover { filter:brightness(1.08); }
+  .axis-target-primary .axis-visibility-toggle.all-hidden,
+  .axis-target-secondary .axis-visibility-toggle.all-hidden {
+    color:var(--secondary-text-color); background:rgba(127,127,127,.28);
+  }
   .axis-target-secondary .axis-target-label { justify-content:flex-end; }
   .axis-compare-toggle, .axis-running-total-toggle {
     width:36px; height:24px; padding:0; display:inline-flex; align-items:center; justify-content:center;
