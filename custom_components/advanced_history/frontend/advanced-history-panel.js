@@ -32,6 +32,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._excludeY2Comparison = false;
+    this._comparisonBannerVisible = true;
     this._loaded = false;
     this._initialized = false;
     this._cards = [];
@@ -161,6 +162,21 @@ class AdvancedHistoryPanel extends HTMLElement {
     button.title = label;
     button.setAttribute("aria-label", label);
     button.querySelector("ha-icon")?.setAttribute("icon", "mdi:compare-horizontal");
+  }
+
+  _syncY1ComparisonToggle(compareActive = this._comparisonIsActive()) {
+    const button = this.shadowRoot?.getElementById("toggle-y1-comparison");
+    if (!button) return;
+    button.hidden = !this._targetCount(this._targets);
+    button.classList.toggle("active", Boolean(compareActive));
+    button.setAttribute("aria-pressed", String(Boolean(compareActive)));
+    const label = this._customLocalize("comparison_settings");
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    const enabled = this.shadowRoot?.getElementById("comparison-enabled");
+    this._setComparisonMenuCheckboxState?.(enabled, Boolean(compareActive));
+    const showBanner = this.shadowRoot?.getElementById("comparison-show-banner");
+    this._setComparisonMenuCheckboxState?.(showBanner, this._comparisonBannerVisible);
   }
 
   _toggleY2Comparison() {
@@ -388,6 +404,10 @@ class AdvancedHistoryPanel extends HTMLElement {
           <div class="axis-target-group axis-target-primary${y1TargetClass}">
             <div class="axis-target-label">
               <span class="axis-badge">Y1</span><span>${this._escape(this._customLocalize("primary_axis"))}</span>
+              <div class="axis-comparison-menu-shell">
+                <button id="toggle-y1-comparison" class="axis-compare-toggle axis-compare-primary" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-pressed="false"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+                <ha-dropdown id="y1-comparison-menu" class="axis-comparison-menu" placement="bottom-start" distance="7"></ha-dropdown>
+              </div>
               <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
             </div>
             <div id="target-picker-host" class="native-target-picker">
@@ -431,6 +451,14 @@ class AdvancedHistoryPanel extends HTMLElement {
       "click",
       () => this._toggleY2Comparison(),
     );
+    this.shadowRoot.getElementById("toggle-y1-comparison")?.addEventListener(
+      "click",
+      (event) => this._toggleY1ComparisonMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-y1-comparison")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
+    );
     this.shadowRoot.getElementById("toggle-y1-running-total")?.addEventListener(
       "click",
       () => this._toggleAxisRunningTotal("primary"),
@@ -440,6 +468,7 @@ class AdvancedHistoryPanel extends HTMLElement {
       () => this._toggleAxisRunningTotal("secondary"),
     );
     this._syncY2ComparisonToggle();
+    this._syncY1ComparisonToggle();
     this._syncRunningTotalAxisButtons();
     this._bindEnergyDatePickerAutoHide?.();
     this._bindPanelTabs();

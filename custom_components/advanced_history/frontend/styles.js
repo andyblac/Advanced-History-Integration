@@ -78,7 +78,7 @@ export const panelStyles = `
   .axis-target-secondary .axis-badge { background:var(--primary-color); }
   .axis-target-secondary .axis-target-label { justify-content:flex-end; }
   .axis-compare-toggle, .axis-running-total-toggle {
-    width:36px; height:24px; padding:3px 8px; display:grid; place-items:center;
+    width:36px; height:24px; padding:0; display:inline-flex; align-items:center; justify-content:center;
     box-sizing:border-box; appearance:none; line-height:0;
     color:var(--secondary-text-color);
     background:rgba(127,127,127,.28);
@@ -87,14 +87,34 @@ export const panelStyles = `
   }
   .axis-compare-toggle:hover, .axis-running-total-toggle:hover { color:var(--primary-text-color); background:rgba(127,127,127,.38); }
   .axis-compare-toggle.active { color:var(--text-primary-color,var(--primary-text-color)); background:var(--primary-color); border-color:var(--primary-color); }
+  .axis-compare-primary.active {
+    color:var(--text-primary-color,var(--primary-text-color));
+    background:var(--ha-color-green-80,var(--success-color));
+    border-color:var(--ha-color-green-80,var(--success-color));
+  }
   .axis-running-total-primary.active {
     color:var(--text-primary-color,var(--primary-text-color));
     background:var(--ha-color-green-80,var(--success-color));
     border-color:var(--ha-color-green-80,var(--success-color));
   }
   .axis-running-total-secondary.active { color:var(--text-primary-color,var(--primary-text-color)); background:var(--primary-color); border-color:var(--primary-color); }
-  .axis-compare-toggle ha-icon, .axis-running-total-toggle ha-icon { width:18px; height:18px; --mdc-icon-size:18px; }
+  .axis-compare-toggle ha-icon, .axis-running-total-toggle ha-icon { display:block; flex:0 0 18px; width:18px; height:18px; margin:0; --mdc-icon-size:18px; }
   .axis-compare-toggle[hidden], .axis-running-total-toggle[hidden] { display:none; }
+  .axis-comparison-menu-shell { position:relative; display:flex; align-items:center; }
+  .axis-comparison-menu { --ha-dropdown-font-size:14px; font-weight:400; }
+  .axis-comparison-menu::part(menu) { width:268px; box-sizing:border-box; }
+  .comparison-menu-check { width:100%; }
+  .comparison-menu-check:focus { outline:none; }
+  .comparison-menu-check ha-icon { color:var(--secondary-text-color); }
+  .comparison-menu-heading { margin:5px 10px 8px; padding-top:10px; border-top:1px solid var(--divider-color); color:var(--secondary-text-color); font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:.04em; }
+  .comparison-menu-options { padding:0 10px; display:flex; align-items:center; gap:7px; }
+  .comparison-menu-select {
+    flex:0 0 auto; height:32px; box-sizing:border-box; font:inherit; font-size:13px; line-height:1.4;
+    color:var(--primary-text-color); background:var(--card-background-color,transparent);
+    border:1px solid var(--divider-color,currentColor); border-radius:14px; cursor:pointer; outline:none;
+  }
+  .comparison-menu-period { flex:1 1 auto; min-width:0; padding:2px 7px; }
+  .comparison-menu-count { width:48px; padding:2px 5px; }
   .axis-target-divider { flex:0 0 1px; align-self:stretch; margin-top:28px; background:var(--divider-color); }
   .energy-nav-floating {
     position:fixed; z-index:20; left:16px; right:16px; bottom:max(12px,env(safe-area-inset-bottom));

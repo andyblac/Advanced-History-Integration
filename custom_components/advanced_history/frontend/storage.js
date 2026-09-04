@@ -62,6 +62,7 @@ export class StorageMethods {
       this._hiddenY2Targets = this._normalizeTargets(incomingSnapshot.hidden_y2_targets || {});
       incomingSnapshot.chart = this._normalizeSnapshotChart(incomingSnapshot.chart);
       this._excludeY2Comparison = Boolean(incomingSnapshot.chart.exclude_y2_comparison);
+      this._comparisonBannerVisible = incomingSnapshot.chart.show_comparison_banner !== false;
       this._activeSnapshot = this._clone(incomingSnapshot.chart);
       this._prepareSnapshotRangeRestore(incomingSnapshot);
       this._currentSnapshot = this._clone(incomingSnapshot);
@@ -125,6 +126,7 @@ export class StorageMethods {
       );
       previous.chart = this._normalizeSnapshotChart(previous.chart);
       this._excludeY2Comparison = Boolean(previous.chart.exclude_y2_comparison);
+      this._comparisonBannerVisible = previous.chart.show_comparison_banner !== false;
       this._activeSnapshot = this._clone(previous.chart);
       this._currentSnapshot.chart = this._clone(previous.chart);
       this._saveCurrentSnapshot(this._currentSnapshot);
@@ -497,6 +499,7 @@ export class StorageMethods {
       chart.rolling_resume_hours = this._panelRollingResumeHours;
     }
     if (this._excludeY2Comparison) chart.exclude_y2_comparison = true;
+    if (!this._comparisonBannerVisible) chart.show_comparison_banner = false;
     return {
       schema: 1,
       id: this._newSnapshotId(),
@@ -950,6 +953,7 @@ export class StorageMethods {
     snapshot = this._clone(snapshot);
     snapshot.chart = this._normalizeSnapshotChart(snapshot.chart);
     this._excludeY2Comparison = Boolean(snapshot.chart.exclude_y2_comparison);
+    this._comparisonBannerVisible = snapshot.chart.show_comparison_banner !== false;
     this._activeSnapshot = this._clone(snapshot.chart);
     const rollingHours = this._prepareSnapshotRangeRestore(snapshot, loadingSavedRange);
     if (this._activeSnapshot?.compare === undefined) delete this._activeSnapshot.compare;

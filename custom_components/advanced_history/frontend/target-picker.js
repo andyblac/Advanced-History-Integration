@@ -159,6 +159,7 @@ export class TargetPickerMethods {
     if (removeAll) removeAll.hidden = !this._targetCount();
     this._syncAxisTargetLayout();
     this._syncY2ComparisonToggle();
+    this._syncY1ComparisonToggle();
     this._syncNativeTargetVisibility(axis);
     this._syncNativeTargetVisibility(secondary ? "primary" : "secondary");
     this.shadowRoot.querySelector(".notice")?.remove();
@@ -176,6 +177,7 @@ export class TargetPickerMethods {
       "axis-target-compact",
       !hasY2Targets && hasY1Targets,
     );
+    this._syncY1ComparisonToggle?.();
   }
 
   _targetPickerHass() {

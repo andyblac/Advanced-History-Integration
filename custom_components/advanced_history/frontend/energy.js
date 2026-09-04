@@ -13,6 +13,173 @@ export class EnergyMethods {
     return choice === "last_year" ? "yoy" : choice ? "previous" : "";
   }
 
+  _comparisonBannerHidden(compareCard) {
+    return !this._comparisonBannerVisible
+      || this._periodRestoreLoading
+      || this._energyInteractionLoading
+      || !this._targetCount()
+      || !this._energyCollection?.compare
+      || Boolean(compareCard?.hidden);
+  }
+
+  _syncComparisonBannerVisibility() {
+    const host = this.shadowRoot?.getElementById("compare-banner");
+    const card = host?.querySelector("hui-energy-compare-card");
+    if (host) host.hidden = this._comparisonBannerHidden(card);
+  }
+
+  _setComparisonMenuCheckboxState(item, checked) {
+    if (!item) return;
+    item._advancedHistoryChecked = Boolean(checked);
+    item.querySelector('[slot="icon"]')?.setAttribute(
+      "icon",
+      item._advancedHistoryChecked ? "mdi:checkbox-outline" : "mdi:checkbox-blank-outline",
+    );
+    const syncAria = () => {
+      item.setAttribute("role", "menuitemcheckbox");
+      item.setAttribute("aria-checked", String(item._advancedHistoryChecked));
+    };
+    syncAria();
+    item.updateComplete?.then(syncAria);
+  }
+
+  _renderY1ComparisonMenu() {
+    const menu = this.shadowRoot?.getElementById("y1-comparison-menu");
+    if (!menu) return;
+    const collection = this._energyCollection;
+    const active = collection
+      ? Boolean(collection.compare)
+      : this._comparisonIsActive();
+    const choice = this._energyCompareChoice
+      || this._energyCompareChoiceFromNative(collection?.compare)
+      || "previous_period";
+    const options = this._energyCompareOptions(collection).map(([value, label]) => (
+      `<option value="${this._escape(value)}">${this._escape(this._energyCompareLabel(value, label))}</option>`
+    )).join("");
+    const countOptions = Array.from({ length: 10 }, (_, index) => {
+      const value = String(index + 1);
+      return `<option value="${value}">${value}</option>`;
+    }).join("");
+    const count = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._energyCompareCount)) || 1),
+    );
+    const compareDataLabel = this._localize(
+      "ui.panel.lovelace.components.energy_period_selector.compare",
+      "Compare data",
+    );
+    const comparisonBannerLabel = this._customLocalize("show_comparison_banner");
+    menu.innerHTML = `
+      <ha-dropdown-item id="comparison-enabled" class="comparison-menu-check" value="comparison-enabled"><ha-icon slot="icon"></ha-icon>${this._escape(compareDataLabel)}</ha-dropdown-item>
+      <ha-dropdown-item id="comparison-show-banner" class="comparison-menu-check" value="comparison-show-banner"><ha-icon slot="icon"></ha-icon>${this._escape(comparisonBannerLabel)}</ha-dropdown-item>
+      <div class="comparison-menu-heading">${this._escape(this._customLocalize("comparison_options"))}</div>
+      <div class="comparison-menu-options">
+        <select id="comparison-period" class="comparison-menu-select comparison-menu-period" aria-label="${this._escape(this._customLocalize("comparison_period"))}" title="${this._escape(this._customLocalize("comparison_period"))}">${options}</select>
+        <select id="comparison-count" class="comparison-menu-select comparison-menu-count" aria-label="${this._escape(this._customLocalize("comparison_count"))}" title="${this._escape(this._customLocalize("comparison_count"))}">${countOptions}</select>
+      </div>`;
+    const comparisonEnabled = menu.querySelector("#comparison-enabled");
+    const comparisonBanner = menu.querySelector("#comparison-show-banner");
+    const comparisonPeriod = menu.querySelector("#comparison-period");
+    const comparisonCount = menu.querySelector("#comparison-count");
+    this._setComparisonMenuCheckboxState(comparisonEnabled, active);
+    this._setComparisonMenuCheckboxState(comparisonBanner, this._comparisonBannerVisible);
+    comparisonPeriod.value = choice;
+    comparisonCount.value = String(count);
+    if (menu._advancedHistoryComparisonSelect) {
+      menu.removeEventListener("wa-select", menu._advancedHistoryComparisonSelect);
+    }
+    menu._advancedHistoryComparisonSelect = (event) => {
+      const item = event.detail?.item;
+      if (item !== comparisonEnabled && item !== comparisonBanner) return;
+      event.preventDefault();
+      const checked = !item._advancedHistoryChecked;
+      this._setComparisonMenuCheckboxState(item, checked);
+      if (item === comparisonEnabled) {
+        this._setY1ComparisonEnabled(checked);
+        return;
+      }
+      this._comparisonBannerVisible = checked;
+      this._syncComparisonBannerVisibility();
+      this._recordChange(null, true);
+    };
+    menu.addEventListener("wa-select", menu._advancedHistoryComparisonSelect);
+    comparisonPeriod.addEventListener("change", (event) => {
+      this._setY1ComparisonChoice(event.currentTarget.value);
+    });
+    comparisonCount.addEventListener("change", (event) => {
+      this._setY1ComparisonCount(event.currentTarget.value);
+    });
+  }
+
+  _toggleY1ComparisonMenu(event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const menu = this.shadowRoot?.getElementById("y1-comparison-menu");
+    const button = this.shadowRoot?.getElementById("toggle-y1-comparison");
+    if (!menu || !button) return;
+    const opening = !menu.open;
+    this._closeY1ComparisonMenu();
+    if (!opening) return;
+    this._renderY1ComparisonMenu();
+    menu.anchorElement = button;
+    menu.open = true;
+    button.setAttribute("aria-expanded", "true");
+    menu.addEventListener("wa-hide", () => {
+      button.setAttribute("aria-expanded", "false");
+    }, { once: true });
+  }
+
+  _closeY1ComparisonMenu() {
+    const menu = this.shadowRoot?.getElementById("y1-comparison-menu");
+    const button = this.shadowRoot?.getElementById("toggle-y1-comparison");
+    if (menu) menu.open = false;
+    button?.setAttribute("aria-expanded", "false");
+  }
+
+  _setY1ComparisonEnabled(enabled) {
+    const collection = this._energyCollection;
+    if (!collection?.setCompare) return;
+    const choice = this._energyCompareChoice || "previous_period";
+    if (enabled) this._energyCompareChoice = choice;
+    const mode = enabled ? this._nativeEnergyCompareMode(choice) : "";
+    this._beginGraphDataSourceCycle();
+    this._beginEnergyInteractionLoading();
+    collection.setCompare(mode);
+    this._energyApplyCompareMode?.(mode, true);
+    collection.refresh?.();
+    this._syncY1ComparisonToggle(Boolean(mode));
+  }
+
+  _setY1ComparisonChoice(choice) {
+    if (!choice) return;
+    this._energyCompareChoice = choice;
+    const collection = this._energyCollection;
+    if (!collection?.compare) {
+      this._recordChange(null, true);
+      return;
+    }
+    const mode = this._nativeEnergyCompareMode(choice);
+    this._beginGraphDataSourceCycle();
+    this._beginEnergyInteractionLoading();
+    collection.setCompare?.(mode);
+    this._energyApplyCompareMode?.(mode, true);
+    this._syncEnergyCompareRange?.(choice);
+    collection.refresh?.();
+  }
+
+  _setY1ComparisonCount(value) {
+    this._energyCompareCount = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(value)) || 1),
+    );
+    if (this._energyCollection?.compare) {
+      this._beginGraphDataSourceCycle();
+      this._energyApplyCompareMode?.(this._energyCollection.compare, true);
+      this._syncEnergyCompareRange?.();
+    }
+    this._recordChange(null, true);
+  }
+
   _energyCompareRange(start, end, choice, count = 1) {
     const ranges = this._energyCompareRanges(start, end, choice, count);
     if (!ranges.length) return null;
@@ -322,6 +489,7 @@ export class EnergyMethods {
       };
       compareCard.requestUpdate?.();
     };
+    this._syncEnergyCompareRange = syncRange;
     syncRange(choice);
 
     const install = async () => {
@@ -578,9 +746,7 @@ export class EnergyMethods {
     const charts = this.shadowRoot?.getElementById("charts");
     if (charts && !this._periodRestoreLoading) charts.hidden = false;
     if (compareHost && compareCard && !this._periodRestoreLoading) {
-      compareHost.hidden = !this._targetCount()
-        || !this._energyCollection?.compare
-        || Boolean(compareCard.hidden);
+      compareHost.hidden = this._comparisonBannerHidden(compareCard);
     }
   }
 
@@ -1103,7 +1269,7 @@ export class EnergyMethods {
     if (icon) {
       icon.setAttribute(
         "icon",
-        this._datePickerAutoHide ? "mdi:checkbox-marked-outline" : "mdi:checkbox-blank-outline",
+        this._datePickerAutoHide ? "mdi:checkbox-outline" : "mdi:checkbox-blank-outline",
       );
     }
   }
@@ -1219,11 +1385,7 @@ export class EnergyMethods {
         ...(collectionKey ? { collection_key: collectionKey } : {}),
       });
       const syncCompareVisibility = () => {
-        compareHost.hidden = this._periodRestoreLoading
-          || this._energyInteractionLoading
-          || !this._targetCount()
-          || !this._energyCollection?.compare
-          || Boolean(compareCard.hidden);
+        compareHost.hidden = this._comparisonBannerHidden(compareCard);
       };
       // The native card can synchronously replay cached Energy data as soon as
       // it connects. Listen before connecting it so its first visibility event
@@ -1535,13 +1697,8 @@ export class EnergyMethods {
 
     const applyMode = (mode = collection.compare, force = false) => {
       if (this._energyRenderToken !== token) return;
-      compareHost.hidden = this._periodRestoreLoading
-        || this._energyInteractionLoading
-        || !this._targetCount()
-        || !collection.compare
-        || Boolean(compareCard.hidden);
+      compareHost.hidden = this._comparisonBannerHidden(compareCard);
       const effectiveMode = this._periodRestoreLoading ? collection.compare : mode;
-      if (!effectiveMode) this._energyCompareChoice = null;
       const nativeChoice = effectiveMode === "previous"
         ? "previous_period"
         : effectiveMode === "yoy" ? "last_year" : null;
@@ -1557,6 +1714,7 @@ export class EnergyMethods {
       // native control aligned with this panel's restored comparison mode.
       this._syncNativeEnergyCompareSelection(Boolean(next));
       this._syncY2ComparisonToggle(Boolean(next));
+      this._syncY1ComparisonToggle(Boolean(next));
       const nextDetailKey = this._largeRangeDetailRenderKey();
       if (this._periodRestoreLoading) {
         this._energyCompare = next;
@@ -1574,6 +1732,7 @@ export class EnergyMethods {
       this._largeRangeDetailStateKey = nextDetailKey;
       this._renderGraphs();
     };
+    this._energyApplyCompareMode = applyMode;
     applyMode();
     if (normalizedEnergyDay && !restoringPeriod) {
       this._renderGraphs();
@@ -1623,7 +1782,7 @@ export class EnergyMethods {
       applyMode(compareMode, periodRestored || timeRangeReset || resetComparePeriod);
       this._syncEnergyCompareControl(compareCard, collection, applyMode);
       if (periodRestored) {
-        compareHost.hidden = Boolean(compareCard.hidden);
+        compareHost.hidden = this._comparisonBannerHidden(compareCard);
         this._renderLargeRangeDetailBanner();
       }
       this._finishEnergyInteractionLoading(compareHost, compareCard);
@@ -1755,6 +1914,8 @@ export class EnergyMethods {
     this._largeRangeDetailDismissedKey = null;
     const compareHost = this.shadowRoot?.getElementById("compare-banner");
     if (compareHost) compareHost.hidden = true;
+    this._syncY1ComparisonToggle(false);
+    this._closeY1ComparisonMenu();
     this._resetNativeEnergyCompareUI();
 
     if (!collection) {

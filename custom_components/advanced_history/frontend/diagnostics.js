@@ -161,6 +161,7 @@ export class DiagnosticsMethods {
         graph_height: snapshot.chart?.graph_height ?? this._effectiveGraphHeight(),
         compare: this._sanitizeDiagnosticValue(snapshot.chart?.compare ?? this._effectiveCompare(), aliases),
         exclude_y2_comparison: Boolean(snapshot.chart?.exclude_y2_comparison),
+        show_comparison_banner: snapshot.chart?.show_comparison_banner !== false,
         large_range_detail: (() => {
           const profile = this._largeRangeDetailProfile();
           return {
