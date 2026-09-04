@@ -104,6 +104,7 @@ export class TargetPickerMethods {
       picker.setAttribute("compact", "");
       picker.addEventListener("value-changed", (event) => this._nativeTargetsChanged(event, axis));
       picker.addEventListener("click", (event) => this._nativeTargetChipClicked(event, axis));
+      picker.addEventListener("dblclick", (event) => this._nativeTargetChipDoubleClicked(event, axis));
       host.replaceChildren(picker);
       if (secondary) this._nativeY2TargetPicker = picker;
       else this._nativeTargetPicker = picker;
@@ -237,10 +238,31 @@ export class TargetPickerMethods {
     }
 
     const displayStateCache = new Map();
+    const customEntityNames = new Map(
+      Object.entries(this._effectiveEntityOptionsConfig?.() || {})
+        .filter(([, options]) => (
+          options
+          && typeof options === "object"
+          && !Array.isArray(options)
+          && String(options.name || "").trim()
+        ))
+        .map(([entityId, options]) => [entityId, String(options.name).trim()])
+    );
     const states = new Proxy(pickerStates, {
       get(target, property, receiver) {
         const state = Reflect.get(target, property, receiver);
         if (typeof property !== "string" || !state) return state;
+        const customName = customEntityNames.get(property);
+        if (customName) {
+          const cached = displayStateCache.get(property);
+          if (cached?.source === state && cached?.customName === customName) return cached.display;
+          const display = {
+            ...state,
+            attributes: { ...state.attributes, friendly_name: customName },
+          };
+          displayStateCache.set(property, { source: state, customName, display });
+          return display;
+        }
         const areaName = entityAreas.get(property);
         if (!areaName) return state;
 
@@ -266,6 +288,35 @@ export class TargetPickerMethods {
   }
 
   _nativeTargetChipClicked(event, axis = "primary") {
+    const details = this._nativeTargetChipEventDetails(event, axis);
+    if (!details || !this._nativeTargetChipIconClicked(event, details.chip)) return;
+    const { chip, kind, targets } = details;
+    this._targetChipClickTimers ||= new WeakMap();
+    const pending = this._targetChipClickTimers.get(chip);
+    if (pending) window.clearTimeout(pending);
+    if (event.detail > 1) {
+      this._targetChipClickTimers.delete(chip);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      this._targetChipClickTimers.delete(chip);
+      if (targets[kind]?.includes(chip.itemId)) {
+        this._toggleTargetVisibility(axis, kind, chip.itemId);
+      }
+    }, 240);
+    this._targetChipClickTimers.set(chip, timer);
+  }
+
+  _nativeTargetChipIconClicked(event, chip) {
+    const path = event.composedPath();
+    const chipIndex = path.indexOf(chip);
+    if (chipIndex < 0) return false;
+    return path.slice(0, chipIndex).some((node) => (
+      node?.dataset?.advancedHistoryVisibilityToggle !== undefined
+    ));
+  }
+
+  _nativeTargetChipEventDetails(event, axis = "primary") {
     const path = event.composedPath();
     const chipIndex = path.findIndex(
       (node) => node?.localName === "ha-target-picker-value-chip"
@@ -283,7 +334,116 @@ export class TargetPickerMethods {
     const kind = `${chip.type}_id`;
     const targets = axis === "secondary" ? this._y2Targets : this._targets;
     if (!targets[kind]) return;
-    this._toggleTargetVisibility(axis, kind, chip.itemId);
+    return { chip, kind, targets };
+  }
+
+  _nativeTargetChipDoubleClicked(event, axis = "primary") {
+    const details = this._nativeTargetChipEventDetails(event, axis);
+    if (!details || details.kind !== "entity_id") return;
+    const pending = this._targetChipClickTimers?.get(details.chip);
+    if (pending) window.clearTimeout(pending);
+    this._targetChipClickTimers?.delete(details.chip);
+    event.preventDefault();
+    event.stopPropagation();
+    void this._beginTargetNameEdit(details.chip, details.chip.itemId);
+  }
+
+  _setTargetDisplayName(entity, value) {
+    const chart = this._activeSnapshot
+      ? this._clone(this._activeSnapshot)
+      : this._captureSnapshot().chart;
+    const entityOptions = this._clone(chart.entity_options || {});
+    const existing = entityOptions[entity];
+    const options = existing && typeof existing === "object" && !Array.isArray(existing)
+      ? { ...existing }
+      : {};
+    const name = String(value || "").trim();
+    if (name) options.name = name;
+    else delete options.name;
+    if (Object.keys(options).length) entityOptions[entity] = options;
+    else delete entityOptions[entity];
+    chart.entity_options = entityOptions;
+    this._activeSnapshot = chart;
+    this._recordChange(null, true);
+    for (const [picker, axis] of [
+      [this._nativeTargetPicker, "primary"],
+      [this._nativeY2TargetPicker, "secondary"],
+    ]) {
+      if (!picker) continue;
+      picker.hass = this._targetPickerHass();
+      picker.requestUpdate?.();
+      this._syncNativeTargetVisibility(axis);
+    }
+    this._renderGraphs();
+  }
+
+  async _beginTargetNameEdit(chip, entity) {
+    await chip.updateComplete;
+    const tag = chip.shadowRoot?.querySelector("wa-tag");
+    if (!tag || tag.querySelector("[data-advanced-history-name-input]")) return;
+    const currentName = this._entityName(entity);
+    const controls = tag.querySelector("[data-advanced-history-controls]");
+    const label = [...tag.childNodes].find((node) => {
+      if (node === controls || !String(node.textContent || "").trim()) return false;
+      if (node.nodeType === 3) return true;
+      return !node.matches?.("button, ha-icon, input, [data-advanced-history-controls]");
+    });
+    const previousDisplay = label?.style?.display;
+    const previousText = label?.textContent || "";
+    if (label?.nodeType === 3) label.textContent = "";
+    else if (label?.style) label.style.display = "none";
+
+    const input = document.createElement("input");
+    input.type = "text";
+    input.value = currentName;
+    input.maxLength = 100;
+    input.dataset.advancedHistoryNameInput = "";
+    input.setAttribute("aria-label", this._localize("ui.common.rename", "Rename"));
+    input.style.cssText = [
+      `width:${Math.min(260, Math.max(90, (currentName.length + 1) * 8.5))}px`,
+      "min-width:70px",
+      "height:30px",
+      "box-sizing:border-box",
+      "padding:0 6px",
+      "color:var(--primary-text-color)",
+      "background:var(--card-background-color)",
+      "border:1px solid var(--primary-color)",
+      "border-radius:4px",
+      "outline:0",
+      "font:inherit",
+    ].join(";");
+    tag.insertBefore(input, controls || null);
+
+    let finished = false;
+    const finish = (save) => {
+      if (finished) return;
+      finished = true;
+      const value = input.value.trim();
+      const changed = save && value !== currentName;
+      input.remove();
+      if (changed) this._setTargetDisplayName(entity, value);
+      const displayName = changed
+        ? value || this._entityDisplayName(entity)
+        : previousText;
+      if (label) label.textContent = displayName;
+      if (label?.style) label.style.display = previousDisplay;
+    };
+    for (const type of ["pointerdown", "click", "dblclick"]) {
+      input.addEventListener(type, (event) => event.stopPropagation());
+    }
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        input.blur();
+      } else if (event.key === "Escape") {
+        event.preventDefault();
+        finish(false);
+        chip.focus();
+      }
+    });
+    input.addEventListener("blur", () => finish(true), { once: true });
+    input.focus();
+    input.select();
   }
 
   _syncNativeTargetVisibility(axis = "primary") {
@@ -348,8 +508,13 @@ export class TargetPickerMethods {
         "[data-advanced-history-controls], [data-advanced-history-series], [data-advanced-history-running-total]"
       ).forEach((button) => button.remove()));
       const axisRunningTotalActive = this._axisRunningTotalActive(axis);
+      const pickerHass = this._targetPickerHass();
       chips.forEach((chip) => {
         const kind = `${chip.type}_id`;
+        if (kind === "entity_id") {
+          chip.hass = pickerHass;
+          chip.requestUpdate?.();
+        }
         const hidden = Boolean(hiddenTargets[kind]?.includes(chip.itemId));
         const unavailable = kind === "entity_id" && (
           !this._hass.states[chip.itemId]
@@ -360,17 +525,37 @@ export class TargetPickerMethods {
           : kind === "device_id"
             ? this._deviceName(chip.itemId)
             : this._entityName(chip.itemId);
-        chip.style.cursor = "pointer";
+        const explicitEntity = (
+          kind === "entity_id"
+          && entityIds.has(chip.itemId)
+        );
+        chip.style.cursor = "";
         chip.style.opacity = hidden ? ".45" : "";
         chip.style.filter = hidden ? "grayscale(1)" : "";
-        chip.setAttribute("role", "button");
-        chip.setAttribute("aria-pressed", hidden ? "true" : "false");
-        chip.setAttribute("title", this._customLocalize(hidden ? "show_target" : "hide_target", { target: name }));
+        chip.removeAttribute("role");
+        chip.removeAttribute("aria-pressed");
+        const title = this._customLocalize(hidden ? "show_target" : "hide_target", { target: name });
+        if (explicitEntity) {
+          chip.setAttribute("title", this._customLocalize("double_click_rename_target"));
+        } else {
+          chip.removeAttribute("title");
+        }
         const applyAxisColor = async () => {
           await chip.updateComplete;
           if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
           const tag = chip.shadowRoot?.querySelector("wa-tag");
           if (!tag) return;
+          const icon = chip.shadowRoot?.querySelector(
+            "ha-state-icon, ha-icon, [slot='start'], [slot='prefix'], [slot='icon'], [part~='icon']"
+          );
+          if (icon) {
+            icon.dataset.advancedHistoryVisibilityToggle = "";
+            icon.setAttribute("role", "button");
+            icon.setAttribute("aria-label", title);
+            icon.setAttribute("aria-pressed", hidden ? "true" : "false");
+            icon.setAttribute("title", title);
+            icon.style.cursor = "pointer";
+          }
           const axisColor = unavailable
             ? "var(--state-unavailable-color, var(--error-color, #db4437))"
             : secondary
@@ -385,10 +570,6 @@ export class TargetPickerMethods {
           }
         };
         void applyAxisColor();
-        const explicitEntity = (
-          kind === "entity_id"
-          && entityIds.has(chip.itemId)
-        );
         const showSeries = explicitEntity && this._seriesChoices(chip.itemId).length > 1;
         const showRunningTotal = (
           !axisRunningTotalActive
@@ -919,7 +1100,11 @@ export class TargetPickerMethods {
 
   _areaName(id) { return this._areas.find((area) => area.area_id === id)?.name || id || this._localize("ui.components.device-picker.no_area", "No area"); }
   _deviceName(id) { const device = this._devices.find((item) => item.id === id); return device?.name_by_user || device?.name || id; }
-  _entityName(id) { const state = this._hass.states[id]; const registry = this._entities.find((item) => item.entity_id === id); return registry?.name || state?.attributes?.friendly_name || id; }
+  _baseEntityName(id) { const state = this._hass.states[id]; const registry = this._entities.find((item) => item.entity_id === id); return registry?.name || state?.attributes?.friendly_name || id; }
+  _entityName(id) {
+    const customName = this._effectiveEntityOptionsConfig?.()?.[id]?.name;
+    return String(customName || "").trim() || this._baseEntityName(id);
+  }
   _entityDisplayName(id) {
     const name = this._entityName(id);
     const entity = this._entities.find((item) => item.entity_id === id);

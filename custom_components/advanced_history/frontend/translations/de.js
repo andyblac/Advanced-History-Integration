@@ -76,6 +76,7 @@ export default {
   "more_info_entity_reset_confirm": "Dadurch werden die gespeicherten Einstellungen für diese Entität entfernt und die globalen Standards wiederhergestellt.",
   "hide_target": "{target} im Diagramm ausblenden",
   "show_target": "{target} im Diagramm anzeigen",
+  "double_click_rename_target": "Zum Umbenennen doppelklicken.",
   "configure_attributes": "Diagrammattribute für {target} auswählen",
   "enable_running_total": "{target} für den ausgewählten Zeitraum als laufende Summe anzeigen",
   "disable_running_total": "{target} nicht mehr als laufende Summe anzeigen",

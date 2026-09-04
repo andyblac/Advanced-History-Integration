@@ -76,6 +76,7 @@ export default {
   "more_info_entity_reset_confirm": "Hiermee worden de opgeslagen instellingen voor deze entiteit verwijderd en de algemene standaardwaarden hersteld.",
   "hide_target": "{target} in de grafiek verbergen",
   "show_target": "{target} in de grafiek tonen",
+  "double_click_rename_target": "Dubbelklik om de naam te wijzigen.",
   "configure_attributes": "Grafiekkenmerken voor {target} kiezen",
   "enable_running_total": "{target} als oplopend totaal voor de geselecteerde periode tonen",
   "disable_running_total": "{target} niet langer als oplopend totaal tonen",

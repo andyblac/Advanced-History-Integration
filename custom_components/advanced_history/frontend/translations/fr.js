@@ -76,6 +76,7 @@ export default {
   "more_info_entity_reset_confirm": "Cela supprime les paramètres enregistrés pour cette entité et restaure les valeurs globales.",
   "hide_target": "Masquer {target} du graphique",
   "show_target": "Afficher {target} sur le graphique",
+  "double_click_rename_target": "Double-cliquez pour renommer.",
   "configure_attributes": "Choisir les attributs du graphique pour {target}",
   "enable_running_total": "Afficher {target} sous forme de total cumulé pour la période sélectionnée",
   "disable_running_total": "Ne plus afficher {target} sous forme de total cumulé",

@@ -76,6 +76,7 @@ export default {
   "more_info_entity_reset_confirm": "Questa operazione rimuove le impostazioni salvate per l’entità e ripristina i valori globali.",
   "hide_target": "Nascondi {target} dal grafico",
   "show_target": "Mostra {target} nel grafico",
+  "double_click_rename_target": "Fai doppio clic per rinominare.",
   "configure_attributes": "Scegli gli attributi del grafico per {target}",
   "enable_running_total": "Mostra {target} come totale progressivo per il periodo selezionato",
   "disable_running_total": "Interrompi la visualizzazione di {target} come totale progressivo",

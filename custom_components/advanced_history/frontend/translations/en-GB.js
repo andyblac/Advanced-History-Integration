@@ -76,6 +76,7 @@ export default {
   "more_info_entity_reset_confirm": "This removes the saved settings for this entity and restores the More Info Card Defaults.",
   "hide_target": "Hide {target} from the chart",
   "show_target": "Show {target} on the chart",
+  "double_click_rename_target": "Double-click to rename.",
   "configure_attributes": "Choose graph attributes for {target}",
   "enable_running_total": "Show {target} as a running total for the selected period",
   "disable_running_total": "Stop showing {target} as a running total",
