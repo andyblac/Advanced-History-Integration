@@ -189,6 +189,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
     applyDashboardRuntimeState,
     containSgccEditorConfigEvent,
     dashboardRuntimeState,
+    sgccConfigsWithSnapshotComparisons,
     snapshotFromSgccConfigs,
   } = await import(
     "../custom_components/advanced_history/frontend/advanced-history-sgcc-card.js"
@@ -247,6 +248,41 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.deepEqual(restored.chart.running_total_axes, { primary: true });
   assert.equal(restored.chart.show_comparison_banner, false);
   assert.deepEqual(restored.chart.card_options, original.chart.card_options);
+
+  const comparisonConfigs = sgccConfigsWithSnapshotComparisons([{
+    type: "custom:statistics-graph-chart-card",
+    entities: [
+      { entity: "sensor.gas", compare: { opacity: 0.6 } },
+      { entity: "sensor.temperature", y_axis: "secondary", compare: { opacity: 0.4 } },
+    ],
+  }], {
+    chart: {
+      exclude_y2_comparison: true,
+      entity_options: { "sensor.gas": { compare: { opacity: 0.8 } } },
+    },
+    period: { compare: "previous", compare_choice: "last_month", compare_count: 2 },
+  }, {
+    card_options: {
+      numeric: { entities: { compare: { line_style: "dotted", show_fill: true } } },
+    },
+  });
+  assert.deepEqual(comparisonConfigs[0].entities[0].compare, [
+    {
+      opacity: 0.8,
+      line_style: "dotted",
+      show_fill: true,
+      period: "last_month",
+      periods_back: 1,
+    },
+    {
+      opacity: 0.8,
+      line_style: "dotted",
+      show_fill: true,
+      period: "last_month",
+      periods_back: 2,
+    },
+  ]);
+  assert.equal(comparisonConfigs[0].entities[1].compare, undefined);
 
   const wrapperEditor = new AdvancedHistorySgccCardEditor();
   const embeddedEditor = {};

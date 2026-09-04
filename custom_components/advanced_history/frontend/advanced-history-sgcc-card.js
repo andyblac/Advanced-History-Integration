@@ -129,6 +129,151 @@ function clone(value) {
     : JSON.parse(JSON.stringify(value));
 }
 
+function dashboardStateStorageKey(snapshot) {
+  const id = String(snapshot?.id || "").trim();
+  return id ? `${DASHBOARD_CARD_STATE_STORAGE_PREFIX}:${id}` : "";
+}
+
+function snapshotComparison(snapshot) {
+  if (Object.prototype.hasOwnProperty.call(snapshot?.chart || {}, "compare")) {
+    return clone(snapshot.chart.compare);
+  }
+  if (!snapshot?.period?.compare) return null;
+  const choice = snapshot.period.compare_choice
+    || (snapshot.period.compare === "yoy" ? "last_year" : "previous_period");
+  const count = Math.max(
+    1,
+    Math.min(10, Math.trunc(Number(snapshot.period.compare_count)) || 1),
+  );
+  if (count === 1) return choice;
+  return Array.from({ length: count }, (_, index) => ({
+    period: choice,
+    periods_back: index + 1,
+  }));
+}
+
+function mergeComparisonStyle(active, configured) {
+  const mergeOne = (activeRow, configuredRow) => {
+    const style = configuredRow
+      && typeof configuredRow === "object"
+      && !Array.isArray(configuredRow)
+      ? clone(configuredRow)
+      : {};
+    if (activeRow === true) return Object.keys(style).length ? style : true;
+    if (activeRow && typeof activeRow === "object" && !Array.isArray(activeRow)) {
+      return { ...style, ...clone(activeRow) };
+    }
+    return { ...style, period: activeRow };
+  };
+  if (Array.isArray(active)) {
+    const configuredRows = Array.isArray(configured) ? configured : null;
+    return active.map((row, index) => mergeOne(
+      row,
+      configuredRows
+        ? configuredRows.length === 1 ? configuredRows[0] : configuredRows[index]
+        : configured,
+    ));
+  }
+  return mergeOne(active, Array.isArray(configured) ? configured[0] : configured);
+}
+
+function comparisonStyleOnly(value) {
+  const clean = (row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return {};
+    const style = clone(row);
+    delete style.period;
+    delete style.periods_back;
+    return style;
+  };
+  return Array.isArray(value) ? value.map(clean) : clean(value);
+}
+
+function mergeComparisonDefaults(...sources) {
+  let merged = {};
+  for (const source of sources) {
+    if (source === undefined) continue;
+    const styles = comparisonStyleOnly(source);
+    if (Array.isArray(styles)) {
+      merged = styles.map((style, index) => ({
+        ...(Array.isArray(merged)
+          ? (merged.length === 1 ? merged[0] : merged[index])
+          : merged),
+        ...style,
+      }));
+    } else if (Array.isArray(merged)) {
+      merged = merged.map((style) => ({ ...style, ...styles }));
+    } else {
+      merged = { ...merged, ...styles };
+    }
+  }
+  return merged;
+}
+
+function typedOptions(value, variant = "numeric") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value.numeric || value.state
+    ? value[variant] || {}
+    : value;
+}
+
+function comparisonDefaults(row, snapshot, settings) {
+  const configuredCard = {
+    ...clone(typedOptions(settings?.card_options)),
+    ...clone(typedOptions(snapshot?.chart?.card_options)),
+  };
+  const templates = [];
+  for (const key of ["entities", "numeric_entities"]) {
+    const values = Array.isArray(configuredCard[key])
+      ? configuredCard[key]
+      : configuredCard[key] ? [configuredCard[key]] : [];
+    for (const value of values) {
+      if (
+        value
+        && typeof value === "object"
+        && !Array.isArray(value)
+        && value.entity == null
+        && value.statistic_id == null
+      ) templates.push(value.compare);
+    }
+  }
+  const entity = row.entity || row.statistic_id;
+  const key = row.attribute ? `${entity}::${row.attribute}` : entity;
+  const configuredEntities = settings?.entity_options || {};
+  const snapshotEntities = snapshot?.chart?.entity_options || {};
+  return mergeComparisonDefaults(
+    row.compare,
+    ...templates,
+    configuredEntities[entity]?.compare,
+    configuredEntities[key]?.compare,
+    snapshotEntities[entity]?.compare,
+    snapshotEntities[key]?.compare,
+  );
+}
+
+export function sgccConfigsWithSnapshotComparisons(configs, snapshot, settings = {}) {
+  const active = snapshotComparison(snapshot);
+  const excludeSecondary = Boolean(snapshot?.chart?.exclude_y2_comparison);
+  return clone(configs || []).map((config) => {
+    if (!config || config.chart_mode === "state_timeline" || !Array.isArray(config.entities)) {
+      return config;
+    }
+    config.entities = config.entities.map((raw) => {
+      const row = typeof raw === "string" ? { entity: raw } : clone(raw);
+      if (!row || typeof row !== "object") return raw;
+      if (active == null || active === false || (excludeSecondary && row.y_axis === "secondary")) {
+        delete row.compare;
+      } else {
+        row.compare = mergeComparisonStyle(
+          active,
+          comparisonDefaults(row, snapshot, settings),
+        );
+      }
+      return row;
+    });
+    return config;
+  });
+}
+
 export function dashboardRuntimeState(snapshot) {
   const chart = {};
   for (const key of DASHBOARD_RUNTIME_CHART_KEYS) {
@@ -295,7 +440,24 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
     const storedConfigs = Array.isArray(this._config.sgcc_configs)
       ? this._config.sgcc_configs.filter(Boolean)
       : [];
-    const configs = storedConfigs.length ? storedConfigs : fallbackSgccConfigs(this._config);
+    const baseConfigs = storedConfigs.length ? storedConfigs : fallbackSgccConfigs(this._config);
+    let snapshot = this._config.snapshot;
+    const stateKey = dashboardStateStorageKey(snapshot);
+    if (stateKey) {
+      try {
+        snapshot = applyDashboardRuntimeState(
+          snapshot,
+          JSON.parse(localStorage.getItem(stateKey) || "null"),
+        );
+      } catch (error) {
+        console.warn("Advanced History card editor: unable to restore dashboard state", error);
+      }
+    }
+    const configs = sgccConfigsWithSnapshotComparisons(
+      baseConfigs,
+      snapshot,
+      this._config.settings,
+    );
     if (!configs.length) {
       this.shadowRoot.innerHTML = `<p>${this._customLocalize("dashboard_card_editor_unavailable")}</p>`;
       return;
@@ -366,6 +528,19 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
       if (!host) return;
       host.replaceChildren(editor);
       this._editor = editor;
+      await editor.updateComplete;
+      if (token !== this._renderToken) return;
+      if (editor.shadowRoot && !editor.shadowRoot.querySelector("[data-advanced-history-comparisons]")) {
+        const managedStyles = document.createElement("style");
+        managedStyles.dataset.advancedHistoryComparisons = "";
+        managedStyles.textContent = `
+          .cmp-add,
+          .cmp-del,
+          .cmp-row .f:has(.cmp-period),
+          .cmp-row .f:has(.cmp-back) { display:none !important; }
+        `;
+        editor.shadowRoot.append(managedStyles);
+      }
     } catch (error) {
       if (token !== this._renderToken) return;
       this._editor = null;
@@ -453,8 +628,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
   }
 
   _dashboardStateStorageKey() {
-    const id = String(this._dashboardConfig?.snapshot?.id || "").trim();
-    return id ? `${DASHBOARD_CARD_STATE_STORAGE_PREFIX}:${id}` : "";
+    return dashboardStateStorageKey(this._dashboardConfig?.snapshot);
   }
 
   _loadDashboardSnapshot() {
