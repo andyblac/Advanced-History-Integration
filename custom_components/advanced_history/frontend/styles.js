@@ -156,7 +156,7 @@ export const panelStyles = `
     border-radius:24px; overflow:hidden;
   }
   .period-selector-floating .period-selector-date-control:hover,
-  .period-selector-floating .period-selector-date-control:focus-within {
+  .period-selector-floating .period-selector-date-control:has(:focus-visible) {
     background:var(--secondary-background-color);
   }
   .period-selector-floating .period-selector-date-picker {
