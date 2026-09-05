@@ -1011,6 +1011,14 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     return dashboardDatePickerVisible(this._dashboardConfig);
   }
 
+  _dashboardConfiguredComparisonPeriod() {
+    return comparisonPeriodFromSgccConfigs(this._dashboardConfig?.sgcc_configs) || {
+      compare: "",
+      compare_choice: null,
+      compare_count: 1,
+    };
+  }
+
   _createDashboardPeriodStore() {
     const group = this._dashboardDatePickerGroup();
     if (!group) {

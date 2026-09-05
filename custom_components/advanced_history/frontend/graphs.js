@@ -73,6 +73,16 @@ function graphComparisonRows(configured) {
   return compare && typeof compare === "object" ? [compare] : [];
 }
 
+export function renderedGraphDataSources(card) {
+  const sources = new Set();
+  for (const series of card?._graphData?.series || []) {
+    if (!Array.isArray(series?.points) || !series.points.length) continue;
+    if (series._isStat === true) sources.add("statistics");
+    else if (series._isStat === false) sources.add("history");
+  }
+  return [...sources];
+}
+
 function graphColorRgb(color) {
   const value = graphColorKey(color);
   const shortHex = value.match(/^#([0-9a-f])([0-9a-f])([0-9a-f])$/i);
@@ -209,6 +219,9 @@ export class GraphMethods {
     if (!host) return;
     this._disconnectDynamicGraphLayout();
     const detail = this._largeRangeDetailProfile();
+    for (const card of this._graphCards || []) {
+      card.__advancedHistorySourceObserver?.disconnect?.();
+    }
     this._cards = this._cards.filter((card) => !this._graphCards.includes(card));
     this._graphCards = [];
     host.replaceChildren();
@@ -939,6 +952,7 @@ export class GraphMethods {
       host.append(shell);
       this._cards.push(card);
       this._graphCards.push(card);
+      this._observeRenderedGraphDataSource(card);
       if (this._dashboardCardMode) {
         this._syncGraphCardsToEnergyPeriod?.();
       }
@@ -1159,6 +1173,22 @@ export class GraphMethods {
     return tracker;
   }
 
+  _observeRenderedGraphDataSource(card) {
+    const record = () => this._recordRenderedGraphDataSource(card);
+    record();
+    if (typeof MutationObserver === "undefined" || !card?.shadowRoot) return;
+    card.__advancedHistorySourceObserver?.disconnect?.();
+    const observer = new MutationObserver(record);
+    observer.observe(card.shadowRoot, { childList: true, subtree: true });
+    card.__advancedHistorySourceObserver = observer;
+  }
+
+  _recordRenderedGraphDataSource(card) {
+    for (const source of renderedGraphDataSources(card)) {
+      card.__advancedHistorySourceTracker?.record?.(source);
+    }
+  }
+
   _dataSourceCacheKey(mode, series) {
     const start = this._energyCollection?.start;
     const end = this._energyCollection?.end;
@@ -1299,6 +1329,9 @@ export class GraphMethods {
   _activateGraphDataSourceTracking() {
     for (const card of this._graphCards || []) {
       card.__advancedHistorySourceTracker?.activate?.();
+      // SGCC can satisfy a reconnect entirely from its internal data cache,
+      // producing no request for the hass proxy to observe.
+      this._recordRenderedGraphDataSource(card);
       if (this._hass) {
         // Recreate the instrumented wrapper so reconnecting a cached panel
         // gives the card a genuinely new hass value. This makes the card

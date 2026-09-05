@@ -1179,7 +1179,13 @@ export class EnergyMethods {
       // remain local to each card (including an editor preview), so restore
       // them before discarding the pending range that the group replaces.
       const localComparison = this._pendingRollingCompareRestore
-        ?? this._pendingPeriodRestore;
+        ?? this._pendingPeriodRestore
+        // Lovelace can detach and reconnect an already initialized card
+        // without applying its snapshot again. In that path there is no
+        // pending period, so recover the card-local comparison from its
+        // canonical SGCC entity rows instead of inheriting the empty compare
+        // state of the newly created local store.
+        ?? this._dashboardConfiguredComparisonPeriod?.();
       const localCompare = this._restoreDashboardLocalComparison(localComparison);
       store.setCompare(localCompare);
       this._pendingRollingCompareRestore = null;

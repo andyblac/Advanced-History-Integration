@@ -295,6 +295,9 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._panelTabsResizeObserver?.disconnect();
     this._panelTabsResizeObserver = null;
     this._disconnectDynamicGraphLayout?.();
+    for (const card of this._graphCards || []) {
+      card.__advancedHistorySourceObserver?.disconnect?.();
+    }
     this._releaseDashboardCardLayout?.();
     this._energyRenderToken = null;
     this._energyUnsubscribe?.();

@@ -22,8 +22,47 @@ test("dashboard followers retain their card-local comparison selection", () => {
   assert.equal(context._energyCompareChoice, "last_month");
   assert.equal(context._energyCompareCount, 2);
 });
+
+test("reconnected dashboard followers restore comparison from SGCC config", () => {
+  const token = Symbol("render");
+  const store = {
+    compare: "",
+    start: new Date("2026-09-01T00:00:00.000Z"),
+    end: new Date("2026-09-30T23:59:59.999Z"),
+    setCompare(value) { this.compare = value; },
+    subscribe() { return () => {}; },
+  };
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _energyRenderToken: token,
+    _dashboardPeriodStoreFollower: true,
+    _pendingRollingCompareRestore: null,
+    _pendingPeriodRestore: null,
+    _dashboardConfiguredComparisonPeriod: () => ({
+      compare: "yoy",
+      compare_choice: "last_year",
+      compare_count: 3,
+    }),
+    _createDashboardPeriodStore: () => store,
+    _finishPeriodRestore() {},
+    _activateGraphDataSourceTracking() {},
+    _syncY2ComparisonToggle() {},
+    _syncY1ComparisonToggle() {},
+    _largeRangeDetailRenderKey: () => "detail",
+    _renderGraphs() {},
+    _syncGraphCardsToEnergyPeriod() {},
+    _renderDashboardComparisonBanner() {},
+    _recordChange() {},
+  });
+
+  context._bindDashboardPeriodStore(token, {}, {}, false);
+
+  assert.equal(store.compare, "yoy");
+  assert.equal(context._energyCompareChoice, "last_year");
+  assert.equal(context._energyCompareCount, 3);
+});
 import {
   GraphMethods,
+  renderedGraphDataSources,
   withoutDashboardWrapperNavigation,
 } from "../custom_components/advanced_history/frontend/graphs.js";
 
@@ -437,6 +476,19 @@ test("dashboard SGCC does not expose its local period store as an Energy collect
 
   assert.equal(card.hass.connection._advanced_history_test, undefined);
   assert.equal(connection._advanced_history_test, undefined);
+});
+
+test("rendered SGCC data supplies a source when its request came from cache", () => {
+  assert.deepEqual(renderedGraphDataSources({
+    _graphData: {
+      series: [
+        { _isStat: true, points: [{ t: 1, v: 2 }] },
+        { _isStat: false, points: [{ t: 1, v: 3 }] },
+        { _isStat: true, points: [] },
+      ],
+    },
+  }), ["statistics", "history"]);
+  assert.deepEqual(renderedGraphDataSources({ _graphData: { series: [] } }), []);
 });
 
 test("dashboard date control formats a compact range with a separate year", () => {
