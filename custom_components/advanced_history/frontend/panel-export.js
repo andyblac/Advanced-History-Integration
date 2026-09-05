@@ -104,6 +104,7 @@ function typedCardOptions(value, variant) {
 
 function dashboardGraphConfig(config, panelConfig = {}) {
   const variant = config.chart_mode === "state_timeline" ? "state" : "numeric";
+  const source = clone(config);
   const defaults = clone(typedCardOptions(panelConfig.card_options, variant));
   const templates = ["entities", "numeric_entities", "state_entities"]
     .flatMap((key) => {
@@ -118,7 +119,11 @@ function dashboardGraphConfig(config, panelConfig = {}) {
       && value.entity == null
       && value.statistic_id == null
     ));
-  const next = { ...defaults, ...clone(config) };
+  const next = {
+    type: source.type || `custom:${CARD_TAG}`,
+    ...defaults,
+    ...source,
+  };
   if (Array.isArray(next.entities)) {
     const configuredEntities = panelConfig.entity_options || {};
     next.entities = next.entities.map((raw) => {

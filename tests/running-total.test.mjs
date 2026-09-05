@@ -190,6 +190,7 @@ test("Advanced History dashboard card stores SGCC options only in sgcc_configs",
       show_state: false,
     }],
   }]);
+  assert.equal(Object.keys(exported.sgcc_configs[0])[0], "type");
   assert.deepEqual(exported.snapshot, {
     id: "dashboard-card-1",
     chart: {
