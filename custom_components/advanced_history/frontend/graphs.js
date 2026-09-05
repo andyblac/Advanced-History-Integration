@@ -569,9 +569,11 @@ export class GraphMethods {
     const transparent = String(config?.card_background_color || "")
       .trim()
       .toLowerCase() === "transparent";
+    // Do not make the theme surface variables transparent. SGCC also uses
+    // them for floating UI such as graph and pie tooltips and the date picker
+    // panel. Transparency is deliberately scoped to the card/plot below.
     for (const property of ["--ha-card-background", "--card-background-color"]) {
-      if (transparent) card.style.setProperty(property, "transparent");
-      else card.style.removeProperty(property);
+      card.style.removeProperty(property);
     }
 
     const root = card.shadowRoot;

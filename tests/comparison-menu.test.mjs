@@ -328,12 +328,14 @@ test("dashboard SGCC inherits the wrapper background when transparency is the de
   });
 
   context._applyDashboardGraphBackground(card, { card_background_color: "transparent" });
-  assert.equal(values.get("--ha-card-background"), "transparent");
-  assert.equal(values.get("--card-background-color"), "transparent");
+  assert.equal(values.has("--ha-card-background"), false);
+  assert.equal(values.has("--card-background-color"), false);
   assert.equal(managedStyle.dataset.advancedHistoryTransparentSgcc, "");
+  assert.match(managedStyle.textContent, /\.sgc-card/);
   assert.match(managedStyle.textContent, /\.sgc-plot-wrap/);
   assert.match(managedStyle.textContent, /backdrop-filter: none !important/);
   assert.match(managedStyle.textContent, /box-shadow: none !important/);
+  assert.doesNotMatch(managedStyle.textContent, /tooltip|dp-panel/);
 
   let removed = false;
   managedStyle.remove = () => { removed = true; managedStyle = undefined; };
