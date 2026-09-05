@@ -208,6 +208,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
   const {
     AdvancedHistorySgccCardEditor,
     applyDashboardRuntimeState,
+    cardConfigWithTitle,
     containSgccEditorConfigEvent,
     dashboardRuntimeState,
     sgccConfigsWithSnapshotComparisons,
@@ -224,6 +225,10 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(innerEventStopped, true);
   assert.deepEqual(containedDraft, innerConfig);
   assert.notEqual(containedDraft, innerConfig);
+
+  const titled = cardConfigWithTitle({ type: "custom:advanced-history-sgcc-card" }, "Gas");
+  assert.equal(titled.title, "Gas");
+  assert.equal(cardConfigWithTitle(titled, "").title, undefined);
 
   const original = {
     targets: { area_id: [], device_id: [], entity_id: ["sensor.gas"] },

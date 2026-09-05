@@ -129,6 +129,14 @@ function clone(value) {
     : JSON.parse(JSON.stringify(value));
 }
 
+export function cardConfigWithTitle(config, title) {
+  const next = clone(config) || {};
+  const value = String(title ?? "");
+  if (value) next.title = value;
+  else delete next.title;
+  return next;
+}
+
 function dashboardStateStorageKey(snapshot) {
   const id = String(snapshot?.id || "").trim();
   return id ? `${DASHBOARD_CARD_STATE_STORAGE_PREFIX}:${id}` : "";
@@ -469,16 +477,42 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
         : this._customLocalize("numeric_history");
       return `<button type="button" data-index="${index}" class="${index === this._activeIndex ? "active" : ""}">${label}</button>`;
     }).join("")}</nav>` : "";
+    const titleLabel = this._hass.localize?.(
+      "ui.panel.lovelace.editor.card.generic.title",
+    ) || "Title";
     this.shadowRoot.innerHTML = `
       <style>
         :host { display:block; }
+        .card-title-option { margin:0 0 16px; display:block; }
+        .card-title-option span { margin:0 0 7px; display:block; color:var(--secondary-text-color); font-size:13px; font-weight:500; }
+        .card-title-option input {
+          width:100%; min-height:48px; padding:0 12px; box-sizing:border-box;
+          color:var(--primary-text-color); background:var(--card-background-color);
+          border:1px solid var(--divider-color); border-radius:8px; font:inherit;
+        }
+        .card-title-option input:focus { border-color:var(--primary-color); outline:1px solid var(--primary-color); }
         nav { margin:0 0 12px; display:flex; gap:4px; border-bottom:1px solid var(--divider-color); }
         button { min-height:40px; padding:0 12px; border:0; border-bottom:3px solid transparent; color:var(--secondary-text-color); background:transparent; font:inherit; cursor:pointer; }
         button.active { color:var(--primary-color); border-bottom-color:var(--primary-color); }
         .sgcc-editor-host { min-height:120px; }
         .loading, p { padding:24px 8px; color:var(--secondary-text-color); text-align:center; }
       </style>
+      <label class="card-title-option">
+        <span>${this._escape(titleLabel)}</span>
+        <input id="card-title" type="text" autocomplete="off">
+      </label>
       ${tabs}<div class="sgcc-editor-host"><div class="loading">${this._hass.localize?.("ui.common.loading") || "Loading"}…</div></div>`;
+    const titleInput = this.shadowRoot.getElementById("card-title");
+    titleInput.value = this._config.title || "";
+    titleInput.addEventListener("input", () => {
+      const next = cardConfigWithTitle(this._config, titleInput.value);
+      this._config = next;
+      this.dispatchEvent(new CustomEvent("config-changed", {
+        detail: { config: next },
+        bubbles: true,
+        composed: true,
+      }));
+    });
     for (const button of this.shadowRoot.querySelectorAll("[data-index]")) {
       button.addEventListener("click", () => {
         this._activeIndex = Number(button.dataset.index) || 0;
@@ -567,6 +601,16 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
   _customLocalize(key) {
     const language = this._hass?.locale?.language || this._hass?.language;
     return customLocalize(language, key);
+  }
+
+  _escape(value) {
+    return String(value ?? "").replace(/[&<>\"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[character]);
   }
 }
 
