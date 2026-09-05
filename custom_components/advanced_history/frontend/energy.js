@@ -1008,6 +1008,26 @@ export class EnergyMethods {
     const start = collection?.start;
     const end = collection?.end;
     if (!(start instanceof Date) || !(end instanceof Date)) return false;
+    if (this._dashboardCardMode) {
+      const group = this._dashboardDatePickerGroup?.();
+      if (!group) return false;
+      const detail = {
+        group,
+        mode: "custom",
+        offset: 0,
+        customStart: start.toISOString(),
+        customEnd: end.toISOString(),
+        sourceId: `advanced-history-${this._dashboardConfig?.snapshot?.id || "dashboard"}`,
+      };
+      if (typeof window !== "undefined" && typeof CustomEvent !== "undefined") {
+        window.dispatchEvent(new CustomEvent("sgc-datepicker-sync", { detail }));
+      } else {
+        for (const card of this._graphCards || []) {
+          card?._onDatePickerSyncEvent?.({ detail });
+        }
+      }
+      return true;
+    }
     let synced = false;
     for (const card of this._graphCards || []) {
       if (typeof card?._handleEnergyDate !== "function") continue;
@@ -1131,27 +1151,38 @@ export class EnergyMethods {
     host.replaceChildren(alert);
   }
 
-  _bindDashboardPeriodStore(token, host, compareHost) {
+  _bindDashboardPeriodStore(token, host, compareHost, renderControls = true) {
     const store = this._createDashboardPeriodStore();
     this._energyCollection = store;
-    if (this._panelRollingHours && this._pendingRollingCompareRestore) {
-      const restore = this._pendingRollingCompareRestore;
+    if (this._dashboardPeriodStoreFollower) {
+      // The first card mounted for a group owns its initial period. Followers
+      // adopt that live period instead of replacing it with their exported or
+      // locally cached range during startup.
       this._pendingRollingCompareRestore = null;
-      this._energyCompareChoice = restore.choice;
-      this._energyCompareCount = restore.count;
-      store.setCompare(restore.compare);
-    }
-    if (this._panelRollingHours) {
-      this._refreshPanelRollingRange(true);
-    } else if (this._pendingPeriodRestore?.start) {
-      this._restorePendingPeriod(store, false);
+      this._pendingPeriodRestore = null;
       this._finishPeriodRestore();
-    } else if (this._energyResetPending || !this._targetCount()) {
-      this._resetEnergySelection(store);
+    } else {
+      if (this._panelRollingHours && this._pendingRollingCompareRestore) {
+        const restore = this._pendingRollingCompareRestore;
+        this._pendingRollingCompareRestore = null;
+        this._energyCompareChoice = restore.choice;
+        this._energyCompareCount = restore.count;
+        store.setCompare(restore.compare);
+      }
+      if (this._panelRollingHours) {
+        this._refreshPanelRollingRange(true);
+      } else if (this._pendingPeriodRestore?.start) {
+        this._restorePendingPeriod(store, false);
+        this._finishPeriodRestore();
+      } else if (this._energyResetPending || !this._targetCount()) {
+        this._resetEnergySelection(store);
+      }
     }
     this._activateGraphDataSourceTracking();
-    this._renderDashboardEnergyController(host, store);
-    this._renderPanelTimeRangeControl(host);
+    if (renderControls) {
+      this._renderDashboardEnergyController(host, store);
+      this._renderPanelTimeRangeControl(host);
+    }
 
     const applyMode = (mode = store.compare, force = false) => {
       if (this._energyRenderToken !== token) return;
@@ -1932,10 +1963,11 @@ export class EnergyMethods {
     host.innerHTML = `<div class="target-picker" style="cursor:default"><span class="target-label">${this._escape(dateRange)}</span><span style="padding:3px 4px;color:var(--secondary-text-color)">${this._escape(loading)}…</span></div>`;
     if (this._dashboardCardMode) {
       try {
-        await this._ensureDashboardDatePickerLoaded();
+        const renderControls = this._dashboardDatePickerVisible?.() !== false;
+        if (renderControls) await this._ensureDashboardDatePickerLoaded();
         if (this._energyRenderToken !== token || !host.isConnected) return;
         host.replaceChildren();
-        this._bindDashboardPeriodStore(token, host, compareHost);
+        this._bindDashboardPeriodStore(token, host, compareHost, renderControls);
       } catch (error) {
         if (this._energyRenderToken !== token || !host.isConnected) return;
         console.error("Advanced History: dashboard date picker failed to load", error);

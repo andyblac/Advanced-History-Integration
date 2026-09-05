@@ -2,6 +2,9 @@ import {
   ADVANCED_HISTORY_CARD_SCHEMA,
   ADVANCED_HISTORY_CARD_TYPE,
   CARD_TAG,
+  DASHBOARD_SNAPSHOT_SGCC_KEYS,
+  DASHBOARD_SNAPSHOT_SOURCE_KEYS,
+  DASHBOARD_STORED_SGCC_OMIT_KEYS,
 } from "./constants.js";
 
 const BRIDGE_TAG = "ha-panel-history";
@@ -60,16 +63,101 @@ export function dashboardConfigWithNewView(config, title, layout = "sections") {
 function compactPanelSettings(config = {}) {
   const keys = [
     "card_module_url",
-    "card_options",
-    "entity_options",
-    "default_hours",
-    "graph_height",
     "large_range_automatic_detail",
     "large_range_detail_threshold_days",
   ];
-  return Object.fromEntries(keys.flatMap((key) => (
+  const settings = Object.fromEntries(keys.flatMap((key) => (
     config[key] === undefined ? [] : [[key, clone(config[key])]]
   )));
+  if (settings.large_range_automatic_detail !== false) {
+    delete settings.large_range_automatic_detail;
+  }
+  if (
+    !Number(settings.large_range_detail_threshold_days)
+    || Number(settings.large_range_detail_threshold_days) === 31
+  ) {
+    delete settings.large_range_detail_threshold_days;
+  }
+  return settings;
+}
+
+function dashboardSnapshot(snapshot) {
+  const next = clone(snapshot);
+  delete next.schema;
+  delete next.name;
+  delete next.saved_at;
+  delete next.targets;
+  delete next.hidden_targets;
+  delete next.y2_targets;
+  delete next.hidden_y2_targets;
+  for (const key of DASHBOARD_SNAPSHOT_SOURCE_KEYS) delete next[key];
+  next.chart = clone(next.chart || {});
+  delete next.chart.defaults_mode;
+  for (const key of DASHBOARD_SNAPSHOT_SGCC_KEYS) delete next.chart[key];
+  return next;
+}
+
+function typedCardOptions(value, variant) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value.numeric || value.state ? value[variant] || {} : value;
+}
+
+function dashboardGraphConfig(config, panelConfig = {}) {
+  const variant = config.chart_mode === "state_timeline" ? "state" : "numeric";
+  const defaults = clone(typedCardOptions(panelConfig.card_options, variant));
+  const templates = ["entities", "numeric_entities", "state_entities"]
+    .flatMap((key) => {
+      const value = defaults[key];
+      delete defaults[key];
+      return Array.isArray(value) ? value : value ? [value] : [];
+    })
+    .filter((value) => (
+      value
+      && typeof value === "object"
+      && !Array.isArray(value)
+      && value.entity == null
+      && value.statistic_id == null
+    ));
+  const next = { ...defaults, ...clone(config) };
+  if (Array.isArray(next.entities)) {
+    const configuredEntities = panelConfig.entity_options || {};
+    next.entities = next.entities.map((raw) => {
+      const row = typeof raw === "string" ? { entity: raw } : clone(raw);
+      const entity = row?.entity || row?.statistic_id;
+      if (!entity) return raw;
+      const key = row.attribute ? `${entity}::${row.attribute}` : entity;
+      return Object.assign(
+        {},
+        ...templates.map(clone),
+        clone(configuredEntities[entity] || {}),
+        clone(configuredEntities[key] || {}),
+        row,
+      );
+    });
+  }
+  for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) delete next[key];
+  if (next.card_background_color === "transparent") delete next.card_background_color;
+  return next;
+}
+
+function uuid() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(bytes);
+  else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
+
+export function dashboardDatePickerGroup(panelName = "") {
+  const configuredName = String(panelName || "").trim();
+  return configuredName || `advanced-history-${uuid()}`;
 }
 
 export function advancedHistoryDashboardCard(
@@ -78,20 +166,25 @@ export function advancedHistoryDashboardCard(
   title = "",
   entities = [],
   graphConfigs = [],
+  panelName = "",
 ) {
   if (!snapshot?.targets || !snapshot?.chart) return null;
+  const datePickerGroup = dashboardDatePickerGroup(panelName);
+  const settings = compactPanelSettings(panelConfig);
+  const normalizedTitle = String(title || "").trim();
+  const sgccConfigs = graphConfigs
+    .filter((config) => config && typeof config === "object" && !Array.isArray(config))
+    .map((config) => dashboardGraphConfig(config, panelConfig));
   const config = {
     type: ADVANCED_HISTORY_CARD_TYPE,
     schema: ADVANCED_HISTORY_CARD_SCHEMA,
-    snapshot: clone(snapshot),
-    settings: compactPanelSettings(panelConfig),
-    entities: [...new Set(entities.filter((entity) => typeof entity === "string"))],
-    sgcc_configs: graphConfigs
-      .filter((config) => config && typeof config === "object" && !Array.isArray(config))
-      .map((config) => clone(config)),
+    show_date_picker: true,
+    date_picker_group: datePickerGroup,
+    ...(normalizedTitle ? { title: normalizedTitle } : {}),
+    sgcc_configs: sgccConfigs,
+    snapshot: dashboardSnapshot(snapshot),
+    ...(Object.keys(settings).length ? { settings } : {}),
   };
-  const normalizedTitle = String(title || "").trim();
-  if (normalizedTitle) config.title = normalizedTitle;
   return config;
 }
 
@@ -213,32 +306,40 @@ function entityId(row) {
   return typeof row === "string" ? row : row?.entity || row?.statistic_id;
 }
 
+function exportedSgccConfigs(card) {
+  return card?.type === ADVANCED_HISTORY_CARD_TYPE
+    ? card.sgcc_configs || []
+    : [card];
+}
+
+function exportedEntityRows(cards) {
+  return cards.flatMap((card) => (
+    exportedSgccConfigs(card).flatMap((config) => config?.entities || [])
+  ));
+}
+
 function deselectedEntityIds(cards) {
-  return [...new Set(cards.flatMap((card) => (
-    card.entities || []
-  ).filter((row) => row && typeof row === "object" && row.enabled === false)
+  return [...new Set(exportedEntityRows(cards)
+    .filter((row) => row && typeof row === "object" && row.enabled === false)
     .map(entityId)
-    .filter(Boolean)))];
+    .filter(Boolean))];
 }
 
 export function dashboardCardsWithHiddenEntitiesOnLoad(cards) {
-  return cards.map((card) => ({
-    ...clone(card),
-    entities: (card.entities || []).map((row) => {
-      if (!row || typeof row !== "object" || row.enabled !== false) return clone(row);
-      return {
-        ...clone(row),
-        enabled: true,
-        auto_hide: true,
-      };
-    }),
-  }));
+  return cards.map((card) => {
+    const next = clone(card);
+    for (const config of exportedSgccConfigs(next)) {
+      config.entities = (config.entities || []).map((row) => {
+        if (!row || typeof row !== "object" || row.enabled !== false) return clone(row);
+        return { ...clone(row), enabled: true, auto_hide: true };
+      });
+    }
+    return next;
+  });
 }
 
-function exportEntityIds(cards) {
-  return [...new Set(cards.flatMap((card) => (
-    card.entities || []
-  ).map(entityId).filter(Boolean)))];
+export function dashboardCardEntityIds(cards) {
+  return [...new Set(exportedEntityRows(cards).map(entityId).filter(Boolean))];
 }
 
 function deselectedOptions(cards, labels) {
@@ -247,7 +348,7 @@ function deselectedOptions(cards, labels) {
   return {
     hiddenOnLoadCards: dashboardCardsWithHiddenEntitiesOnLoad(cards),
     disabledCards: clone(cards),
-    entities: exportEntityIds(cards),
+    entities: dashboardCardEntityIds(cards),
     label: labels.hideEntitiesOnLoad,
     note: labels.hideEntitiesOnLoadNote,
   };
@@ -544,7 +645,7 @@ export async function addCardsToDashboard({ hass, container, cards, labels, ensu
     const bridge = document.createElement("div");
     bridge.hidden = true;
     bridge.hass = hass;
-    bridge._getEntityIds = () => exportEntityIds(cards);
+    bridge._getEntityIds = () => dashboardCardEntityIds(cards);
     bridge._mungedStateHistory = {};
     bridge._startDate = new Date(Date.now() - 3_600_000);
     bridge._endDate = new Date();

@@ -2,7 +2,10 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { EnergyMethods } from "../custom_components/advanced_history/frontend/energy.js";
-import { GraphMethods } from "../custom_components/advanced_history/frontend/graphs.js";
+import {
+  GraphMethods,
+  withoutDashboardWrapperNavigation,
+} from "../custom_components/advanced_history/frontend/graphs.js";
 
 test("comparison menu enables the selected comparison type", () => {
   const calls = [];
@@ -212,6 +215,26 @@ test("axis badges hide and restore every main legend series on their axis", () =
   assert.equal(buttonState.get("y1:aria-pressed"), "true");
 });
 
+test("dashboard SGCC inherits the wrapper background when transparency is the default", () => {
+  const values = new Map();
+  const card = {
+    style: {
+      setProperty: (key, value) => values.set(key, value),
+      removeProperty: (key) => values.delete(key),
+    },
+  };
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _dashboardCardMode: true,
+  });
+
+  context._applyDashboardGraphBackground(card, { card_background_color: "transparent" });
+  assert.equal(values.get("--ha-card-background"), "transparent");
+  assert.equal(values.get("--card-background-color"), "transparent");
+
+  context._applyDashboardGraphBackground(card, { card_background_color: "#123456" });
+  assert.equal(values.size, 0);
+});
+
 test("dashboard period store publishes local state without an Energy request", async () => {
   const context = Object.create(EnergyMethods.prototype);
   const store = context._createDashboardPeriodStore();
@@ -235,6 +258,39 @@ test("dashboard period store publishes local state without an Energy request", a
   assert.equal(remounted.start.getTime(), start.getTime());
   assert.equal(remounted.end.getTime(), end.getTime());
   assert.equal(remounted.compare, "previous");
+});
+
+test("dashboard navigation uses SGCC's native date-picker synchronization", () => {
+  let received;
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _dashboardCardMode: true,
+    _dashboardConfig: { snapshot: { id: "test-card" } },
+    _dashboardDatePickerGroup: () => "shared-group",
+    _graphCards: [{
+      _onDatePickerSyncEvent: (event) => { received = event.detail; },
+    }],
+  });
+  const start = new Date("2026-09-01T00:00:00.000Z");
+  const end = new Date("2026-09-30T23:59:59.999Z");
+
+  context._syncGraphCardsToEnergyPeriod({ start, end });
+
+  assert.equal(received.group, "shared-group");
+  assert.equal(received.mode, "custom");
+  assert.equal(received.customStart, start.toISOString());
+  assert.equal(received.customEnd, end.toISOString());
+});
+
+test("dashboard runtime drops legacy Energy navigation options", () => {
+  const config = withoutDashboardWrapperNavigation({
+    energy_date_sync: true,
+    energy_collection_key: "legacy",
+    show_date_picker: true,
+    date_picker_group: "legacy-group",
+    entities: ["sensor.gas"],
+  });
+
+  assert.deepEqual(config, { entities: ["sensor.gas"] });
 });
 
 test("dashboard controller binds local state after its date picker loads", async () => {
@@ -265,7 +321,38 @@ test("dashboard controller binds local state after its date picker loads", async
   assert.equal(bound, true);
 });
 
-test("dashboard SGCC receives the local period store through its sync key", () => {
+test("hidden dashboard date controls still bind to their shared period group", async () => {
+  const host = {
+    isConnected: true,
+    innerHTML: "",
+    replaceChildren() { this.innerHTML = ""; },
+  };
+  const compareHost = {};
+  let boundRenderControls;
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _dashboardCardMode: true,
+    _dashboardDatePickerVisible: () => false,
+    _escape: (value) => value,
+    _localize: (_key, fallback) => fallback,
+    _ensureDashboardDatePickerLoaded: async () => {
+      throw new Error("hidden controls must not wait for the picker");
+    },
+    _bindDashboardPeriodStore: (_token, boundHost, boundCompareHost, renderControls) => {
+      assert.equal(boundHost, host);
+      assert.equal(boundCompareHost, compareHost);
+      boundRenderControls = renderControls;
+    },
+    shadowRoot: {
+      getElementById: (id) => id === "date-controller" ? host : compareHost,
+    },
+  });
+
+  await context._renderEnergyController();
+
+  assert.equal(boundRenderControls, false);
+});
+
+test("dashboard SGCC does not expose its local period store as an Energy collection", () => {
   const store = { start: new Date(), end: new Date() };
   const connection = {
     sendMessagePromise: async () => [],
@@ -280,7 +367,7 @@ test("dashboard SGCC receives the local period store through its sync key", () =
 
   context._setGraphCardHass(card, hass);
 
-  assert.equal(card.hass.connection._advanced_history_test, store);
+  assert.equal(card.hass.connection._advanced_history_test, undefined);
   assert.equal(connection._advanced_history_test, undefined);
 });
 

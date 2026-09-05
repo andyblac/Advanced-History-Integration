@@ -194,6 +194,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     const title = activeTab
       ? this._panelTabDisplayLabel(activeTab, activeTabIndex)
       : "";
+    const configuredPanelName = String(activeTab?.name || "").trim();
     const card = advancedHistoryDashboardCard(
       this._captureSnapshot(title),
       this.config,
@@ -205,6 +206,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
       this._graphCards.map((graphCard) => (
         graphCard?.__advancedHistoryConfig || graphCard?._config
       )).filter(Boolean),
+      configuredPanelName,
     );
     if (!card) return;
     if (button) button.disabled = true;

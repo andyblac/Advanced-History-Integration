@@ -1,4 +1,8 @@
-import { CARD_HACS_INSTALL_URL, CARD_TAG } from "./constants.js";
+import {
+  CARD_HACS_INSTALL_URL,
+  CARD_TAG,
+  DASHBOARD_SYNC_GROUP_KEYS,
+} from "./constants.js";
 import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { CARD_DEFAULT_AGGREGATE, automaticEntityOptions } from "./entity-defaults.js";
 import {
@@ -174,6 +178,29 @@ function normalizeCompactHistoryResponse(response) {
     changed ||= next !== value;
   }
   return changed ? normalized : response;
+}
+
+const DASHBOARD_WRAPPER_NAVIGATION_KEYS = [
+  "energy_date_sync",
+  "energy_collection_key",
+  "show_date_picker",
+  "date_picker_position",
+  "date_picker_nav_position",
+  "date_picker_shortcuts_position",
+  "date_picker_group",
+  "date_picker_modes",
+  "date_picker_default_mode",
+  "date_picker_step",
+  "show_interval_picker",
+  "interval_picker_position",
+  "interval_picker_group",
+  "interval_options",
+];
+
+export function withoutDashboardWrapperNavigation(config) {
+  const next = { ...(config || {}) };
+  for (const key of DASHBOARD_WRAPPER_NAVIGATION_KEYS) delete next[key];
+  return next;
 }
 
 export class GraphMethods {
@@ -517,8 +544,24 @@ export class GraphMethods {
     // for ResizeObserver is too late because Lovelace can already have seen
     // the transient size and repositioned the dashboard.
     root.addEventListener("pointerdown", lock, true);
-    root.addEventListener("click", lock, true);
+    root.addEventListener("click", (event) => {
+      lock(event);
+      if (event.target?.closest?.(".sgc-detail-legend-entity, .sgc-legend-item")) {
+        queueMicrotask(() => this._syncDashboardSgccVisibilityFromCards?.());
+      }
+    }, true);
     card.__advancedHistoryLegendLayoutGuard = true;
+  }
+
+  _applyDashboardGraphBackground(card, config) {
+    if (!this._dashboardCardMode || !card?.style) return;
+    const transparent = String(config?.card_background_color || "")
+      .trim()
+      .toLowerCase() === "transparent";
+    for (const property of ["--ha-card-background", "--card-background-color"]) {
+      if (transparent) card.style.setProperty(property, "transparent");
+      else card.style.removeProperty(property);
+    }
   }
 
   _axisLegendEntries(axis) {
@@ -574,6 +617,7 @@ export class GraphMethods {
     for (const entry of entries) {
       if (this._legendEntryHidden(entry) !== hide) entry.click();
     }
+    this._syncDashboardSgccVisibilityFromCards?.();
     this._syncAxisVisibilityButtons();
   }
 
@@ -774,7 +818,7 @@ export class GraphMethods {
       promoteBatteryUpperBound("primary", "upper_bound");
       promoteBatteryUpperBound("secondary", "upper_bound_secondary");
     }
-    const config = {
+    let config = {
       type: `custom:${CARD_TAG}`, card_header: title,
       entities,
       hours_to_show: this._effectiveDefaultHours(),
@@ -788,12 +832,25 @@ export class GraphMethods {
         ? { auto_scale_points: false, group_by: "raw" }
         : {}),
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
-      energy_date_sync: true,
-      ...(this._panelEnergyCollectionKey()
-        ? { energy_collection_key: this._panelEnergyCollectionKey() }
+      ...(!this._dashboardCardMode
+        ? {
+            energy_date_sync: true,
+            ...(this._panelEnergyCollectionKey()
+              ? { energy_collection_key: this._panelEnergyCollectionKey() }
+              : {}),
+          }
         : {}),
       ...this._panelGraphHourOptions(),
     };
+    if (this._dashboardCardMode) {
+      config = withoutDashboardWrapperNavigation(config);
+      if (config.card_background_color == null || config.card_background_color === "") {
+        config.card_background_color = "transparent";
+      }
+      config.show_date_picker = false;
+      const syncGroup = this._dashboardDatePickerGroup?.() || "advanced-history-dashboard";
+      for (const key of DASHBOARD_SYNC_GROUP_KEYS) config[key] = syncGroup;
+    }
     if (mode !== "state_timeline" && config.height === "auto") {
       // The card's native height:auto implementation only enables its
       // fill-height path when it is hosted in a numeric grid row. AHP owns
@@ -811,6 +868,7 @@ export class GraphMethods {
       shell.classList.add("state-controls-row");
     }
     try {
+      this._applyDashboardGraphBackground(card, config);
       if (detail?.automatic) {
         // Statistics Graph Chart Card persists its on-card Group By and PPH
         // overrides. Apply one picker-free configuration first so the card's
@@ -853,6 +911,9 @@ export class GraphMethods {
       }
       this._graphLayoutObserveCard?.(card);
       card.updateComplete?.then(() => {
+        if (this._dashboardCardMode && this._graphCards?.includes(card)) {
+          this._syncGraphCardsToEnergyPeriod?.();
+        }
         this._graphLayoutSchedule?.();
       });
     }
@@ -1284,19 +1345,8 @@ export class GraphMethods {
       }
       return recordResponse(message, result);
     };
-    const dashboardCollectionKey = this._dashboardCardMode
-      ? this._panelEnergyCollectionKey?.()
-      : null;
-    const dashboardCollectionProperty = dashboardCollectionKey
-      ? `_${dashboardCollectionKey}`
-      : null;
     const connection = hass.connection ? new Proxy(hass.connection, {
       get: (target, property) => {
-        if (
-          dashboardCollectionProperty
-          && property === dashboardCollectionProperty
-          && this._energyCollection
-        ) return this._energyCollection;
         const value = Reflect.get(target, property, target);
         if (typeof value !== "function") return value;
         if (!["subscribeMessage", "sendMessage", "sendMessagePromise"].includes(property)) {
@@ -1733,9 +1783,13 @@ export class GraphMethods {
         ? "state_timeline"
         : (cardOptions.chart_mode ?? editorMode),
       entities,
-      energy_date_sync: true,
-      ...(this._panelEnergyCollectionKey()
-        ? { energy_collection_key: this._panelEnergyCollectionKey() }
+      ...(!this._dashboardCardMode
+        ? {
+            energy_date_sync: true,
+            ...(this._panelEnergyCollectionKey()
+              ? { energy_collection_key: this._panelEnergyCollectionKey() }
+              : {}),
+          }
         : {}),
     };
   }

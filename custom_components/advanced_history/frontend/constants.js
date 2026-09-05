@@ -2,6 +2,44 @@ export const CARD_TAG = "statistics-graph-chart-card";
 export const ADVANCED_HISTORY_CARD_TAG = "advanced-history-sgcc-card";
 export const ADVANCED_HISTORY_CARD_TYPE = `custom:${ADVANCED_HISTORY_CARD_TAG}`;
 export const ADVANCED_HISTORY_CARD_SCHEMA = 1;
+export const DASHBOARD_SYNC_GROUP_KEYS = [
+  "date_picker_group",
+  "interval_picker_group",
+  "pph_picker_group",
+  "group_by_picker_group",
+  "tooltip_sync_group",
+  "zoom_sync_group",
+  "scroll_sync_group",
+];
+export const DASHBOARD_STORED_SGCC_OMIT_KEYS = [
+  "energy_date_sync",
+  "energy_collection_key",
+  "show_date_picker",
+  "date_picker_position",
+  "date_picker_nav_position",
+  "date_picker_shortcuts_position",
+  "date_picker_modes",
+  "date_picker_default_mode",
+  "date_picker_step",
+  "show_interval_picker",
+  "interval_picker_position",
+  "interval_options",
+  "grid_options",
+  ...DASHBOARD_SYNC_GROUP_KEYS,
+];
+export const DASHBOARD_SNAPSHOT_SGCC_KEYS = [
+  "card_options",
+  "entity_options",
+  "attribute_selection",
+  "default_hours",
+  "source_graph_height",
+];
+export const DASHBOARD_SNAPSHOT_SOURCE_KEYS = [
+  "source_bookmark_id",
+  "source_external_bookmark",
+  "source_external_bookmark_owner_id",
+  "source_external_bookmark_id",
+];
 export const CARD_RESOURCE_MATCH = "statistics-graph-chart-card";
 export const CARD_DEFAULT_MODULE_URLS = [
   "/hacsfiles/Statistics-Graph-Chart-Card/statistics-graph-chart-card.js",

@@ -3,6 +3,10 @@ import {
   ADVANCED_HISTORY_CARD_SCHEMA,
   ADVANCED_HISTORY_CARD_TAG,
   CARD_TAG,
+  DASHBOARD_SNAPSHOT_SGCC_KEYS,
+  DASHBOARD_SNAPSHOT_SOURCE_KEYS,
+  DASHBOARD_STORED_SGCC_OMIT_KEYS,
+  DASHBOARD_SYNC_GROUP_KEYS,
 } from "./constants.js";
 import { cardConfigToSnapshot } from "./card-handoff.js";
 import { ensureCardLoaded } from "./config-flow-defaults.js";
@@ -10,6 +14,7 @@ import { customLocalize, loadTranslations } from "./translations.js";
 import { panelStyles } from "./styles.js";
 
 const DASHBOARD_CARD_STATE_STORAGE_PREFIX = "advanced_history_dashboard_card_state_v1";
+const DASHBOARD_PERIOD_GROUP_STORES = new Map();
 const DASHBOARD_RUNTIME_CHART_KEYS = [
   "time_range",
   "rolling_hours",
@@ -38,11 +43,13 @@ const cardStyles = `
     align-items:center; gap:12px; color:var(--secondary-text-color); font-size:12px; font-weight:500;
   }
   .dashboard-axis-group { min-width:0; display:flex; align-items:center; gap:7px; }
-  .dashboard-axis-group.secondary { justify-content:flex-end; }
+  .dashboard-axis-group.primary { grid-column:1; grid-row:1; }
+  .dashboard-axis-group.secondary { grid-column:3; grid-row:1; justify-content:flex-end; }
   .dashboard-date-controls {
     min-width:0; max-width:100%; display:flex; align-items:center;
-    justify-self:center; gap:5px; width:max-content;
+    grid-column:2; grid-row:1; justify-self:center; gap:5px; width:max-content;
   }
+  .dashboard-date-controls[hidden] { display:none; }
   .dashboard-download-button {
     width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center;
     color:var(--secondary-text-color); background:var(--secondary-background-color);
@@ -111,6 +118,7 @@ const cardStyles = `
   .energy-nav-card .panel-time-range-value { min-width:96px; }
   @container (max-width:900px) {
     .dashboard-axis-strip { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+    .dashboard-axis-group.secondary { grid-column:2; }
     .dashboard-date-controls {
       grid-column:1 / -1; grid-row:2; margin-inline:auto;
     }
@@ -134,6 +142,56 @@ export function cardConfigWithTitle(config, title) {
   const value = String(title ?? "");
   if (value) next.title = value;
   else delete next.title;
+  return next;
+}
+
+export function dashboardDatePickerVisible(config) {
+  if (Object.prototype.hasOwnProperty.call(config || {}, "show_date_picker")) {
+    return config.show_date_picker !== false;
+  }
+  const embedded = config?.sgcc_configs?.find((item) => (
+    Object.prototype.hasOwnProperty.call(item || {}, "show_date_picker")
+  ));
+  if (embedded) return embedded.show_date_picker !== false;
+  return true;
+}
+
+export function compactDashboardSgccConfig(config) {
+  const next = clone(config) || {};
+  for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) delete next[key];
+  if (next.card_background_color === "transparent") delete next.card_background_color;
+  return next;
+}
+
+export function compactDashboardSnapshot(snapshot) {
+  const next = clone(snapshot);
+  if (!next) return next;
+  delete next.schema;
+  delete next.name;
+  delete next.saved_at;
+  delete next.targets;
+  delete next.hidden_targets;
+  delete next.y2_targets;
+  delete next.hidden_y2_targets;
+  for (const key of DASHBOARD_SNAPSHOT_SOURCE_KEYS) delete next[key];
+  next.chart = clone(next.chart || {});
+  delete next.chart.defaults_mode;
+  for (const key of DASHBOARD_SNAPSHOT_SGCC_KEYS) delete next.chart[key];
+  return next;
+}
+
+export function dashboardConfigWithDateNavigation(config, source = {}) {
+  const next = clone(config) || {};
+  const showDatePicker = Object.prototype.hasOwnProperty.call(source, "show_date_picker")
+    ? source.show_date_picker !== false
+    : dashboardDatePickerVisible(next);
+  const datePickerGroup = Object.prototype.hasOwnProperty.call(source, "date_picker_group")
+    ? String(source.date_picker_group || "").trim()
+    : String(next.date_picker_group || "").trim();
+  next.show_date_picker = showDatePicker;
+  next.date_picker_group = datePickerGroup;
+  next.sgcc_configs = (next.sgcc_configs || []).map(compactDashboardSgccConfig);
+  next.snapshot = compactDashboardSnapshot(next.snapshot);
   return next;
 }
 
@@ -398,7 +456,15 @@ function fallbackSgccConfigs(config) {
     ...(snapshot?.hidden_targets?.entity_id || []),
     ...(snapshot?.hidden_y2_targets?.entity_id || []),
   ]);
-  const entities = (config?.entities || []).map((entity) => ({
+  const configuredEntities = Array.isArray(config?.entities) && config.entities.length
+    ? config.entities
+    : [
+      ...(snapshot?.targets?.entity_id || []),
+      ...(snapshot?.hidden_targets?.entity_id || []),
+      ...(snapshot?.y2_targets?.entity_id || []),
+      ...(snapshot?.hidden_y2_targets?.entity_id || []),
+    ];
+  const entities = [...new Set(configuredEntities)].map((entity) => ({
     entity,
     ...(clone(chart.entity_options?.[entity]) || {}),
     ...(y2.has(entity) ? { y_axis: "secondary" } : {}),
@@ -420,6 +486,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
     this._hass = null;
     this._config = null;
     this._editor = null;
+    this._editorSectionObserver = null;
     this._renderToken = 0;
     this._activeIndex = 0;
   }
@@ -444,12 +511,17 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
   async _render() {
     if (!this._config || !this._hass) return;
     const token = ++this._renderToken;
+    this._editorSectionObserver?.disconnect();
+    this._editorSectionObserver = null;
     this._editor = null;
     const storedConfigs = Array.isArray(this._config.sgcc_configs)
       ? this._config.sgcc_configs.filter(Boolean)
       : [];
     const baseConfigs = storedConfigs.length ? storedConfigs : fallbackSgccConfigs(this._config);
-    let snapshot = this._config.snapshot;
+    let snapshot = snapshotFromSgccConfigs(
+      this._config.snapshot,
+      baseConfigs,
+    );
     const stateKey = dashboardStateStorageKey(snapshot);
     if (stateKey) {
       try {
@@ -465,7 +537,18 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
       baseConfigs,
       snapshot,
       this._config.settings,
-    );
+    ).map((config) => {
+      const next = {
+        ...config,
+        show_date_picker: dashboardDatePickerVisible(this._config),
+      };
+      if (next.card_background_color == null || next.card_background_color === "") {
+        next.card_background_color = "transparent";
+      }
+      const group = String(this._config.date_picker_group || "").trim();
+      for (const key of DASHBOARD_SYNC_GROUP_KEYS) next[key] = group;
+      return next;
+    });
     if (!configs.length) {
       this.shadowRoot.innerHTML = `<p>${this._customLocalize("dashboard_card_editor_unavailable")}</p>`;
       return;
@@ -477,42 +560,16 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
         : this._customLocalize("numeric_history");
       return `<button type="button" data-index="${index}" class="${index === this._activeIndex ? "active" : ""}">${label}</button>`;
     }).join("")}</nav>` : "";
-    const titleLabel = this._hass.localize?.(
-      "ui.panel.lovelace.editor.card.generic.title",
-    ) || "Title";
     this.shadowRoot.innerHTML = `
       <style>
         :host { display:block; }
-        .card-title-option { margin:0 0 16px; display:block; }
-        .card-title-option span { margin:0 0 7px; display:block; color:var(--secondary-text-color); font-size:13px; font-weight:500; }
-        .card-title-option input {
-          width:100%; min-height:48px; padding:0 12px; box-sizing:border-box;
-          color:var(--primary-text-color); background:var(--card-background-color);
-          border:1px solid var(--divider-color); border-radius:8px; font:inherit;
-        }
-        .card-title-option input:focus { border-color:var(--primary-color); outline:1px solid var(--primary-color); }
         nav { margin:0 0 12px; display:flex; gap:4px; border-bottom:1px solid var(--divider-color); }
         button { min-height:40px; padding:0 12px; border:0; border-bottom:3px solid transparent; color:var(--secondary-text-color); background:transparent; font:inherit; cursor:pointer; }
         button.active { color:var(--primary-color); border-bottom-color:var(--primary-color); }
         .sgcc-editor-host { min-height:120px; }
         .loading, p { padding:24px 8px; color:var(--secondary-text-color); text-align:center; }
       </style>
-      <label class="card-title-option">
-        <span>${this._escape(titleLabel)}</span>
-        <input id="card-title" type="text" autocomplete="off">
-      </label>
       ${tabs}<div class="sgcc-editor-host"><div class="loading">${this._hass.localize?.("ui.common.loading") || "Loading"}…</div></div>`;
-    const titleInput = this.shadowRoot.getElementById("card-title");
-    titleInput.value = this._config.title || "";
-    titleInput.addEventListener("input", () => {
-      const next = cardConfigWithTitle(this._config, titleInput.value);
-      this._config = next;
-      this.dispatchEvent(new CustomEvent("config-changed", {
-        detail: { config: next },
-        bubbles: true,
-        composed: true,
-      }));
-    });
     for (const button of this.shadowRoot.querySelectorAll("[data-index]")) {
       button.addEventListener("click", () => {
         this._activeIndex = Number(button.dataset.index) || 0;
@@ -545,12 +602,15 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
             ? this._config.sgcc_configs
             : configs,
         );
-        nextConfigs[this._activeIndex] = draft;
-        const next = {
+        nextConfigs[this._activeIndex] = compactDashboardSgccConfig(draft);
+        const next = dashboardConfigWithDateNavigation({
           ...clone(this._config),
           sgcc_configs: nextConfigs,
           snapshot: snapshotFromSgccConfigs(this._config.snapshot, nextConfigs),
-        };
+        }, {
+          show_date_picker: dashboardDatePickerVisible(this._config),
+          date_picker_group: this._config.date_picker_group,
+        });
         this._config = next;
         this.dispatchEvent(new CustomEvent("config-changed", {
           detail: { config: next },
@@ -564,16 +624,107 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
       this._editor = editor;
       await editor.updateComplete;
       if (token !== this._renderToken) return;
-      if (editor.shadowRoot && !editor.shadowRoot.querySelector("[data-advanced-history-comparisons]")) {
+      const mountAdvancedHistoryPanel = () => {
+        const editorRoot = editor.shadowRoot?.querySelector(".root");
+        if (!editorRoot || editorRoot.querySelector('[data-panel="advanced-history"]')) return;
+        const titleLabel = this._hass.localize?.(
+          "ui.panel.lovelace.editor.card.generic.title",
+        ) || "Title";
+        const panel = document.createElement("div");
+        panel.className = "panel open";
+        panel.dataset.panel = "advanced-history";
+        panel.innerHTML = `
+          <div class="panel-header" data-toggle="advanced-history">
+            <div class="panel-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+            <span class="panel-title">Advanced History Card</span>
+            <span class="panel-subtitle">Title and date navigation</span>
+            <span class="panel-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </div>
+          <div class="panel-body">
+            <div class="fg">
+              <div class="f"><label>${this._escape(titleLabel)}</label><input id="advanced_history_title" type="text" autocomplete="off" value="${this._escape(this._config.title || "")}"></div>
+              <div class="advanced-history-navigation-row mt8">
+                <label class="si advanced-history-date-toggle"><div class="st"><input id="advanced_history_show_date_picker" type="checkbox" ${dashboardDatePickerVisible(this._config) ? "checked" : ""}><span class="ss"></span></div><div class="sl"><span class="sn">Date Picker</span></div></label>
+                <input id="advanced_history_date_picker_group" class="advanced-history-group-input" type="text" autocomplete="off" placeholder="Group" value="${this._escape(String(this._config.date_picker_group || "").trim())}">
+              </div>
+            </div>
+          </div>`;
+        editorRoot.prepend(panel);
+        panel.querySelector(".panel-header")?.addEventListener("click", (event) => {
+          event.stopPropagation();
+          panel.classList.toggle("open");
+        });
+        const titleInput = panel.querySelector("#advanced_history_title");
+        const showDatePickerInput = panel.querySelector("#advanced_history_show_date_picker");
+        const datePickerGroupInput = panel.querySelector("#advanced_history_date_picker_group");
+        titleInput?.addEventListener("input", (event) => {
+          event.stopPropagation();
+          const next = cardConfigWithTitle(this._config, titleInput.value);
+          this._config = next;
+          this.dispatchEvent(new CustomEvent("config-changed", {
+            detail: { config: next }, bubbles: true, composed: true,
+          }));
+        });
+        const updateDateNavigation = (event) => {
+          event.stopPropagation();
+          const next = dashboardConfigWithDateNavigation(this._config, {
+            show_date_picker: showDatePickerInput.checked,
+            date_picker_group: datePickerGroupInput.value,
+          });
+          this._config = next;
+          this.dispatchEvent(new CustomEvent("config-changed", {
+            detail: { config: next }, bubbles: true, composed: true,
+          }));
+        };
+        showDatePickerInput?.addEventListener("change", updateDateNavigation);
+        datePickerGroupInput?.addEventListener("input", updateDateNavigation);
+      };
+      const mountManagedStyles = () => {
+        if (!editor.shadowRoot || editor.shadowRoot.querySelector("[data-advanced-history-comparisons]")) return;
         const managedStyles = document.createElement("style");
         managedStyles.dataset.advancedHistoryComparisons = "";
         managedStyles.textContent = `
+          .advanced-history-navigation-row {
+            width:100%; display:grid !important;
+            grid-template-columns:140px minmax(0,1fr) !important;
+            align-items:center; gap:8px;
+          }
+          .advanced-history-date-toggle {
+            width:140px !important; min-width:0 !important; max-width:140px !important;
+            box-sizing:border-box; white-space:nowrap;
+          }
+          .advanced-history-date-toggle .sl,
+          .advanced-history-date-toggle .sn { min-width:0 !important; white-space:nowrap; }
+          .advanced-history-group-input {
+            width:100% !important; min-width:0 !important;
+            box-sizing:border-box;
+          }
           .cmp-add,
           .cmp-del,
           .cmp-row .f:has(.cmp-period),
-          .cmp-row .f:has(.cmp-back) { display:none !important; }
+          .cmp-row .f:has(.cmp-back),
+          [data-mt="calendar"],
+          [data-mtc="calendar"],
+          .overlay-row:has(#energy_date_sync),
+          .overlay-row:has(#show_interval_picker),
+          .overlay-row:has(#show_date_picker) { display:none !important; }
         `;
         editor.shadowRoot.append(managedStyles);
+      };
+      const restoreManagedEditorContent = () => {
+        if (token !== this._renderToken || this._editor !== editor) return;
+        mountAdvancedHistoryPanel();
+        mountManagedStyles();
+      };
+      restoreManagedEditorContent();
+      if (typeof MutationObserver !== "undefined" && editor.shadowRoot) {
+        this._editorSectionObserver = new MutationObserver(() => {
+          queueMicrotask(restoreManagedEditorContent);
+        });
+        this._editorSectionObserver.observe(editor.shadowRoot, {
+          childList: true,
+          subtree: true,
+        });
       }
     } catch (error) {
       if (token !== this._renderToken) return;
@@ -632,8 +783,9 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     if (
       !config
       || Number(config.schema) !== ADVANCED_HISTORY_CARD_SCHEMA
-      || !config.snapshot?.targets
       || !config.snapshot?.chart
+      || !Array.isArray(config.sgcc_configs)
+      || !config.sgcc_configs.length
     ) {
       throw new Error("Advanced History SGCC Card requires a valid panel snapshot");
     }
@@ -671,12 +823,102 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     return { columns: 12, rows: "auto", min_columns: 6, min_rows: 4 };
   }
 
+  _dashboardDatePickerGroup() {
+    const wrapperGroup = typeof this._dashboardConfig?.date_picker_group === "string"
+      ? this._dashboardConfig.date_picker_group.trim()
+      : "";
+    if (wrapperGroup) return wrapperGroup;
+    const embedded = this._dashboardConfig?.sgcc_configs?.find((item) => (
+      typeof item?.date_picker_group === "string" && item.date_picker_group.trim()
+    ));
+    const group = embedded?.date_picker_group;
+    const configured = typeof group === "string" ? group.trim() : "";
+    if (configured) return configured;
+    const id = String(this._dashboardConfig?.snapshot?.id || "").trim();
+    return id ? `advanced-history-${id}` : "advanced-history-dashboard";
+  }
+
+  _dashboardDatePickerVisible() {
+    return dashboardDatePickerVisible(this._dashboardConfig);
+  }
+
+  _createDashboardPeriodStore() {
+    const group = this._dashboardDatePickerGroup();
+    if (!group) {
+      this._dashboardPeriodStoreFollower = false;
+      return super._createDashboardPeriodStore();
+    }
+    const existing = DASHBOARD_PERIOD_GROUP_STORES.get(group);
+    if (existing) {
+      this._dashboardPeriodStoreFollower = true;
+      return existing;
+    }
+    const store = super._createDashboardPeriodStore();
+    DASHBOARD_PERIOD_GROUP_STORES.set(group, store);
+    this._dashboardPeriodStoreFollower = false;
+    return store;
+  }
+
   _dashboardStateStorageKey() {
     return dashboardStateStorageKey(this._dashboardConfig?.snapshot);
   }
 
+  _syncDashboardSgccVisibilityFromCards() {
+    const configs = clone(this._dashboardConfig?.sgcc_configs || []);
+    let changed = false;
+    for (let cardIndex = 0; cardIndex < configs.length; cardIndex += 1) {
+      const card = this._graphCards?.[cardIndex];
+      const rows = configs[cardIndex]?.entities;
+      const root = card?.shadowRoot;
+      if (!root || !Array.isArray(rows) || !Array.isArray(card?._entities)) continue;
+      const detailed = [...root.querySelectorAll(".sgc-detail-legend-entity[data-id]")];
+      const compact = [...root.querySelectorAll(".sgc-legend-item[data-id]")];
+      const byId = new Map((detailed.length ? detailed : compact).map(
+        (entry) => [entry.dataset.id, entry],
+      ));
+      const indexesBySeries = new Map();
+      card._entities.forEach((row, index) => {
+        if (!row || row._compareOf != null) return;
+        const key = seriesKey(row);
+        if (!key) return;
+        const indexes = indexesBySeries.get(key) || [];
+        indexes.push(index);
+        indexesBySeries.set(key, indexes);
+      });
+      const usedBySeries = new Map();
+      configs[cardIndex].entities = rows.map((raw) => {
+        const row = typeof raw === "string" ? { entity: raw } : clone(raw);
+        const key = seriesKey(row);
+        const occurrence = usedBySeries.get(key) || 0;
+        usedBySeries.set(key, occurrence + 1);
+        const renderedIndex = indexesBySeries.get(key)?.[occurrence];
+        const entityId = row?.entity || row?.statistic_id;
+        const entry = renderedIndex == null || !entityId
+          ? null
+          : byId.get(`${entityId}__${renderedIndex}`);
+        if (!entry) return raw;
+        const enabled = !this._legendEntryHidden(entry);
+        if (row.enabled !== enabled || typeof raw === "string") changed = true;
+        row.enabled = enabled;
+        return row;
+      });
+    }
+    if (!changed) return;
+    this._dashboardConfig.sgcc_configs = configs;
+    this._dashboardConfig.snapshot = compactDashboardSnapshot(this._dashboardConfig.snapshot);
+  }
+
   _loadDashboardSnapshot() {
-    const snapshot = clone(this._dashboardConfig?.snapshot);
+    const storedConfigs = Array.isArray(this._dashboardConfig?.sgcc_configs)
+      ? this._dashboardConfig.sgcc_configs.filter(Boolean)
+      : [];
+    const baseConfigs = storedConfigs.length
+      ? storedConfigs
+      : fallbackSgccConfigs(this._dashboardConfig);
+    const snapshot = snapshotFromSgccConfigs(
+      this._dashboardConfig?.snapshot,
+      baseConfigs,
+    );
     const key = this._dashboardStateStorageKey();
     if (!key) return snapshot;
     try {
@@ -740,6 +982,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     const dependencyMissing = Boolean(this._cardLoadError);
     const hasY1Targets = Boolean(this._targetCount(this._targets));
     const hasY2Targets = Boolean(this._targetCount(this._y2Targets));
+    const showDatePicker = dashboardDatePickerVisible(this._dashboardConfig);
     const downloadData = this._localize(
       "ui.panel.lovelace.components.energy_period_selector.download_data",
       "Download data",
@@ -758,7 +1001,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
               </div>
               <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" ${hasY1Targets ? "" : "hidden"} role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
             </div>
-            <div class="dashboard-date-controls">
+            <div class="dashboard-date-controls" ${showDatePicker ? "" : "hidden"}>
               <div id="date-controller" class="energy-nav-card"></div>
               <button id="download-chart-data" class="dashboard-download-button" type="button" title="${this._escape(downloadData)}" aria-label="${this._escape(downloadData)}"><ha-icon icon="mdi:download"></ha-icon></button>
             </div>

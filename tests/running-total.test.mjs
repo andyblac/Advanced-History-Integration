@@ -7,7 +7,12 @@ import {
 } from "../custom_components/advanced_history/frontend/running-total.js";
 import { TargetPickerMethods } from "../custom_components/advanced_history/frontend/target-picker.js";
 import {
+  DASHBOARD_STORED_SGCC_OMIT_KEYS,
+} from "../custom_components/advanced_history/frontend/constants.js";
+import {
   advancedHistoryDashboardCard,
+  dashboardCardEntityIds,
+  dashboardCardsWithHiddenEntitiesOnLoad,
   dashboardConfigWithNewView,
   dashboardCardSnapshots,
 } from "../custom_components/advanced_history/frontend/panel-export.js";
@@ -119,9 +124,12 @@ test("dashboard export removes the panel-only running-total aggregation", () => 
   assert.equal(exported.entities[1].aggregate_func, "max");
 });
 
-test("Advanced History dashboard card preserves the complete panel snapshot", () => {
+test("Advanced History dashboard card stores SGCC options only in sgcc_configs", () => {
   const snapshot = {
     schema: 1,
+    id: "dashboard-card-1",
+    name: "Gas snapshot",
+    saved_at: "2026-09-05T08:55:40.426Z",
     targets: { entity_id: ["sensor.gas"], area_id: [], device_id: [] },
     y2_targets: { entity_id: ["sensor.temperature"], area_id: [], device_id: [] },
     chart: {
@@ -137,31 +145,114 @@ test("Advanced History dashboard card preserves the complete panel snapshot", ()
       compare_choice: "last_year",
       compare_count: 3,
     },
+    source_bookmark_id: "bookmark-1",
+    source_external_bookmark: true,
+    source_external_bookmark_owner_id: "user-1",
+    source_external_bookmark_id: "external-1",
   };
   const exported = advancedHistoryDashboardCard(
     snapshot,
     {
       graph_height: 420,
+      default_hours: 24,
+      large_range_automatic_detail: true,
+      large_range_detail_threshold_days: 31,
       card_options: { numeric: { show_fill: true } },
+      entity_options: {
+        "sensor.gas": { show_state: false },
+        "sensor.temperature::humidity": { line_width: 2 },
+        "sensor.unrelated": { show_state: true },
+      },
       config_entry_id: "not-exported",
     },
     "Gas",
     ["sensor.gas", "sensor.temperature", "sensor.gas"],
-    [{ type: "custom:statistics-graph-chart-card", entities: ["sensor.gas"] }],
+    [{
+      type: "custom:statistics-graph-chart-card",
+      entities: ["sensor.gas"],
+      energy_date_sync: true,
+      energy_collection_key: "energy_advanced_history_panel_test",
+    }],
+    "Gas panel",
   );
 
   assert.equal(exported.type, "custom:advanced-history-sgcc-card");
   assert.equal(exported.schema, 1);
   assert.equal(exported.title, "Gas");
-  assert.deepEqual(exported.entities, ["sensor.gas", "sensor.temperature"]);
+  assert.equal(exported.show_date_picker, true);
+  assert.equal(exported.date_picker_group, "Gas panel");
+  assert.equal(exported.entities, undefined);
   assert.deepEqual(exported.sgcc_configs, [{
     type: "custom:statistics-graph-chart-card",
-    entities: ["sensor.gas"],
+    show_fill: true,
+    entities: [{
+      entity: "sensor.gas",
+      show_state: false,
+    }],
   }]);
-  assert.deepEqual(exported.snapshot, snapshot);
-  assert.deepEqual(exported.settings, {
-    card_options: { numeric: { show_fill: true } },
-    graph_height: 420,
+  assert.deepEqual(exported.snapshot, {
+    id: "dashboard-card-1",
+    chart: {
+      running_total_axes: { primary: true },
+      exclude_y2_comparison: true,
+      show_comparison_banner: false,
+    },
+    period: snapshot.period,
+  });
+  assert.equal(exported.settings, undefined);
+  const exportedKeys = Object.keys(exported);
+  assert.ok(exportedKeys.indexOf("title") < exportedKeys.indexOf("sgcc_configs"));
+  assert.ok(exportedKeys.indexOf("snapshot") > exportedKeys.indexOf("sgcc_configs"));
+  for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) {
+    assert.equal(exported.sgcc_configs[0][key], undefined);
+  }
+
+  const customBackground = advancedHistoryDashboardCard(
+    snapshot,
+    {},
+    "Gas",
+    ["sensor.gas"],
+    [{
+      type: "custom:statistics-graph-chart-card",
+      entities: ["sensor.gas"],
+      card_background_color: "#123456",
+    }],
+    "Gas panel",
+  );
+  assert.equal(customBackground.sgcc_configs[0].card_background_color, "#123456");
+});
+
+test("dashboard export generates a UUID date-picker group without a configured panel name", () => {
+  const exported = advancedHistoryDashboardCard({
+    targets: { entity_id: ["sensor.gas"] },
+    chart: {},
+  });
+
+  assert.match(
+    exported.date_picker_group,
+    /^advanced-history-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+  );
+});
+
+test("native dashboard handoff reads entities from canonical SGCC configs", () => {
+  const card = {
+    type: "custom:advanced-history-sgcc-card",
+    sgcc_configs: [{
+      entities: [
+        { entity: "sensor.gas", enabled: false },
+        { entity: "sensor.temperature", y_axis: "secondary" },
+      ],
+    }],
+  };
+  assert.deepEqual(dashboardCardEntityIds([card]), [
+    "sensor.gas",
+    "sensor.temperature",
+  ]);
+  const [hiddenOnLoad] = dashboardCardsWithHiddenEntitiesOnLoad([card]);
+  assert.deepEqual(hiddenOnLoad.sgcc_configs[0].entities[0], {
+    entity: "sensor.gas",
+    enabled: true,
+    auto_hide: true,
   });
 });
 
@@ -207,9 +298,13 @@ test("SGCC editor changes retain Advanced History options and native height", as
   globalThis.window ||= { customCards: [] };
   const {
     AdvancedHistorySgccCardEditor,
+    AdvancedHistorySgccCard,
     applyDashboardRuntimeState,
     cardConfigWithTitle,
     containSgccEditorConfigEvent,
+    compactDashboardSnapshot,
+    dashboardConfigWithDateNavigation,
+    dashboardDatePickerVisible,
     dashboardRuntimeState,
     sgccConfigsWithSnapshotComparisons,
     snapshotFromSgccConfigs,
@@ -229,6 +324,68 @@ test("SGCC editor changes retain Advanced History options and native height", as
   const titled = cardConfigWithTitle({ type: "custom:advanced-history-sgcc-card" }, "Gas");
   assert.equal(titled.title, "Gas");
   assert.equal(cardConfigWithTitle(titled, "").title, undefined);
+  assert.equal(dashboardDatePickerVisible({}), true);
+  assert.equal(dashboardDatePickerVisible({ show_date_picker: false }), false);
+  assert.equal(dashboardDatePickerVisible({
+    sgcc_configs: [{ show_date_picker: false }],
+  }), false);
+  assert.equal(dashboardDatePickerVisible({
+    show_date_picker: true,
+    sgcc_configs: [{ show_date_picker: false }],
+  }), true);
+  assert.deepEqual(compactDashboardSnapshot({
+    schema: 1,
+    id: "dashboard-card-2",
+    name: "Gas snapshot",
+    saved_at: "2026-09-05T08:55:40.426Z",
+    targets: { entity_id: ["sensor.gas"] },
+    hidden_targets: { entity_id: [] },
+    chart: {
+      defaults_mode: "overrides",
+      card_options: { height: 500 },
+      entity_options: { "sensor.gas": { enabled: true } },
+      attribute_selection: { "sensor.gas": ["state"] },
+      default_hours: 24,
+      source_graph_height: 500,
+      running_total_axes: { primary: true },
+    },
+  }), {
+    id: "dashboard-card-2",
+    chart: { running_total_axes: { primary: true } },
+  });
+  const dateNavigationConfig = dashboardConfigWithDateNavigation({
+    show_date_picker: true,
+    date_picker_group: "old-group",
+    sgcc_configs: [{ type: "numeric" }, { type: "state" }],
+  }, {
+    show_date_picker: false,
+    date_picker_group: "shared-group",
+  });
+  assert.equal(dateNavigationConfig.show_date_picker, false);
+  assert.equal(dateNavigationConfig.date_picker_group, "shared-group");
+  for (const config of dateNavigationConfig.sgcc_configs) {
+    for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) {
+      assert.equal(config[key], undefined);
+    }
+  }
+
+  const group = `test-${Date.now()}-${Math.random()}`;
+  const periodOwner = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
+    _dashboardConfig: {
+      date_picker_group: group,
+      sgcc_configs: [{ date_picker_group: "stale-group" }],
+    },
+    _dashboardPeriodState: null,
+  });
+  const periodFollower = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
+    _dashboardConfig: { date_picker_group: group },
+    _dashboardPeriodState: null,
+  });
+  const ownerStore = periodOwner._createDashboardPeriodStore();
+  const followerStore = periodFollower._createDashboardPeriodStore();
+  assert.equal(followerStore, ownerStore);
+  assert.equal(periodOwner._dashboardPeriodStoreFollower, false);
+  assert.equal(periodFollower._dashboardPeriodStoreFollower, true);
 
   const original = {
     targets: { area_id: [], device_id: [], entity_id: ["sensor.gas"] },
@@ -255,6 +412,37 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(updated.chart.show_comparison_banner, false);
   assert.equal(updated.chart.entity_options["sensor.gas"].line_width, 3);
   assert.deepEqual(updated.period, { compare: "previous" });
+
+  const hiddenLegendEntry = {
+    dataset: { id: "sensor.gas__0" },
+    classList: { contains: (name) => name === "legend-hidden" },
+  };
+  const visibilityContext = Object.assign(
+    Object.create(AdvancedHistorySgccCard.prototype),
+    {
+      _dashboardConfig: {
+        snapshot: { chart: { card_options: { stale: true } } },
+        sgcc_configs: [{
+          type: "custom:statistics-graph-chart-card",
+          entities: ["sensor.gas"],
+        }],
+      },
+      _graphCards: [{
+        _entities: [{ entity: "sensor.gas" }],
+        shadowRoot: {
+          querySelectorAll: (selector) => (
+            selector.startsWith(".sgc-detail") ? [hiddenLegendEntry] : []
+          ),
+        },
+      }],
+    },
+  );
+  visibilityContext._syncDashboardSgccVisibilityFromCards();
+  assert.equal(
+    visibilityContext._dashboardConfig.sgcc_configs[0].entities[0].enabled,
+    false,
+  );
+  assert.deepEqual(visibilityContext._dashboardConfig.snapshot, { chart: {} });
 
   const runtime = dashboardRuntimeState({
     chart: {
