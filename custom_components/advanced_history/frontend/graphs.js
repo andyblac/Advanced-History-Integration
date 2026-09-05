@@ -562,6 +562,38 @@ export class GraphMethods {
       if (transparent) card.style.setProperty(property, "transparent");
       else card.style.removeProperty(property);
     }
+
+    const root = card.shadowRoot;
+    if (!root) return;
+    const selector = "style[data-advanced-history-transparent-sgcc]";
+    const existing = root.querySelector?.(selector);
+    if (!transparent) {
+      existing?.remove?.();
+      return;
+    }
+    if (existing) return;
+
+    const ownerDocument = card.ownerDocument || root.ownerDocument;
+    const style = ownerDocument?.createElement?.("style");
+    if (!style) return;
+    style.dataset.advancedHistoryTransparentSgcc = "";
+    // SGCC applies its card background inside its own shadow root. Keep those
+    // surfaces transparent so AHC's themed background remains visible. Only
+    // the colour component is overridden, preserving any configured image.
+    style.textContent = `
+      .sgc-card,
+      .sgc-plot-wrap,
+      .sgc-plot {
+        background-color: transparent !important;
+      }
+      .sgc-card {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+      }
+    `;
+    root.append?.(style);
   }
 
   _axisLegendEntries(axis) {
@@ -883,6 +915,7 @@ export class GraphMethods {
         });
       }
       card.setConfig(config);
+      this._applyDashboardGraphBackground(card, config);
       card.__advancedHistoryConfig = config;
       this._setGraphCardHass(card, this._hass);
       shell.append(card, sourceIndicator);
@@ -911,6 +944,7 @@ export class GraphMethods {
       }
       this._graphLayoutObserveCard?.(card);
       card.updateComplete?.then(() => {
+        this._applyDashboardGraphBackground(card, config);
         if (this._dashboardCardMode && this._graphCards?.includes(card)) {
           this._syncGraphCardsToEnergyPeriod?.();
         }

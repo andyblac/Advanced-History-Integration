@@ -217,10 +217,18 @@ test("axis badges hide and restore every main legend series on their axis", () =
 
 test("dashboard SGCC inherits the wrapper background when transparency is the default", () => {
   const values = new Map();
+  let managedStyle;
   const card = {
     style: {
       setProperty: (key, value) => values.set(key, value),
       removeProperty: (key) => values.delete(key),
+    },
+    ownerDocument: {
+      createElement: () => ({ dataset: {}, textContent: "", remove() {} }),
+    },
+    shadowRoot: {
+      querySelector: () => managedStyle,
+      append: (style) => { managedStyle = style; },
     },
   };
   const context = Object.assign(Object.create(GraphMethods.prototype), {
@@ -230,9 +238,16 @@ test("dashboard SGCC inherits the wrapper background when transparency is the de
   context._applyDashboardGraphBackground(card, { card_background_color: "transparent" });
   assert.equal(values.get("--ha-card-background"), "transparent");
   assert.equal(values.get("--card-background-color"), "transparent");
+  assert.equal(managedStyle.dataset.advancedHistoryTransparentSgcc, "");
+  assert.match(managedStyle.textContent, /\.sgc-plot-wrap/);
+  assert.match(managedStyle.textContent, /backdrop-filter: none !important/);
+  assert.match(managedStyle.textContent, /box-shadow: none !important/);
 
+  let removed = false;
+  managedStyle.remove = () => { removed = true; managedStyle = undefined; };
   context._applyDashboardGraphBackground(card, { card_background_color: "#123456" });
   assert.equal(values.size, 0);
+  assert.equal(removed, true);
 });
 
 test("dashboard period store publishes local state without an Energy request", async () => {
