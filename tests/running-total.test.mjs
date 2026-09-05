@@ -400,6 +400,18 @@ test("SGCC editor changes retain Advanced History options and native height", as
     dashboardConfigWithPendingComparison(pendingConfig).sgcc_configs,
     fiveComparisons,
   );
+  const echoedRuntimeConfig = {
+    ...structuredClone(pendingConfig),
+    sgcc_configs: structuredClone(fiveComparisons),
+  };
+  assert.equal(
+    dashboardConfigWithPendingComparison(echoedRuntimeConfig),
+    echoedRuntimeConfig,
+  );
+  assert.deepEqual(
+    dashboardConfigWithPendingComparison(pendingConfig).sgcc_configs,
+    fiveComparisons,
+  );
   const reloadedCard = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
     _initialized: false,
     _hass: null,

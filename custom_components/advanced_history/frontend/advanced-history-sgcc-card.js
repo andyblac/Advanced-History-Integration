@@ -274,7 +274,10 @@ export function dashboardConfigWithPendingComparison(config) {
   const currentFingerprint = sgccConfigsFingerprint(config?.sgcc_configs);
   const nextFingerprint = sgccConfigsFingerprint(saved.next);
   if (currentFingerprint === nextFingerprint) {
-    localStorage.removeItem(key);
+    // Lovelace echoes runtime `config-changed` values back through setConfig,
+    // even though they are not durable until the dashboard is explicitly
+    // saved. Keep the staged comparison in that case so a subsequent page
+    // reload cannot fall back to the persisted, older SGCC rows.
     return config;
   }
   if (currentFingerprint !== saved.base) {
