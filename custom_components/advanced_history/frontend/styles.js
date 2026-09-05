@@ -151,6 +151,14 @@ export const panelStyles = `
     width:max-content; max-width:100%; height:100%; padding-inline:8px;
     display:flex; flex-direction:row; align-items:center; box-sizing:border-box;
   }
+  .period-selector-floating .period-selector-date-control {
+    flex:none; height:48px; display:flex; flex-direction:row; align-items:center;
+    border-radius:24px; overflow:hidden;
+  }
+  .period-selector-floating .period-selector-date-control:hover,
+  .period-selector-floating .period-selector-date-control:focus-within {
+    background:var(--secondary-background-color);
+  }
   .period-selector-floating .period-selector-date-picker {
     flex:none; min-width:var(--ha-space-2,8px); height:100%; display:flex; flex-direction:row;
     align-items:center;
@@ -191,7 +199,7 @@ export const panelStyles = `
   .period-selector-floating .period-selector-menu-button {
     flex-shrink:0; color:var(--primary-text-color);
   }
-  .period-selector-floating .period-selector-label:hover { background:var(--secondary-background-color); }
+  .period-selector-floating .period-selector-label:hover { background:transparent; }
   .period-selector-floating .period-selector-menu { --ha-dropdown-font-size:14px; font-weight:400; }
   .panel-time-range {
     position:absolute; z-index:2; top:8px; left:50%; transform:translateX(-50%);
@@ -303,8 +311,12 @@ export const panelStyles = `
   .library-save button, .library-row button { min-width:40px; height:40px; padding:0 12px; border:0; border-radius:8px; cursor:pointer; color:var(--primary-color); background:transparent; font-weight:500; }
   .library-save button { color:var(--text-primary-color,white); background:var(--primary-color); }
   .library-list { flex:1; min-height:0; overflow:auto; padding:10px; }
-  .library-row { min-height:64px; padding:8px 8px 8px 14px; display:flex; align-items:center; gap:8px; border-radius:8px; }
+  .library-row { min-height:58px; padding:5px 8px 5px 14px; display:flex; align-items:center; gap:8px; border-radius:8px; }
   .library-row:hover { background:var(--secondary-background-color); }
+  .library-row.dragging { opacity:.46; background:var(--secondary-background-color); }
+  .library-row .bookmark-drag-handle { width:32px; min-width:32px; padding:4px; color:var(--secondary-text-color); cursor:grab; }
+  .library-row .bookmark-drag-handle:active { cursor:grabbing; }
+  .library-row .bookmark-drag-handle ha-icon { width:20px; height:20px; }
   .library-main { flex:1; min-width:0; border:0; padding:0; cursor:pointer; color:var(--primary-text-color); background:transparent; text-align:left; }
   .library-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
   .library-summary { display:block; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--secondary-text-color); font-size:12px; }

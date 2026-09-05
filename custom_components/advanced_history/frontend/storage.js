@@ -1329,18 +1329,101 @@ export class StorageMethods {
     const { readOnly = false, ownerUserId = null, showOwner = false } = options;
     const deleteLabel = this._localize("ui.common.delete", "Delete");
     const updateLabel = this._customLocalize("update_bookmark");
+    const reorderLabel = this._customLocalize("reorder_bookmark");
     const visibleLabel = this._customLocalize("visible_to_everyone");
     const canPublish = isBookmarks && Boolean(this._hass?.user?.is_admin);
-    return items.map((item) => `
-      <div class="library-row">
+    return items.map((item) => {
+      const name = item.name || this._snapshotLabel(item);
+      return `
+      <div class="library-row"${!readOnly && isBookmarks ? ` data-bookmark-row="${this._escape(item.id)}"` : ""}>
+        ${!readOnly && isBookmarks ? `<button class="bookmark-drag-handle" type="button" draggable="true" data-drag-bookmark="${this._escape(item.id)}" title="${this._escape(reorderLabel)}" aria-label="${this._escape(`${reorderLabel}: ${name}`)}"><ha-icon icon="mdi:drag-vertical"></ha-icon></button>` : ""}
         <button class="library-main" data-open-snapshot="${this._escape(item.id)}" data-owner-user-id="${this._escape(item._owner_user_id || ownerUserId || "")}">
-          <span class="library-name">${this._escape(item.name || this._snapshotLabel(item))}</span>
+          <span class="library-name">${this._escape(name)}</span>
           <span class="library-summary">${showOwner && item._owner_name ? `${this._escape(item._owner_name)} · ` : ""}${this._escape(this._snapshotSummary(item))}</span>
         </button>
         ${!readOnly && isBookmarks && this._bookmarkHasChanges(item) ? `<button class="update" data-update-snapshot="${this._escape(item.id)}" title="${this._escape(updateLabel)}"><ha-icon icon="mdi:update"></ha-icon></button>` : ""}
         ${canPublish ? `<button class="visibility ${item.visible_everyone ? "active" : ""}" data-toggle-visible="${this._escape(item.id)}" data-owner-user-id="${this._escape(item._owner_user_id || ownerUserId || this._hass.user.id)}" aria-pressed="${item.visible_everyone ? "true" : "false"}" title="${this._escape(visibleLabel)}"><ha-icon icon="${item.visible_everyone ? "mdi:account-multiple" : "mdi:account-multiple-outline"}"></ha-icon></button>` : ""}
         ${readOnly ? "" : `<button class="delete" data-delete-snapshot="${this._escape(item.id)}" title="${this._escape(deleteLabel)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>`}
-      </div>`).join("");
+      </div>`;
+    }).join("");
+  }
+
+  _saveBookmarkOrder(ids) {
+    const bookmarks = this._loadLibrary(BOOKMARKS_STORAGE_KEY);
+    if (!Array.isArray(ids) || ids.length !== bookmarks.length) return false;
+    const byId = new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark]));
+    const reordered = ids.map((id) => byId.get(id));
+    if (reordered.some((bookmark) => !bookmark) || new Set(ids).size !== ids.length) return false;
+    if (reordered.every((bookmark, index) => bookmark === bookmarks[index])) return false;
+    return this._saveLibrary(BOOKMARKS_STORAGE_KEY, reordered);
+  }
+
+  _bindBookmarkReordering(backdrop, kind, bookmarkState) {
+    if (kind !== "bookmarks" || bookmarkState?.readOnly) return;
+    const list = backdrop.querySelector(".library-list");
+    if (!list) return;
+    let dragging = null;
+
+    const persistDomOrder = () => this._saveBookmarkOrder(
+      Array.from(list.querySelectorAll("[data-bookmark-row]"), (row) => row.dataset.bookmarkRow)
+    );
+    const finishDrag = () => {
+      if (!dragging) return;
+      dragging.classList.remove("dragging");
+      dragging = null;
+      persistDomOrder();
+    };
+
+    list.addEventListener("dragstart", (event) => {
+      const handle = event.target.closest("[data-drag-bookmark]");
+      if (!handle) {
+        event.preventDefault();
+        return;
+      }
+      dragging = handle.closest("[data-bookmark-row]");
+      if (!dragging) return;
+      dragging.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", dragging.dataset.bookmarkRow);
+      event.dataTransfer.setDragImage?.(dragging, 24, dragging.offsetHeight / 2);
+    });
+    list.addEventListener("dragover", (event) => {
+      if (!dragging) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      const target = event.target.closest("[data-bookmark-row]");
+      if (!target || target === dragging) return;
+      const rect = target.getBoundingClientRect();
+      const after = event.clientY > rect.top + rect.height / 2;
+      list.insertBefore(dragging, after ? target.nextSibling : target);
+    });
+    list.addEventListener("drop", (event) => {
+      if (!dragging) return;
+      event.preventDefault();
+      finishDrag();
+    });
+    list.addEventListener("dragend", finishDrag);
+    list.querySelectorAll("[data-drag-bookmark]").forEach((handle) => {
+      handle.addEventListener("keydown", (event) => {
+        if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+        const row = handle.closest("[data-bookmark-row]");
+        if (!row) return;
+        event.preventDefault();
+        if (event.key === "ArrowUp" && row.previousElementSibling) {
+          list.insertBefore(row, row.previousElementSibling);
+        } else if (event.key === "ArrowDown" && row.nextElementSibling) {
+          list.insertBefore(row.nextElementSibling, row);
+        } else if (event.key === "Home") {
+          list.prepend(row);
+        } else if (event.key === "End") {
+          list.append(row);
+        } else {
+          return;
+        }
+        persistDomOrder();
+        handle.focus();
+      });
+    });
   }
 
   _bookmarkLibraryState() {
@@ -1556,6 +1639,7 @@ export class StorageMethods {
         this._notice = this._customLocalize("bookmark_sync_error");
       }
     }));
+    this._bindBookmarkReordering(backdrop, kind, bookmarkState);
     this.shadowRoot.append(backdrop);
     backdrop.querySelector("#bookmark-name")?.select();
   }

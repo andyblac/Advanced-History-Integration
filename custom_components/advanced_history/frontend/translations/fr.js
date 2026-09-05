@@ -26,6 +26,7 @@ export default {
   "bookmark_name": "Nom du favori",
   "save_current": "Enregistrer l’affichage actuel",
   "update_bookmark": "Mettre à jour le favori",
+  "reorder_bookmark": "Réorganiser le favori",
   "clear_bookmarks": "Effacer les favoris",
   "clear_history": "Effacer l’historique",
   "confirm_clear_bookmarks": "Effacer tous les favoris ?",

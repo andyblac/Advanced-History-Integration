@@ -26,6 +26,7 @@ export default {
   "bookmark_name": "Bookmark name",
   "save_current": "Save current",
   "update_bookmark": "Update bookmark",
+  "reorder_bookmark": "Reorder bookmark",
   "clear_bookmarks": "Clear bookmarks",
   "clear_history": "Clear history",
   "confirm_clear_bookmarks": "Clear all bookmarks?",

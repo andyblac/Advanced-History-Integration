@@ -26,6 +26,7 @@ export default {
   "bookmark_name": "Name des Lesezeichens",
   "save_current": "Aktuelles Diagramm speichern",
   "update_bookmark": "Lesezeichen aktualisieren",
+  "reorder_bookmark": "Lesezeichen neu anordnen",
   "clear_bookmarks": "Lesezeichen löschen",
   "clear_history": "Verlauf löschen",
   "confirm_clear_bookmarks": "Alle Lesezeichen löschen?",

@@ -26,6 +26,7 @@ export default {
   "bookmark_name": "Nome del segnalibro",
   "save_current": "Salva corrente",
   "update_bookmark": "Aggiorna segnalibro",
+  "reorder_bookmark": "Riordina segnalibro",
   "clear_bookmarks": "Cancella segnalibri",
   "clear_history": "Cancella cronologia",
   "confirm_clear_bookmarks": "Cancellare tutti i segnalibri?",

@@ -1068,10 +1068,12 @@ export class PeriodSelectorMethods {
       controller.className = `advanced-history-period-selector${panelMode ? " panel-period-selector" : ""}`;
       controller.innerHTML = panelMode ? `
         <div class="period-selector-content">
-          <section class="period-selector-date-picker">
-            <ha-date-range-picker class="period-selector-picker" minimal backdrop extended-presets popover-placement="top"></ha-date-range-picker>
-          </section>
-          <button class="period-selector-label" type="button" title="${this._escape(dateLabel)}" aria-label="${this._escape(dateLabel)}"><span class="period-selector-primary"></span><span class="period-selector-secondary"></span></button>
+          <div class="period-selector-date-control">
+            <section class="period-selector-date-picker">
+              <ha-date-range-picker class="period-selector-picker" minimal backdrop extended-presets popover-placement="top"></ha-date-range-picker>
+            </section>
+            <button class="period-selector-label" type="button" title="${this._escape(dateLabel)}" aria-label="${this._escape(dateLabel)}"><span class="period-selector-primary"></span><span class="period-selector-secondary"></span></button>
+          </div>
           <section class="period-selector-actions">
             <ha-button class="period-selector-now" appearance="filled" size="s">${this._escape(nowLabel)}</ha-button>
             <ha-icon-button class="period-selector-nav previous" label="${this._escape(previous)}"><ha-icon icon="mdi:chevron-left"></ha-icon></ha-icon-button>

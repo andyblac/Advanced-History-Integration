@@ -26,6 +26,7 @@ export default {
   "bookmark_name": "Nombre del marcador",
   "save_current": "Guardar actual",
   "update_bookmark": "Actualizar marcador",
+  "reorder_bookmark": "Reordenar marcador",
   "clear_bookmarks": "Borrar marcadores",
   "clear_history": "Borrar historial",
   "confirm_clear_bookmarks": "¿Borrar todos los marcadores?",

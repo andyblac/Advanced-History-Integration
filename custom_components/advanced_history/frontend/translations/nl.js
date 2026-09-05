@@ -26,6 +26,7 @@ export default {
   "bookmark_name": "Naam van bladwijzer",
   "save_current": "Huidige opslaan",
   "update_bookmark": "Bladwijzer bijwerken",
+  "reorder_bookmark": "Bladwijzer opnieuw ordenen",
   "clear_bookmarks": "Bladwijzers wissen",
   "clear_history": "Geschiedenis wissen",
   "confirm_clear_bookmarks": "Alle bladwijzers wissen?",
