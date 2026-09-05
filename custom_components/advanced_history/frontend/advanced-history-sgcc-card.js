@@ -13,6 +13,7 @@ import { customLocalize, loadTranslations } from "./translations.js";
 import { panelStyles } from "./styles.js";
 
 const DASHBOARD_CARD_STATE_STORAGE_PREFIX = "advanced_history_dashboard_card_state_v1";
+const DASHBOARD_PENDING_COMPARISON_STORAGE_PREFIX = "advanced_history_dashboard_comparison_v1";
 const DASHBOARD_PERIOD_GROUP_STORES = new Map();
 const DASHBOARD_RUNTIME_CHART_KEYS = [
   "time_range",
@@ -20,7 +21,6 @@ const DASHBOARD_RUNTIME_CHART_KEYS = [
   "rolling_resume_hours",
   "series_transforms",
   "running_total_axes",
-  "compare",
   "exclude_y2_comparison",
   "show_comparison_banner",
 ];
@@ -170,9 +170,78 @@ export function dashboardConfigWithDateNavigation(config, source = {}) {
   return next;
 }
 
-function dashboardStateStorageKey(snapshot) {
-  const id = String(snapshot?.id || "").trim();
+export function dashboardConfigWithSnapshot(config, snapshot) {
+  const compact = compactDashboardSnapshot(snapshot);
+  if (JSON.stringify(config?.snapshot || null) === JSON.stringify(compact || null)) {
+    return config;
+  }
+  return { ...clone(config), snapshot: compact };
+}
+
+function dashboardStateStorageKey(config) {
+  const id = String(config?.snapshot?.id || "").trim();
+  if (!id) return "";
+  const role = dashboardDatePickerVisible(config) ? "controller" : "follower";
+  return `${DASHBOARD_CARD_STATE_STORAGE_PREFIX}:${id}:${role}`;
+}
+
+function legacyDashboardStateStorageKey(config) {
+  const id = String(config?.snapshot?.id || "").trim();
   return id ? `${DASHBOARD_CARD_STATE_STORAGE_PREFIX}:${id}` : "";
+}
+
+function dashboardPendingComparisonStorageKey(config) {
+  const id = String(config?.snapshot?.id || "").trim();
+  if (!id) return "";
+  const role = dashboardDatePickerVisible(config) ? "controller" : "follower";
+  return `${DASHBOARD_PENDING_COMPARISON_STORAGE_PREFIX}:${id}:${role}`;
+}
+
+function sgccConfigsFingerprint(configs) {
+  return JSON.stringify((configs || []).map(compactDashboardSgccConfig));
+}
+
+export function stageDashboardComparisonConfig(config, previousConfigs, nextConfigs) {
+  const key = dashboardPendingComparisonStorageKey(config);
+  if (!key) return;
+  const previousFingerprint = sgccConfigsFingerprint(previousConfigs);
+  const existing = JSON.parse(localStorage.getItem(key) || "null");
+  const base = Number(existing?.schema) === 1
+    && Array.isArray(existing.next)
+    && sgccConfigsFingerprint(existing.next) === previousFingerprint
+    ? existing.base
+    : previousFingerprint;
+  localStorage.setItem(key, JSON.stringify({
+    schema: 1,
+    base,
+    next: clone(nextConfigs),
+  }));
+}
+
+export function dashboardConfigWithPendingComparison(config) {
+  const key = dashboardPendingComparisonStorageKey(config);
+  if (!key) return config;
+  const saved = JSON.parse(localStorage.getItem(key) || "null");
+  if (Number(saved?.schema) !== 1 || !Array.isArray(saved.next)) return config;
+  const currentFingerprint = sgccConfigsFingerprint(config?.sgcc_configs);
+  const nextFingerprint = sgccConfigsFingerprint(saved.next);
+  if (currentFingerprint === nextFingerprint) {
+    localStorage.removeItem(key);
+    return config;
+  }
+  if (currentFingerprint !== saved.base) {
+    localStorage.removeItem(key);
+    return config;
+  }
+  return { ...clone(config), sgcc_configs: clone(saved.next) };
+}
+
+export function loadDashboardRuntimeState(config) {
+  const key = dashboardStateStorageKey(config);
+  if (!key) return null;
+  const legacyKey = legacyDashboardStateStorageKey(config);
+  const saved = localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
+  return JSON.parse(saved || "null");
 }
 
 function snapshotComparison(snapshot) {
@@ -193,7 +262,7 @@ function snapshotComparison(snapshot) {
   }));
 }
 
-function mergeComparisonStyle(active, configured) {
+function mergeComparisonStyle(active, configured, preserved = null) {
   const mergeOne = (activeRow, configuredRow) => {
     const style = configuredRow
       && typeof configuredRow === "object"
@@ -208,14 +277,45 @@ function mergeComparisonStyle(active, configured) {
   };
   if (Array.isArray(active)) {
     const configuredRows = Array.isArray(configured) ? configured : null;
+    const preservedRows = Array.isArray(preserved) ? preserved : null;
     return active.map((row, index) => mergeOne(
       row,
       configuredRows
-        ? configuredRows.length === 1 ? configuredRows[0] : configuredRows[index]
-        : configured,
+        ? configuredRows.length === 1
+          ? configuredRows[0]
+          : configuredRows[index] ?? preservedRows?.[index]
+        : configured ?? preservedRows?.[index],
     ));
   }
-  return mergeOne(active, Array.isArray(configured) ? configured[0] : configured);
+  return mergeOne(
+    active,
+    (Array.isArray(configured) ? configured[0] : configured)
+      ?? (Array.isArray(preserved) ? preserved[0] : preserved),
+  );
+}
+
+function comparisonStyleBank(configs, previous = []) {
+  const bank = clone(previous || []);
+  for (let configIndex = 0; configIndex < (configs || []).length; configIndex += 1) {
+    const entities = Array.isArray(configs[configIndex]?.entities)
+      ? configs[configIndex].entities
+      : [];
+    if (!Array.isArray(bank[configIndex])) bank[configIndex] = [];
+    for (let entityIndex = 0; entityIndex < entities.length; entityIndex += 1) {
+      const row = entities[entityIndex];
+      if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+      if (!Object.prototype.hasOwnProperty.call(row, "compare")) continue;
+      const current = Array.isArray(row.compare) ? row.compare : [row.compare];
+      const saved = Array.isArray(bank[configIndex][entityIndex])
+        ? bank[configIndex][entityIndex]
+        : [];
+      current.forEach((comparison, index) => {
+        saved[index] = clone(comparison);
+      });
+      bank[configIndex][entityIndex] = saved;
+    }
+  }
+  return bank;
 }
 
 function comparisonStyleOnly(value) {
@@ -301,9 +401,9 @@ export function sgccConfigsWithSnapshotComparisons(configs, snapshot, settings =
     config.entities = config.entities.map((raw) => {
       const row = typeof raw === "string" ? { entity: raw } : clone(raw);
       if (!row || typeof row !== "object") return raw;
-      if (active == null || active === false || (excludeSecondary && row.y_axis === "secondary")) {
+      if (active === false || (excludeSecondary && row.y_axis === "secondary")) {
         delete row.compare;
-      } else {
+      } else if (active != null) {
         row.compare = mergeComparisonStyle(
           active,
           comparisonDefaults(row, snapshot, settings),
@@ -315,25 +415,37 @@ export function sgccConfigsWithSnapshotComparisons(configs, snapshot, settings =
   });
 }
 
-export function dashboardRuntimeState(snapshot) {
+export function dashboardRuntimeState(snapshot, comparisonStyles = null) {
   const chart = {};
   for (const key of DASHBOARD_RUNTIME_CHART_KEYS) {
     if (Object.prototype.hasOwnProperty.call(snapshot?.chart || {}, key)) {
       chart[key] = clone(snapshot.chart[key]);
     }
   }
-  return {
+  const period = clone(snapshot?.period || {});
+  delete period.compare;
+  delete period.compare_choice;
+  delete period.compare_count;
+  const state = {
     schema: 1,
-    period: clone(snapshot?.period || {}),
+    period,
     chart,
   };
+  if (Array.isArray(comparisonStyles) && comparisonStyles.length) {
+    state.comparison_styles = clone(comparisonStyles);
+  }
+  return state;
 }
 
 export function applyDashboardRuntimeState(snapshot, state) {
   const next = clone(snapshot);
   if (!next || Number(state?.schema) !== 1) return next;
   if (state.period && typeof state.period === "object") {
-    next.period = clone(state.period);
+    const runtimePeriod = clone(state.period);
+    delete runtimePeriod.compare;
+    delete runtimePeriod.compare_choice;
+    delete runtimePeriod.compare_count;
+    next.period = { ...clone(next.period || {}), ...runtimePeriod };
   }
   next.chart = clone(next.chart || {});
   for (const key of DASHBOARD_RUNTIME_CHART_KEYS) {
@@ -365,6 +477,54 @@ export function containSgccEditorConfigEvent(event) {
   return clone(event.detail?.config);
 }
 
+function comparisonPeriodFromSgccConfigs(configs) {
+  for (const config of configs || []) {
+    if (config?.chart_mode === "state_timeline") continue;
+    const entities = Array.isArray(config?.entities) ? config.entities : [];
+    const entity = entities.find((raw) => {
+      const row = typeof raw === "string" ? null : raw;
+      return row
+        && row.y_axis !== "secondary"
+        && Object.prototype.hasOwnProperty.call(row, "compare")
+        && row.compare !== false
+        && row.compare != null;
+    });
+    if (!entity) continue;
+    const comparisons = (Array.isArray(entity.compare) ? entity.compare : [entity.compare])
+      .filter((value) => value !== false && value != null);
+    if (!comparisons.length) continue;
+    const first = comparisons[0];
+    const choice = first === true
+      ? "previous_period"
+      : typeof first === "string"
+        ? first
+        : first.period || "previous_period";
+    const count = Math.max(
+      comparisons.length,
+      ...comparisons.map((value, index) => (
+        value && typeof value === "object"
+          ? Math.trunc(Number(value.periods_back)) || index + 1
+          : index + 1
+      )),
+    );
+    return {
+      compare: choice === "last_year" ? "yoy" : "previous",
+      compare_choice: choice,
+      compare_count: Math.max(1, Math.min(10, count)),
+    };
+  }
+  return null;
+}
+
+export function applySgccComparisonPeriod(snapshot, configs) {
+  const next = clone(snapshot);
+  const comparisonPeriod = comparisonPeriodFromSgccConfigs(configs);
+  if (comparisonPeriod) {
+    next.period = { ...clone(next.period || {}), ...comparisonPeriod };
+  }
+  return next;
+}
+
 export function snapshotFromSgccConfigs(snapshot, configs) {
   const converted = configs.map((config) => cardConfigToSnapshot(config, null, true))
     .filter(Boolean);
@@ -376,6 +536,9 @@ export function snapshotFromSgccConfigs(snapshot, configs) {
   next.hidden_y2_targets = mergeTargets(converted.map((item) => item.hidden_y2_targets));
 
   const chart = clone(next.chart || {});
+  // SGCC entity rows are the sole source of comparison configuration. Older
+  // dashboard snapshots may still contain this legacy aggregate override.
+  delete chart.compare;
   const existingCardOptions = chart.card_options || {};
   const typed = configs.length > 1
     || Boolean(existingCardOptions.numeric || existingCardOptions.state);
@@ -416,7 +579,7 @@ export function snapshotFromSgccConfigs(snapshot, configs) {
     chart.default_hours = numeric.chart.default_hours;
   }
   next.chart = chart;
-  return next;
+  return applySgccComparisonPeriod(next, configs);
 }
 
 export class AdvancedHistorySgccCardEditor extends HTMLElement {
@@ -429,6 +592,10 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
     this._editorSectionObserver = null;
     this._renderToken = 0;
     this._activeIndex = 0;
+  }
+
+  disconnectedCallback() {
+    this._editorSectionObserver?.disconnect();
   }
 
   set hass(value) {
@@ -454,24 +621,53 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
     this._editorSectionObserver?.disconnect();
     this._editorSectionObserver = null;
     this._editor = null;
+    let pendingComparisonChanged = false;
+    try {
+      const pendingConfig = dashboardConfigWithPendingComparison(this._config);
+      pendingComparisonChanged = pendingConfig !== this._config;
+      this._config = pendingConfig;
+    } catch (error) {
+      console.warn("Advanced History card editor: unable to restore comparison changes", error);
+    }
     const storedConfigs = Array.isArray(this._config.sgcc_configs)
       ? this._config.sgcc_configs.filter(Boolean)
       : [];
+    let runtimeState = null;
+    const stateKey = dashboardStateStorageKey(this._config);
+    if (stateKey) {
+      try {
+        runtimeState = loadDashboardRuntimeState(this._config);
+      } catch (error) {
+        console.warn("Advanced History card editor: unable to restore dashboard state", error);
+      }
+    }
     const baseConfigs = storedConfigs;
     let snapshot = snapshotFromSgccConfigs(
       this._config.snapshot,
       baseConfigs,
     );
-    const stateKey = dashboardStateStorageKey(snapshot);
     if (stateKey) {
       try {
         snapshot = applyDashboardRuntimeState(
           snapshot,
-          JSON.parse(localStorage.getItem(stateKey) || "null"),
+          runtimeState,
         );
+        snapshot = applySgccComparisonPeriod(snapshot, baseConfigs);
       } catch (error) {
         console.warn("Advanced History card editor: unable to restore dashboard state", error);
       }
+    }
+    const syncedConfig = dashboardConfigWithSnapshot(this._config, snapshot);
+    if (syncedConfig !== this._config || pendingComparisonChanged) {
+      this._config = syncedConfig;
+      queueMicrotask(() => {
+        if (token !== this._renderToken) return;
+        this.dispatchEvent(new CustomEvent("config-changed", {
+          detail: { config: syncedConfig },
+          bubbles: true,
+          composed: true,
+        }));
+      });
     }
     const configs = sgccConfigsWithSnapshotComparisons(
       baseConfigs,
@@ -716,6 +912,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     this._datePickerAutoHide = false;
     this._dashboardConfig = null;
     this._dashboardPeriodState = null;
+    this._dashboardComparisonStyles = [];
     this._panelTabsPersistenceSuppressed = true;
   }
 
@@ -782,19 +979,53 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       this._dashboardPeriodStoreFollower = false;
       return super._createDashboardPeriodStore();
     }
-    const existing = DASHBOARD_PERIOD_GROUP_STORES.get(group);
-    if (existing) {
-      this._dashboardPeriodStoreFollower = true;
-      return existing;
-    }
     const store = super._createDashboardPeriodStore();
-    DASHBOARD_PERIOD_GROUP_STORES.set(group, store);
-    this._dashboardPeriodStoreFollower = false;
+    const originalSetPeriod = store.setPeriod.bind(store);
+    let coordinator = DASHBOARD_PERIOD_GROUP_STORES.get(group);
+    this._dashboardPeriodStoreFollower = Boolean(coordinator);
+    if (!coordinator) {
+      coordinator = {
+        start: new Date(store.start),
+        end: new Date(store.end),
+        members: new Set(),
+      };
+      DASHBOARD_PERIOD_GROUP_STORES.set(group, coordinator);
+    } else {
+      originalSetPeriod(coordinator.start, coordinator.end);
+    }
+    const member = { store, setPeriod: originalSetPeriod };
+    coordinator.members.add(member);
+    this._dashboardPeriodGroupMember = { group, coordinator, member };
+    store.setPeriod = (start, end) => {
+      originalSetPeriod(start, end);
+      coordinator.start = new Date(store.start);
+      coordinator.end = new Date(store.end);
+      for (const other of coordinator.members) {
+        if (other === member) continue;
+        other.setPeriod(coordinator.start, coordinator.end);
+        other.store.refresh?.();
+      }
+    };
     return store;
   }
 
+  _releaseDashboardPeriodStore() {
+    const registration = this._dashboardPeriodGroupMember;
+    if (!registration) return;
+    registration.coordinator.members.delete(registration.member);
+    if (!registration.coordinator.members.size) {
+      DASHBOARD_PERIOD_GROUP_STORES.delete(registration.group);
+    }
+    this._dashboardPeriodGroupMember = null;
+  }
+
+  disconnectedCallback() {
+    this._releaseDashboardPeriodStore();
+    super.disconnectedCallback();
+  }
+
   _dashboardStateStorageKey() {
-    return dashboardStateStorageKey(this._dashboardConfig?.snapshot);
+    return dashboardStateStorageKey(this._dashboardConfig);
   }
 
   _syncDashboardSgccVisibilityFromCards() {
@@ -843,30 +1074,48 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
   }
 
   _loadDashboardSnapshot() {
+    const key = this._dashboardStateStorageKey();
+    let state = null;
+    try {
+      if (key) state = loadDashboardRuntimeState(this._dashboardConfig);
+    } catch (error) {
+      console.warn("Advanced History card: unable to restore dashboard state", error);
+    }
     const storedConfigs = Array.isArray(this._dashboardConfig?.sgcc_configs)
       ? this._dashboardConfig.sgcc_configs.filter(Boolean)
       : [];
+    this._dashboardComparisonStyles = comparisonStyleBank(
+      storedConfigs,
+      state?.comparison_styles || this._dashboardComparisonStyles,
+    );
     const snapshot = snapshotFromSgccConfigs(
       this._dashboardConfig?.snapshot,
       storedConfigs,
     );
-    const key = this._dashboardStateStorageKey();
-    if (!key) return snapshot;
-    try {
-      const state = JSON.parse(localStorage.getItem(key) || "null");
-      return applyDashboardRuntimeState(snapshot, state);
-    } catch (error) {
-      console.warn("Advanced History card: unable to restore dashboard state", error);
-      return snapshot;
-    }
+    const resolved = applySgccComparisonPeriod(
+      applyDashboardRuntimeState(snapshot, state),
+      storedConfigs,
+    );
+    return resolved;
   }
 
-  _saveDashboardState(snapshot = null) {
+  _saveDashboardState(snapshot = null, sgccConfigs = null) {
     const key = this._dashboardStateStorageKey();
     if (!key || !this._initialized) return;
     try {
       const current = snapshot ? clone(snapshot) : this._captureSnapshot();
-      localStorage.setItem(key, JSON.stringify(dashboardRuntimeState(current)));
+      const effectiveConfigs = Array.isArray(sgccConfigs)
+        ? sgccConfigs
+        : this._dashboardConfig?.sgcc_configs;
+      this._dashboardComparisonStyles = comparisonStyleBank(
+        effectiveConfigs,
+        this._dashboardComparisonStyles,
+      );
+      const state = dashboardRuntimeState(
+        current,
+        this._dashboardComparisonStyles,
+      );
+      localStorage.setItem(key, JSON.stringify(state));
     } catch (error) {
       console.warn("Advanced History card: unable to save dashboard state", error);
     }
@@ -993,6 +1242,66 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
   _saveTargets() {}
   _saveCurrentSnapshot() {}
   _persistPanelTabs() {}
+  _recordComparisonChange() {
+    const current = this._captureSnapshot();
+    if (!current?.period) return;
+    const stableSnapshotId = String(this._dashboardConfig?.snapshot?.id || "").trim();
+    if (stableSnapshotId) current.id = stableSnapshotId;
+    const compare = this._energyCollection?.compare ?? current.period.compare ?? "";
+    const choice = this._energyCompareChoice || current.period.compare_choice || null;
+    const count = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._energyCompareCount)) || 1),
+    );
+    current.period = {
+      ...current.period,
+      compare,
+      compare_choice: choice,
+      compare_count: count,
+    };
+    const active = compare ? this._energyCompareValue(choice || "previous_period", count) : false;
+    current.chart = clone(current.chart || {});
+    delete current.chart.compare;
+    const previousConfigs = clone(this._dashboardConfig?.sgcc_configs || []);
+    this._dashboardComparisonStyles = comparisonStyleBank(
+      previousConfigs,
+      this._dashboardComparisonStyles,
+    );
+    const configs = clone(this._dashboardConfig?.sgcc_configs || []).map((config, configIndex) => {
+      if (config?.chart_mode === "state_timeline" || !Array.isArray(config?.entities)) {
+        return config;
+      }
+      config.entities = config.entities.map((raw, entityIndex) => {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+        if (raw.y_axis === "secondary") return raw;
+        if (active === false) delete raw.compare;
+        else raw.compare = mergeComparisonStyle(
+          active,
+          raw.compare,
+          this._dashboardComparisonStyles?.[configIndex]?.[entityIndex],
+        );
+        return raw;
+      });
+      return compactDashboardSgccConfig(config);
+    });
+    this._dashboardConfig = {
+      ...this._dashboardConfig,
+      sgcc_configs: configs,
+      snapshot: compactDashboardSnapshot(current),
+    };
+    try {
+      stageDashboardComparisonConfig(this._dashboardConfig, previousConfigs, configs);
+    } catch (error) {
+      console.warn("Advanced History card: unable to stage comparison changes", error);
+    }
+    this._saveDashboardState(current, configs);
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: clone(this._dashboardConfig) },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
   _recordChange(snapshot = null) { this._saveDashboardState(snapshot); }
   _scheduleExternalBookmarkRefresh() {}
 }

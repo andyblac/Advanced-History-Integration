@@ -3,6 +3,16 @@ import { DATE_PICKER_AUTO_HIDE_STORAGE_KEY } from "./constants.js";
 const PANEL_EXPORT_ICON_PATH = "M3 3H11V11H3V3M5 5V9H9V5H5M13 3H21V11H13V3M15 5V9H19V5H15M3 13H11V21H3V13M5 15V19H9V15H5M18 13V16H21V18H18V21H16V18H13V16H16V13H18Z";
 
 export class EnergyMethods {
+  _restoreDashboardLocalComparison(period) {
+    if (!period) return "";
+    this._energyCompareChoice = period.choice ?? period.compare_choice ?? null;
+    this._energyCompareCount = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(period.count ?? period.compare_count)) || 1),
+    );
+    return period.compare || "";
+  }
+
   _energyCompareChoiceFromNative(mode) {
     return mode === "previous"
       ? "previous_period"
@@ -152,6 +162,15 @@ export class EnergyMethods {
     this._energyApplyCompareMode?.(mode, true);
     collection.refresh?.();
     this._syncY1ComparisonToggle(Boolean(mode));
+    this._commitComparisonChange();
+  }
+
+  _commitComparisonChange() {
+    if (typeof this._recordComparisonChange === "function") {
+      this._recordComparisonChange();
+    } else if (typeof this._recordChange === "function") {
+      this._recordChange(null, true);
+    }
   }
 
   _setY1ComparisonChoice(choice) {
@@ -159,7 +178,7 @@ export class EnergyMethods {
     this._energyCompareChoice = choice;
     const collection = this._energyCollection;
     if (!collection?.compare) {
-      this._recordChange(null, true);
+      this._commitComparisonChange();
       return;
     }
     const mode = this._nativeEnergyCompareMode(choice);
@@ -169,6 +188,7 @@ export class EnergyMethods {
     this._energyApplyCompareMode?.(mode, true);
     this._syncEnergyCompareRange?.(choice);
     collection.refresh?.();
+    this._commitComparisonChange();
   }
 
   _setY1ComparisonCount(value) {
@@ -181,7 +201,7 @@ export class EnergyMethods {
       this._energyApplyCompareMode?.(this._energyCollection.compare, true);
       this._syncEnergyCompareRange?.();
     }
-    this._recordChange(null, true);
+    this._commitComparisonChange();
   }
 
   _energyCompareRange(start, end, choice, count = 1) {
@@ -1155,9 +1175,13 @@ export class EnergyMethods {
     const store = this._createDashboardPeriodStore();
     this._energyCollection = store;
     if (this._dashboardPeriodStoreFollower) {
-      // The first card mounted for a group owns its initial period. Followers
-      // adopt that live period instead of replacing it with their exported or
-      // locally cached range during startup.
+      // A group shares only its date range. Comparison mode, period and count
+      // remain local to each card (including an editor preview), so restore
+      // them before discarding the pending range that the group replaces.
+      const localComparison = this._pendingRollingCompareRestore
+        ?? this._pendingPeriodRestore;
+      const localCompare = this._restoreDashboardLocalComparison(localComparison);
+      store.setCompare(localCompare);
       this._pendingRollingCompareRestore = null;
       this._pendingPeriodRestore = null;
       this._finishPeriodRestore();

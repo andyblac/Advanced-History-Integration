@@ -300,16 +300,63 @@ test("SGCC editor changes retain Advanced History options and native height", as
     AdvancedHistorySgccCardEditor,
     AdvancedHistorySgccCard,
     applyDashboardRuntimeState,
+    applySgccComparisonPeriod,
     cardConfigWithTitle,
     containSgccEditorConfigEvent,
     dashboardConfigWithDateNavigation,
+    dashboardConfigWithPendingComparison,
+    dashboardConfigWithSnapshot,
     dashboardDatePickerVisible,
     dashboardRuntimeState,
+    loadDashboardRuntimeState,
     sgccConfigsWithSnapshotComparisons,
     snapshotFromSgccConfigs,
+    stageDashboardComparisonConfig,
   } = await import(
     "../custom_components/advanced_history/frontend/advanced-history-sgcc-card.js"
   );
+  const pendingStorage = new Map();
+  localStorage.getItem = (key) => pendingStorage.get(key) ?? null;
+  localStorage.setItem = (key, value) => pendingStorage.set(key, value);
+  localStorage.removeItem = (key) => pendingStorage.delete(key);
+  const threeComparisons = [{
+    type: "custom:statistics-graph-chart-card",
+    entities: [{ entity: "sensor.gas", compare: [
+      { period: "last_year" },
+      { period: "last_year", periods_back: 2 },
+      { period: "last_year", periods_back: 3 },
+    ] }],
+  }];
+  const fourComparisons = structuredClone(threeComparisons);
+  fourComparisons[0].entities[0].compare.push({
+    period: "last_year",
+    periods_back: 4,
+    hide_on_load: true,
+  });
+  const fiveComparisons = structuredClone(fourComparisons);
+  fiveComparisons[0].entities[0].compare.push({
+    period: "last_year",
+    periods_back: 5,
+    hide_on_load: true,
+  });
+  const pendingConfig = {
+    show_date_picker: true,
+    snapshot: { id: "pending-comparison" },
+    sgcc_configs: threeComparisons,
+  };
+  stageDashboardComparisonConfig(pendingConfig, threeComparisons, fourComparisons);
+  stageDashboardComparisonConfig(pendingConfig, fourComparisons, fiveComparisons);
+  assert.deepEqual(
+    dashboardConfigWithPendingComparison(pendingConfig).sgcc_configs,
+    fiveComparisons,
+  );
+  const independentlyEdited = structuredClone(pendingConfig);
+  independentlyEdited.sgcc_configs[0].show_tooltip = false;
+  assert.equal(
+    dashboardConfigWithPendingComparison(independentlyEdited),
+    independentlyEdited,
+  );
+  localStorage.getItem = () => null;
   let innerEventStopped = false;
   const innerConfig = { type: "custom:statistics-graph-chart-card", height: 500 };
   const containedDraft = containSgccEditorConfigEvent({
@@ -379,9 +426,11 @@ test("SGCC editor changes retain Advanced History options and native height", as
   });
   const ownerStore = periodOwner._createDashboardPeriodStore();
   const followerStore = periodFollower._createDashboardPeriodStore();
-  assert.equal(followerStore, ownerStore);
+  assert.notEqual(followerStore, ownerStore);
   assert.equal(periodOwner._dashboardPeriodStoreFollower, false);
   assert.equal(periodFollower._dashboardPeriodStoreFollower, true);
+  periodOwner._releaseDashboardPeriodStore();
+  periodFollower._releaseDashboardPeriodStore();
 
   const original = {
     targets: { area_id: [], device_id: [], entity_id: ["sensor.gas"] },
@@ -454,10 +503,68 @@ test("SGCC editor changes retain Advanced History options and native height", as
     },
   });
   const restored = applyDashboardRuntimeState(original, runtime);
-  assert.deepEqual(restored.period, runtime.period);
+  assert.deepEqual(runtime.period, {
+    start: "2026-08-01T00:00:00.000Z",
+    end: "2026-09-01T00:00:00.000Z",
+  });
+  assert.deepEqual(restored.period, {
+    compare: "previous",
+    start: "2026-08-01T00:00:00.000Z",
+    end: "2026-09-01T00:00:00.000Z",
+  });
   assert.deepEqual(restored.chart.running_total_axes, { primary: true });
   assert.equal(restored.chart.show_comparison_banner, false);
   assert.deepEqual(restored.chart.card_options, original.chart.card_options);
+
+  const controller = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
+    _dashboardConfig: {
+      snapshot: { id: "shared-export" },
+      show_date_picker: true,
+    },
+  });
+  const follower = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
+    _dashboardConfig: {
+      snapshot: { id: "shared-export" },
+      show_date_picker: false,
+    },
+  });
+  assert.notEqual(
+    controller._dashboardStateStorageKey(),
+    follower._dashboardStateStorageKey(),
+  );
+  const storageReads = [];
+  localStorage.getItem = (key) => {
+    storageReads.push(key);
+    return storageReads.length === 2 ? JSON.stringify(runtime) : null;
+  };
+  assert.deepEqual(loadDashboardRuntimeState(controller._dashboardConfig), runtime);
+  assert.equal(storageReads.length, 2);
+  assert.match(storageReads[0], /:controller$/);
+  assert.equal(storageReads[1], "advanced_history_dashboard_card_state_v1:shared-export");
+  localStorage.getItem = () => null;
+
+  const dateOnlyGroup = `date-only-${Date.now()}`;
+  const firstGroupedCard = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
+    _dashboardConfig: { date_picker_group: dateOnlyGroup },
+    _dashboardPeriodState: null,
+  });
+  const secondGroupedCard = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
+    _dashboardConfig: { date_picker_group: dateOnlyGroup },
+    _dashboardPeriodState: null,
+  });
+  const firstStore = firstGroupedCard._createDashboardPeriodStore();
+  const secondStore = secondGroupedCard._createDashboardPeriodStore();
+  firstStore.setCompare("yoy");
+  firstStore.setPeriod(
+    new Date("2026-04-01T00:00:00.000Z"),
+    new Date("2026-05-01T00:00:00.000Z"),
+  );
+  assert.equal(firstStore.compare, "yoy");
+  assert.equal(secondStore.compare, "");
+  assert.equal(secondStore.start.toISOString(), "2026-04-01T00:00:00.000Z");
+  assert.equal(secondStore.end.toISOString(), "2026-05-01T00:00:00.000Z");
+  firstGroupedCard._releaseDashboardPeriodStore();
+  secondGroupedCard._releaseDashboardPeriodStore();
 
   const comparisonConfigs = sgccConfigsWithSnapshotComparisons([{
     type: "custom:statistics-graph-chart-card",
@@ -493,6 +600,167 @@ test("SGCC editor changes retain Advanced History options and native height", as
     },
   ]);
   assert.equal(comparisonConfigs[0].entities[1].compare, undefined);
+
+  const canonicalComparison = [
+    { period: "last_year", opacity: 1 },
+    { period: "last_year", periods_back: 2, opacity: 0.8 },
+    { period: "last_year", periods_back: 3, opacity: 0.6 },
+  ];
+  const canonicalConfigs = sgccConfigsWithSnapshotComparisons([{
+    type: "custom:statistics-graph-chart-card",
+    entities: [{ entity: "sensor.gas", compare: canonicalComparison }],
+  }], {
+    chart: {},
+    period: { compare: "" },
+  });
+  assert.deepEqual(canonicalConfigs[0].entities[0].compare, canonicalComparison);
+
+  const comparisonSnapshot = snapshotFromSgccConfigs({
+    chart: {},
+    period: {
+      start: "2026-09-01T00:00:00.000Z",
+      end: "2026-10-01T00:00:00.000Z",
+      compare: "",
+      compare_choice: null,
+      compare_count: 1,
+    },
+  }, [{
+    type: "custom:statistics-graph-chart-card",
+    entities: [{ entity: "sensor.gas", compare: canonicalComparison }],
+  }]);
+  assert.deepEqual(comparisonSnapshot.period, {
+    start: "2026-09-01T00:00:00.000Z",
+    end: "2026-10-01T00:00:00.000Z",
+    compare: "yoy",
+    compare_choice: "last_year",
+    compare_count: 3,
+  });
+  const staleRuntimeSnapshot = applyDashboardRuntimeState(comparisonSnapshot, {
+    schema: 1,
+    period: { ...comparisonSnapshot.period, compare_count: 1 },
+    chart: {},
+  });
+  assert.equal(staleRuntimeSnapshot.period.compare, "yoy");
+  assert.equal(staleRuntimeSnapshot.period.compare_choice, "last_year");
+  assert.equal(staleRuntimeSnapshot.period.compare_count, 3);
+  const canonicalRuntimeSnapshot = snapshotFromSgccConfigs(staleRuntimeSnapshot, [{
+    type: "custom:statistics-graph-chart-card",
+    entities: [{ entity: "sensor.gas", compare: canonicalComparison }],
+  }]);
+  assert.equal(canonicalRuntimeSnapshot.period.compare_count, 3);
+  const canonicalComparisonOnly = applySgccComparisonPeriod(staleRuntimeSnapshot, [{
+    type: "custom:statistics-graph-chart-card",
+    entities: [{ entity: "sensor.gas", compare: canonicalComparison }],
+  }]);
+  assert.equal(canonicalComparisonOnly.period.compare, "yoy");
+  assert.equal(canonicalComparisonOnly.period.compare_choice, "last_year");
+  assert.equal(canonicalComparisonOnly.period.compare_count, 3);
+  assert.equal(canonicalComparisonOnly.period.start, staleRuntimeSnapshot.period.start);
+
+  const savedRuntime = {
+    schema: 1,
+    id: "runtime-handoff",
+    period: { ...comparisonSnapshot.period, compare_count: 2 },
+    chart: {},
+  };
+  let storedRuntime = null;
+  localStorage.setItem = (_key, value) => { storedRuntime = JSON.parse(value); };
+  const runtimeContext = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
+    _dashboardConfig: {
+      snapshot: { id: "runtime-handoff" },
+      show_date_picker: true,
+    },
+    _initialized: true,
+    _captureSnapshot: () => savedRuntime,
+  });
+  runtimeContext._saveDashboardState();
+  assert.deepEqual(storedRuntime, dashboardRuntimeState(savedRuntime));
+  localStorage.getItem = () => storedRuntime ? JSON.stringify(storedRuntime) : null;
+  assert.deepEqual(
+    loadDashboardRuntimeState(runtimeContext._dashboardConfig),
+    dashboardRuntimeState(savedRuntime),
+  );
+  runtimeContext._energyCollection = { compare: "previous" };
+  runtimeContext._energyCompareChoice = "last_month";
+  runtimeContext._energyCompareCount = 3;
+  runtimeContext._captureSnapshot = () => ({
+    ...savedRuntime,
+    id: "new-capture-id-that-must-not-replace-card-id",
+    chart: { compare: "last_year" },
+    period: { ...savedRuntime.period, compare: "", compare_choice: null, compare_count: 1 },
+  });
+  runtimeContext._recordChange();
+  assert.equal(storedRuntime.period.compare, undefined);
+  assert.equal(storedRuntime.period.compare_choice, undefined);
+  assert.equal(storedRuntime.period.compare_count, undefined);
+  let emittedConfig = null;
+  runtimeContext._dashboardConfig.sgcc_configs = [{
+    type: "custom:statistics-graph-chart-card",
+    entities: [{ entity: "sensor.gas", compare: { opacity: 0.5 } }],
+  }];
+  runtimeContext.dispatchEvent = (event) => { emittedConfig = event.detail.config; };
+  runtimeContext._recordComparisonChange();
+  assert.equal(runtimeContext._dashboardConfig.snapshot.id, "runtime-handoff");
+  assert.equal(runtimeContext._dashboardConfig.snapshot.chart.compare, undefined);
+  assert.equal(runtimeContext._dashboardConfig.snapshot.period.compare_choice, "last_month");
+  assert.equal(runtimeContext._dashboardConfig.snapshot.period.compare_count, 3);
+  assert.equal(runtimeContext._dashboardConfig.sgcc_configs[0].entities[0].compare.length, 3);
+  const directPreviewConfigs = sgccConfigsWithSnapshotComparisons(
+    runtimeContext._dashboardConfig.sgcc_configs,
+    runtimeContext._dashboardConfig.snapshot,
+  );
+  assert.equal(directPreviewConfigs[0].entities[0].compare.length, 3);
+  assert.equal(runtimeContext._dashboardConfig.sgcc_configs[0].entities[0].compare[0].opacity, 0.5);
+  assert.equal(storedRuntime.sgcc_configs, undefined);
+  assert.deepEqual(emittedConfig, runtimeContext._dashboardConfig);
+  runtimeContext._dashboardConfig.sgcc_configs[0].entities[0].compare = [
+    { period: "last_month", color: "#111111", show_fill: true },
+    { period: "last_month", periods_back: 2, color: "#222222", show_fill: true, hide_on_load: true },
+    { period: "last_month", periods_back: 3, color: "#333333", show_fill: false, hide_on_load: true },
+  ];
+  runtimeContext._energyCompareCount = 2;
+  runtimeContext._recordComparisonChange();
+  assert.equal(runtimeContext._dashboardConfig.sgcc_configs[0].entities[0].compare.length, 2);
+  runtimeContext._energyCompareCount = 3;
+  runtimeContext._recordComparisonChange();
+  const restoredComparisonRows = runtimeContext._dashboardConfig.sgcc_configs[0].entities[0].compare;
+  assert.equal(restoredComparisonRows.length, 3);
+  assert.equal(restoredComparisonRows[1].color, "#222222");
+  assert.equal(restoredComparisonRows[1].hide_on_load, true);
+  assert.equal(restoredComparisonRows[2].color, "#333333");
+  assert.equal(restoredComparisonRows[2].show_fill, false);
+  assert.equal(restoredComparisonRows[2].hide_on_load, true);
+  assert.equal(storedRuntime.comparison_styles[0][0][2].color, "#333333");
+  runtimeContext._saveDashboardState(runtimeContext._dashboardConfig.snapshot);
+  assert.equal(storedRuntime.sgcc_configs, undefined);
+  runtimeContext._dashboardConfig.sgcc_configs = [{
+    type: "custom:statistics-graph-chart-card",
+    entities: [{ entity: "sensor.gas", compare: "previous_period" }],
+  }];
+  storedRuntime.sgcc_configs = [{
+    type: "custom:statistics-graph-chart-card",
+    entities: [{ entity: "sensor.gas", compare: [
+      { period: "last_year" },
+      { period: "last_year", periods_back: 2 },
+      { period: "last_year", periods_back: 3 },
+    ] }],
+  }];
+  const restoredDirectComparison = runtimeContext._loadDashboardSnapshot();
+  assert.equal(restoredDirectComparison.period.compare_choice, "previous_period");
+  assert.equal(restoredDirectComparison.period.compare_count, 1);
+  assert.equal(runtimeContext._dashboardConfig.sgcc_configs[0].entities[0].compare, "previous_period");
+  localStorage.getItem = () => null;
+
+  const synchronizedConfig = dashboardConfigWithSnapshot({
+    type: "custom:advanced-history-sgcc-card",
+    snapshot: { id: "comparison-card", period: { compare: "" } },
+  }, comparisonSnapshot);
+  assert.deepEqual(synchronizedConfig.snapshot.period, comparisonSnapshot.period);
+  assert.equal(
+    dashboardConfigWithSnapshot(synchronizedConfig, comparisonSnapshot),
+    synchronizedConfig,
+  );
+
 
   const wrapperEditor = new AdvancedHistorySgccCardEditor();
   const embeddedEditor = {};

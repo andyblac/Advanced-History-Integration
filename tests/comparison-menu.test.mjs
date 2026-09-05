@@ -2,6 +2,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { EnergyMethods } from "../custom_components/advanced_history/frontend/energy.js";
+
+test("dashboard followers retain their card-local comparison selection", () => {
+  const context = Object.create(EnergyMethods.prototype);
+
+  assert.equal(context._restoreDashboardLocalComparison({
+    compare: "yoy",
+    compare_choice: "last_year",
+    compare_count: 3,
+  }), "yoy");
+  assert.equal(context._energyCompareChoice, "last_year");
+  assert.equal(context._energyCompareCount, 3);
+
+  assert.equal(context._restoreDashboardLocalComparison({
+    compare: "previous",
+    choice: "last_month",
+    count: 2,
+  }), "previous");
+  assert.equal(context._energyCompareChoice, "last_month");
+  assert.equal(context._energyCompareCount, 2);
+});
 import {
   GraphMethods,
   withoutDashboardWrapperNavigation,
@@ -52,6 +72,39 @@ test("comparison menu clamps count and refreshes an active comparison", () => {
 
   assert.equal(context._energyCompareCount, 10);
   assert.deepEqual(calls, ["cycle", ["previous", true], "record"]);
+});
+
+test("comparison menu saves an active period choice immediately", () => {
+  const calls = [];
+  const collection = {
+    compare: "previous",
+    setCompare(value) {
+      this.compare = value;
+      calls.push(["set", value]);
+    },
+    refresh: () => calls.push(["refresh"]),
+  };
+  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+    _energyCollection: collection,
+    _beginGraphDataSourceCycle: () => calls.push(["cycle"]),
+    _beginEnergyInteractionLoading: () => calls.push(["loading"]),
+    _energyApplyCompareMode: (...args) => calls.push(["apply", ...args]),
+    _syncEnergyCompareRange: (...args) => calls.push(["range", ...args]),
+    _recordComparisonChange: () => calls.push(["record"]),
+  });
+
+  context._setY1ComparisonChoice("last_year");
+
+  assert.equal(context._energyCompareChoice, "last_year");
+  assert.deepEqual(calls, [
+    ["cycle"],
+    ["loading"],
+    ["set", "yoy"],
+    ["apply", "yoy", true],
+    ["range", "last_year"],
+    ["refresh"],
+    ["record"],
+  ]);
 });
 
 test("dashboard comparison refresh keeps the chart mounted", () => {
