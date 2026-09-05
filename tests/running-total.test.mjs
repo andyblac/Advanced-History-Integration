@@ -216,6 +216,7 @@ test("Advanced History dashboard card stores SGCC options only in sgcc_configs",
       entity: "sensor.gas",
       show_state: false,
     }],
+    ...Object.fromEntries(DASHBOARD_SYNC_GROUP_KEYS.map((key) => [key, "Gas panel"])),
   }]);
   assert.equal(Object.keys(exported.sgcc_configs[0])[0], "type");
   assert.deepEqual(exported.snapshot, {
@@ -447,10 +448,26 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(dateNavigationConfig.show_date_picker, false);
   assert.equal(dateNavigationConfig.date_picker_group, "shared-group");
   for (const config of dateNavigationConfig.sgcc_configs) {
+    for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+      assert.equal(config[key], "shared-group");
+    }
     for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) {
       assert.equal(config[key], undefined);
     }
   }
+  const overriddenGroups = dashboardConfigWithDateNavigation({
+    date_picker_group: "old-group",
+    sgcc_configs: [{
+      tooltip_sync_group: "custom-tooltips",
+      zoom_sync_group: "old-group",
+    }],
+  }, { date_picker_group: "new-group" });
+  assert.equal(
+    overriddenGroups.sgcc_configs[0].tooltip_sync_group,
+    "custom-tooltips",
+  );
+  assert.equal(overriddenGroups.sgcc_configs[0].zoom_sync_group, "new-group");
+  assert.equal(overriddenGroups.sgcc_configs[0].group_by_picker_group, "new-group");
   const managedRuntimeConfig = dashboardSgccRuntimeConfig({
     type: "custom:statistics-graph-chart-card",
     zoom_sync_group: "old-group",
@@ -461,7 +478,10 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(managedRuntimeConfig.show_date_picker, true);
   assert.equal(managedRuntimeConfig.card_background_color, "transparent");
   for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
-    assert.equal(managedRuntimeConfig[key], "shared-group");
+    assert.equal(
+      managedRuntimeConfig[key],
+      key === "zoom_sync_group" ? "old-group" : "shared-group",
+    );
   }
   let displayed = false;
   const calendarTab = { classList: { contains: (value) => value === "active" } };

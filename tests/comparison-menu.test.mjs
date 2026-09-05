@@ -388,7 +388,7 @@ test("dashboard navigation uses SGCC's native date-picker synchronization", () =
   assert.equal(received.customEnd, end.toISOString());
 });
 
-test("dashboard runtime drops legacy Energy navigation options", () => {
+test("dashboard runtime drops Energy navigation while preserving SGCC group overrides", () => {
   const config = withoutDashboardWrapperNavigation({
     energy_date_sync: true,
     energy_collection_key: "legacy",
@@ -397,7 +397,10 @@ test("dashboard runtime drops legacy Energy navigation options", () => {
     entities: ["sensor.gas"],
   });
 
-  assert.deepEqual(config, { entities: ["sensor.gas"] });
+  assert.deepEqual(config, {
+    date_picker_group: "legacy-group",
+    entities: ["sensor.gas"],
+  });
 });
 
 test("dashboard controller binds local state after its date picker loads", async () => {

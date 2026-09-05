@@ -25,7 +25,6 @@ export const DASHBOARD_STORED_SGCC_OMIT_KEYS = [
   "interval_picker_position",
   "interval_options",
   "grid_options",
-  ...DASHBOARD_SYNC_GROUP_KEYS,
 ];
 export const DASHBOARD_SNAPSHOT_SGCC_KEYS = [
   "card_options",

@@ -11,6 +11,12 @@ import { ensureCardLoaded } from "./config-flow-defaults.js";
 import { compactDashboardSnapshot } from "./panel-export.js";
 import { customLocalize, loadTranslations } from "./translations.js";
 import { panelStyles } from "./styles.js";
+import {
+  dashboardPrimaryScaleOptions,
+  registerDashboardScaleSource,
+  releaseDashboardScaleSource,
+  scaleOptionsFromPicker,
+} from "./dashboard-scale-mode.js";
 
 const DASHBOARD_CARD_STATE_STORAGE_PREFIX = "advanced_history_dashboard_card_state_v1";
 const DASHBOARD_PENDING_COMPARISON_STORAGE_PREFIX = "advanced_history_dashboard_comparison_v1";
@@ -155,8 +161,24 @@ export function compactDashboardSgccConfig(config) {
   return next;
 }
 
+export function dashboardSgccConfigWithGroupDefaults(
+  config,
+  group,
+  previousGroup = null,
+) {
+  const next = compactDashboardSgccConfig(config);
+  for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+    const current = String(next[key] ?? "").trim();
+    const inherited = !Object.prototype.hasOwnProperty.call(next, key)
+      || (previousGroup != null && current === previousGroup);
+    if (inherited) next[key] = group;
+  }
+  return next;
+}
+
 export function dashboardConfigWithDateNavigation(config, source = {}) {
   const next = clone(config) || {};
+  const previousGroup = String(next.date_picker_group || "").trim();
   const showDatePicker = Object.prototype.hasOwnProperty.call(source, "show_date_picker")
     ? source.show_date_picker !== false
     : dashboardDatePickerVisible(next);
@@ -165,7 +187,9 @@ export function dashboardConfigWithDateNavigation(config, source = {}) {
     : String(next.date_picker_group || "").trim();
   next.show_date_picker = showDatePicker;
   next.date_picker_group = datePickerGroup;
-  next.sgcc_configs = (next.sgcc_configs || []).map(compactDashboardSgccConfig);
+  next.sgcc_configs = (next.sgcc_configs || []).map((sgccConfig) => (
+    dashboardSgccConfigWithGroupDefaults(sgccConfig, datePickerGroup, previousGroup)
+  ));
   next.snapshot = compactDashboardSnapshot(next.snapshot);
   return next;
 }
@@ -179,7 +203,9 @@ export function dashboardSgccRuntimeConfig(config, wrapperConfig) {
     next.card_background_color = "transparent";
   }
   const group = String(wrapperConfig?.date_picker_group || "").trim();
-  for (const key of DASHBOARD_SYNC_GROUP_KEYS) next[key] = group;
+  for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(next, key)) next[key] = group;
+  }
   return next;
 }
 
@@ -644,6 +670,15 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
     this._editorSectionObserver = null;
     this._editor = null;
     let pendingComparisonChanged = false;
+    let groupDefaultsChanged = false;
+    const groupedConfig = dashboardConfigWithDateNavigation(this._config, {
+      show_date_picker: dashboardDatePickerVisible(this._config),
+      date_picker_group: this._config.date_picker_group,
+    });
+    if (JSON.stringify(groupedConfig) !== JSON.stringify(this._config)) {
+      this._config = groupedConfig;
+      groupDefaultsChanged = true;
+    }
     try {
       const pendingConfig = dashboardConfigWithPendingComparison(this._config);
       pendingComparisonChanged = pendingConfig !== this._config;
@@ -680,7 +715,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
       }
     }
     const syncedConfig = dashboardConfigWithSnapshot(this._config, snapshot);
-    if (syncedConfig !== this._config || pendingComparisonChanged) {
+    if (syncedConfig !== this._config || pendingComparisonChanged || groupDefaultsChanged) {
       this._config = syncedConfig;
       queueMicrotask(() => {
         if (token !== this._renderToken) return;
@@ -773,40 +808,67 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
       if (token !== this._renderToken) return;
       const syncManagedGroupFields = () => {
         const group = String(this._config?.date_picker_group || "").trim();
+        const stored = this._config?.sgcc_configs?.[this._activeIndex] || {};
         if (editor._config && typeof editor._config === "object") {
-          for (const key of DASHBOARD_SYNC_GROUP_KEYS) editor._config[key] = group;
+          for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+            if (!Object.prototype.hasOwnProperty.call(editor._config, key)) {
+              editor._config[key] = Object.prototype.hasOwnProperty.call(stored, key)
+                ? stored[key]
+                : group;
+            }
+          }
         }
         for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+          const value = Object.prototype.hasOwnProperty.call(stored, key)
+            ? stored[key]
+            : group;
           const control = editor.shadowRoot?.querySelector(
             `#${key}, [name="${key}"]`,
           );
-          if (control && "value" in control && control.value !== group) {
-            control.value = group;
+          if (control && "value" in control && control.value !== value) {
+            control.value = value;
           }
         }
       };
       const mountAdvancedHistoryPanel = () => {
         const editorRoot = editor.shadowRoot?.querySelector(".root");
         if (!editorRoot || editorRoot.querySelector('[data-panel="advanced-history"]')) return;
+        const sgccFieldLabel = (id, fallback) => {
+          const control = editor.shadowRoot?.querySelector(`#${id}`);
+          const label = control?.closest?.(".si")?.querySelector?.(".sn")
+            || control?.closest?.(".f")?.querySelector?.(":scope > label")
+            || control?.closest?.("label");
+          return String(label?.textContent || "").trim() || fallback;
+        };
         const titleLabel = this._hass.localize?.(
           "ui.panel.lovelace.editor.card.generic.title",
         ) || "Title";
+        const advancedHistoryCard = this._customLocalize("advanced_history_card");
+        const titleDateNavigation = this._customLocalize("title_date_navigation");
+        const datePickerLabel = sgccFieldLabel(
+          "show_date_picker",
+          this._customLocalize("date_picker"),
+        );
+        const groupLabel = sgccFieldLabel(
+          "date_picker_group",
+          this._customLocalize("group"),
+        );
         const panel = document.createElement("div");
         panel.className = "panel open";
         panel.dataset.panel = "advanced-history";
         panel.innerHTML = `
           <div class="panel-header" data-toggle="advanced-history">
             <div class="panel-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
-            <span class="panel-title">Advanced History Card</span>
-            <span class="panel-subtitle">Title and date navigation</span>
+            <span class="panel-title">${this._escape(advancedHistoryCard)}</span>
+            <span class="panel-subtitle">${this._escape(titleDateNavigation)}</span>
             <span class="panel-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></span>
           </div>
           <div class="panel-body">
             <div class="fg">
               <div class="f"><label>${this._escape(titleLabel)}</label><input id="advanced_history_title" type="text" autocomplete="off" value="${this._escape(this._config.title || "")}"></div>
               <div class="advanced-history-navigation-row mt8">
-                <label class="si advanced-history-date-toggle"><div class="st"><input id="advanced_history_show_date_picker" type="checkbox" ${dashboardDatePickerVisible(this._config) ? "checked" : ""}><span class="ss"></span></div><div class="sl"><span class="sn">Date Picker</span></div></label>
-                <input id="advanced_history_date_picker_group" class="advanced-history-group-input" type="text" autocomplete="off" placeholder="Group" value="${this._escape(String(this._config.date_picker_group || "").trim())}">
+                <label class="si advanced-history-date-toggle"><div class="st"><input id="advanced_history_show_date_picker" type="checkbox" ${dashboardDatePickerVisible(this._config) ? "checked" : ""}><span class="ss"></span></div><div class="sl"><span class="sn">${this._escape(datePickerLabel)}</span></div></label>
+                <input id="advanced_history_date_picker_group" class="advanced-history-group-input" type="text" autocomplete="off" placeholder="${this._escape(groupLabel)}" value="${this._escape(String(this._config.date_picker_group || "").trim())}">
               </div>
             </div>
           </div>`;
@@ -941,7 +1003,16 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     this._dashboardConfig = null;
     this._dashboardPeriodState = null;
     this._dashboardComparisonStyles = [];
+    this._dashboardInheritedScaleOptions = null;
+    this._dashboardResolvedPrimaryScaleOptions = null;
+    this._dashboardResolvedScaleLabels = new Map();
+    this._dashboardScaleObservers = new Set();
     this._panelTabsPersistenceSuppressed = true;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._registerDashboardScaleInheritance();
   }
 
   setConfig(config) {
@@ -966,6 +1037,8 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     }
     this._dashboardPeriodState = null;
     this._dashboardConfig = clone(resolvedConfig);
+    this._dashboardResolvedPrimaryScaleOptions = null;
+    if (this.isConnected) this._registerDashboardScaleInheritance();
     this._panel = {
       config: {
         ...(clone(resolvedConfig.settings) || {}),
@@ -1009,6 +1082,96 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
 
   _dashboardDatePickerVisible() {
     return dashboardDatePickerVisible(this._dashboardConfig);
+  }
+
+  _registerDashboardScaleInheritance() {
+    if (!this._dashboardConfig) return;
+    registerDashboardScaleSource(
+      this,
+      this._dashboardDatePickerGroup(),
+      dashboardDatePickerVisible(this._dashboardConfig),
+      this._dashboardResolvedPrimaryScaleOptions
+        || dashboardPrimaryScaleOptions(this._dashboardConfig),
+      (options) => {
+        const previous = JSON.stringify(this._dashboardInheritedScaleOptions);
+        const next = JSON.stringify(options);
+        if (previous === next) return;
+        this._dashboardInheritedScaleOptions = clone(options);
+        if (this._initialized) this._render();
+      },
+    );
+  }
+
+  _applyDashboardChildScaleOptions(config) {
+    if (
+      dashboardDatePickerVisible(this._dashboardConfig)
+      || config?.chart_mode === "state_timeline"
+      || !this._dashboardInheritedScaleOptions
+    ) return config;
+    const next = { ...config };
+    const inherited = this._dashboardInheritedScaleOptions;
+    if (inherited.autoScaleDefined) {
+      next.auto_scale_points = inherited.autoScalePoints;
+    } else {
+      delete next.auto_scale_points;
+    }
+    if (inherited.groupByDefined) next.group_by = inherited.groupBy;
+    else delete next.group_by;
+    return next;
+  }
+
+  _trackDashboardScaleCard(card, index = 0) {
+    const root = card?.shadowRoot;
+    if (!root) return;
+    let scheduled = false;
+    const readScale = () => {
+      scheduled = false;
+      const picker = root.querySelector(
+        '[data-qp="gby"] select, select[data-qp="gby"], .sgc-group-by-picker select',
+      );
+      const label = String(
+        picker?.selectedOptions?.[0]?.textContent
+        || picker?.options?.[picker?.selectedIndex]?.textContent
+        || "",
+      ).trim();
+      if (!label || this._dashboardResolvedScaleLabels.get(index) === label) return;
+      this._dashboardResolvedScaleLabels.set(index, label);
+      if (
+        dashboardDatePickerVisible(this._dashboardConfig)
+        && card.__advancedHistoryConfig?.chart_mode !== "state_timeline"
+      ) {
+        this._dashboardResolvedPrimaryScaleOptions = scaleOptionsFromPicker(
+          label,
+          picker?.value,
+          card.__advancedHistoryConfig?.auto_scale_points === true,
+        );
+      }
+      this._registerDashboardScaleInheritance();
+    };
+    const observer = new MutationObserver(() => {
+      if (scheduled) return;
+      scheduled = true;
+      queueMicrotask(readScale);
+    });
+    observer.observe(root, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["value", "selected"],
+    });
+    this._dashboardScaleObservers.add(observer);
+    queueMicrotask(readScale);
+  }
+
+  _releaseDashboardScaleTracking() {
+    this._disconnectDashboardScaleObservers();
+    this._dashboardResolvedScaleLabels.clear();
+  }
+
+  _disconnectDashboardScaleObservers() {
+    for (const observer of this._dashboardScaleObservers) observer.disconnect();
+    this._dashboardScaleObservers.clear();
   }
 
   _dashboardConfiguredComparisonPeriod() {
@@ -1066,6 +1229,8 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
   }
 
   disconnectedCallback() {
+    releaseDashboardScaleSource(this);
+    this._releaseDashboardScaleTracking();
     this._releaseDashboardPeriodStore();
     super.disconnectedCallback();
   }
@@ -1197,6 +1362,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
 
   _render() {
     if (!this._dashboardConfig) return;
+    this._disconnectDashboardScaleObservers();
     this._releaseDashboardCardLayout();
     const title = String(this._dashboardConfig.title || "").trim();
     const cardOptions = this._activeSnapshot?.card_options || {};

@@ -5,6 +5,7 @@ import {
   DASHBOARD_SNAPSHOT_SGCC_KEYS,
   DASHBOARD_SNAPSHOT_SOURCE_KEYS,
   DASHBOARD_STORED_SGCC_OMIT_KEYS,
+  DASHBOARD_SYNC_GROUP_KEYS,
 } from "./constants.js";
 
 const BRIDGE_TAG = "ha-panel-history";
@@ -179,7 +180,13 @@ export function advancedHistoryDashboardCard(
   const normalizedTitle = String(title || "").trim();
   const sgccConfigs = graphConfigs
     .filter((config) => config && typeof config === "object" && !Array.isArray(config))
-    .map((config) => dashboardGraphConfig(config, panelConfig));
+    .map((config) => {
+      const next = dashboardGraphConfig(config, panelConfig);
+      for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+        if (!Object.prototype.hasOwnProperty.call(next, key)) next[key] = datePickerGroup;
+      }
+      return next;
+    });
   const config = {
     type: ADVANCED_HISTORY_CARD_TYPE,
     schema: ADVANCED_HISTORY_CARD_SCHEMA,

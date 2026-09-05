@@ -197,13 +197,11 @@ const DASHBOARD_WRAPPER_NAVIGATION_KEYS = [
   "date_picker_position",
   "date_picker_nav_position",
   "date_picker_shortcuts_position",
-  "date_picker_group",
   "date_picker_modes",
   "date_picker_default_mode",
   "date_picker_step",
   "show_interval_picker",
   "interval_picker_position",
-  "interval_picker_group",
   "interval_options",
 ];
 
@@ -894,7 +892,10 @@ export class GraphMethods {
       }
       config.show_date_picker = false;
       const syncGroup = this._dashboardDatePickerGroup?.() || "advanced-history-dashboard";
-      for (const key of DASHBOARD_SYNC_GROUP_KEYS) config[key] = syncGroup;
+      for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+        if (!Object.prototype.hasOwnProperty.call(config, key)) config[key] = syncGroup;
+      }
+      config = this._applyDashboardChildScaleOptions?.(config) || config;
     }
     if (mode !== "state_timeline" && config.height === "auto") {
       // The card's native height:auto implementation only enables its
@@ -932,6 +933,7 @@ export class GraphMethods {
       card.__advancedHistoryConfig = config;
       this._setGraphCardHass(card, this._hass);
       shell.append(card, sourceIndicator);
+      this._trackDashboardScaleCard?.(card, this._graphCards?.length || 0);
       // Panel chart overrides belong to the current user's chart state. A
       // bookmark loaded from another user's shared library remains read-only;
       // service defaults and More Info entity overrides retain their separate
