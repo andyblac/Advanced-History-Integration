@@ -2,6 +2,101 @@ import { DATE_PICKER_AUTO_HIDE_STORAGE_KEY } from "./constants.js";
 
 const PANEL_EXPORT_ICON_PATH = "M3 3H11V11H3V3M5 5V9H9V5H5M13 3H21V11H13V3M15 5V9H19V5H15M3 13H11V21H3V13M5 15V19H9V15H5M18 13V16H21V18H18V21H16V18H13V16H16V13H18Z";
 
+export function chartDataDownloads(graphCards = []) {
+  return graphCards.flatMap((source, index) => {
+    const card = source?.card || source;
+    const csv = typeof card?._buildCsvText === "function" ? card._buildCsvText() : null;
+    if (!csv) return [];
+    const title = source?.title
+      || card._config?.card_header
+      || (index ? `chart-${index + 1}` : "chart");
+    return [{ csv, title }];
+  });
+}
+
+function safeDownloadTitle(title, fallback) {
+  return String(title || "").trim().toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || fallback;
+}
+
+function crc32(bytes) {
+  let crc = 0xffffffff;
+  for (const byte of bytes) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) {
+      crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1));
+    }
+  }
+  return (crc ^ 0xffffffff) >>> 0;
+}
+
+function zipHeader(size) {
+  const bytes = new Uint8Array(size);
+  return { bytes, view: new DataView(bytes.buffer) };
+}
+
+export function chartDataZip(downloads, modified = new Date()) {
+  const encoder = new TextEncoder();
+  const localParts = [];
+  const centralParts = [];
+  const usedNames = new Set();
+  let offset = 0;
+  const year = Math.max(1980, modified.getFullYear());
+  const dosTime = (modified.getHours() << 11)
+    | (modified.getMinutes() << 5)
+    | Math.floor(modified.getSeconds() / 2);
+  const dosDate = ((year - 1980) << 9)
+    | ((modified.getMonth() + 1) << 5)
+    | modified.getDate();
+
+  downloads.forEach(({ csv, title }, index) => {
+    const base = `advanced-history-${safeDownloadTitle(title, `chart-${index + 1}`)}`;
+    let name = `${base}.csv`;
+    let duplicate = 2;
+    while (usedNames.has(name)) name = `${base}-${duplicate++}.csv`;
+    usedNames.add(name);
+    const nameBytes = encoder.encode(name);
+    const data = encoder.encode(`\ufeff${csv}`);
+    const checksum = crc32(data);
+
+    const local = zipHeader(30);
+    local.view.setUint32(0, 0x04034b50, true);
+    local.view.setUint16(4, 20, true);
+    local.view.setUint16(6, 0x0800, true);
+    local.view.setUint16(10, dosTime, true);
+    local.view.setUint16(12, dosDate, true);
+    local.view.setUint32(14, checksum, true);
+    local.view.setUint32(18, data.length, true);
+    local.view.setUint32(22, data.length, true);
+    local.view.setUint16(26, nameBytes.length, true);
+    localParts.push(local.bytes, nameBytes, data);
+
+    const central = zipHeader(46);
+    central.view.setUint32(0, 0x02014b50, true);
+    central.view.setUint16(4, 20, true);
+    central.view.setUint16(6, 20, true);
+    central.view.setUint16(8, 0x0800, true);
+    central.view.setUint16(12, dosTime, true);
+    central.view.setUint16(14, dosDate, true);
+    central.view.setUint32(16, checksum, true);
+    central.view.setUint32(20, data.length, true);
+    central.view.setUint32(24, data.length, true);
+    central.view.setUint16(28, nameBytes.length, true);
+    central.view.setUint32(42, offset, true);
+    centralParts.push(central.bytes, nameBytes);
+    offset += local.bytes.length + nameBytes.length + data.length;
+  });
+
+  const centralSize = centralParts.reduce((total, part) => total + part.length, 0);
+  const end = zipHeader(22);
+  end.view.setUint32(0, 0x06054b50, true);
+  end.view.setUint16(8, downloads.length, true);
+  end.view.setUint16(10, downloads.length, true);
+  end.view.setUint32(12, centralSize, true);
+  end.view.setUint32(16, offset, true);
+  return new Blob([...localParts, ...centralParts, end.bytes], { type: "application/zip" });
+}
+
 export class PeriodSelectorMethods {
   _restoreDashboardLocalComparison(period) {
     if (!period) return "";
@@ -1933,13 +2028,8 @@ export class PeriodSelectorMethods {
     this._syncPeriodSelectorAutoHideAction(dropdown);
   }
 
-  _downloadChartData() {
-    const downloads = this._graphCards.flatMap((card, index) => {
-      const csv = typeof card._buildCsvText === "function" ? card._buildCsvText() : null;
-      if (!csv) return [];
-      const title = card._config?.card_header || (index ? `chart-${index + 1}` : "chart");
-      return [{ csv, title }];
-    });
+  _downloadChartData(graphCards = this._graphCards) {
+    const downloads = chartDataDownloads(graphCards || []);
     if (!downloads.length) {
       this.dispatchEvent(new CustomEvent("hass-notification", {
         detail: { message: this._localize("ui.components.data-table.no-data", "No data") },
@@ -1952,18 +2042,22 @@ export class PeriodSelectorMethods {
     const now = new Date();
     const part = (value) => String(value).padStart(2, "0");
     const timestamp = `${now.getFullYear()}${part(now.getMonth() + 1)}${part(now.getDate())}-${part(now.getHours())}${part(now.getMinutes())}`;
-    downloads.forEach(({ csv, title }, index) => {
-      const safeTitle = String(title).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || `chart-${index + 1}`;
-      const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = `advanced-history-${safeTitle}-${timestamp}.csv`;
-      document.body.append(anchor);
-      anchor.click();
-      anchor.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 5000);
-    });
+    const multiple = downloads.length > 1;
+    const first = downloads[0];
+    const blob = multiple
+      ? chartDataZip(downloads, now)
+      : new Blob(["\ufeff", first.csv], { type: "text/csv;charset=utf-8" });
+    const safeTitle = safeDownloadTitle(first.title, "chart");
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = multiple
+      ? `advanced-history-group-${timestamp}.zip`
+      : `advanced-history-${safeTitle}-${timestamp}.csv`;
+    document.body.append(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
   }
 
   _resetPeriodSelection(collection = this._periodStore, forceRefresh = false) {

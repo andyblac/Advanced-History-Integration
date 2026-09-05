@@ -79,3 +79,7 @@ export function releaseDashboardScaleSource(owner) {
   if (members.size) notifyScaleSourceGroup(group);
   else dashboardScaleSources.delete(group);
 }
+
+export function dashboardScaleGroupOwners(group) {
+  return [...(dashboardScaleSources.get(group)?.keys() || [])];
+}

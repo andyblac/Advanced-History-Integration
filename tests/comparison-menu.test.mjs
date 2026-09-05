@@ -1,7 +1,41 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { PeriodSelectorMethods } from "../custom_components/advanced_history/frontend/period-selector.js";
+import {
+  chartDataDownloads,
+  chartDataZip,
+  PeriodSelectorMethods,
+} from "../custom_components/advanced_history/frontend/period-selector.js";
+
+test("grouped chart downloads retain one separately named CSV per rendered card", () => {
+  const first = { _buildCsvText: () => "first", _config: {} };
+  const second = { _buildCsvText: () => "second", _config: { card_header: "Native title" } };
+  const loading = { _buildCsvText: () => "", _config: {} };
+
+  assert.deepEqual(chartDataDownloads([
+    { card: first, title: "Electric Consumption" },
+    { card: second, title: "Gas Consumption" },
+    { card: loading, title: "Loading" },
+  ]), [
+    { csv: "first", title: "Electric Consumption" },
+    { csv: "second", title: "Gas Consumption" },
+  ]);
+});
+
+test("multiple grouped charts are packaged as separate CSV files in one ZIP download", async () => {
+  const zip = chartDataZip([
+    { csv: "time,value\n1,2", title: "Electric Consumption" },
+    { csv: "time,value\n1,3", title: "Electric Consumption" },
+  ], new Date(2026, 8, 5, 17, 30, 0));
+  const bytes = Buffer.from(await zip.arrayBuffer());
+  const archive = bytes.toString("utf8");
+
+  assert.equal(bytes.readUInt32LE(0), 0x04034b50);
+  assert.match(archive, /advanced-history-electric-consumption\.csv/);
+  assert.match(archive, /advanced-history-electric-consumption-2\.csv/);
+  assert.match(archive, /time,value\n1,2/);
+  assert.equal(zip.type, "application/zip");
+});
 
 test("dashboard followers retain their card-local comparison selection", () => {
   const context = Object.create(PeriodSelectorMethods.prototype);

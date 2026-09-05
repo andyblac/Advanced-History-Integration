@@ -13,6 +13,7 @@ import { customLocalize, loadTranslations } from "./translations.js";
 import { panelStyles } from "./styles.js";
 import {
   dashboardPrimaryScaleOptions,
+  dashboardScaleGroupOwners,
   registerDashboardScaleSource,
   releaseDashboardScaleSource,
   scaleOptionsFromPicker,
@@ -1081,6 +1082,30 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
 
   _dashboardDatePickerVisible() {
     return dashboardDatePickerVisible(this._dashboardConfig);
+  }
+
+  _downloadChartData() {
+    const seen = new Set();
+    const graphCards = dashboardScaleGroupOwners(this._dashboardDatePickerGroup())
+      .flatMap((owner) => {
+        const cards = owner?._graphCards || [];
+        const ownerTitle = String(owner?._dashboardConfig?.title || "").trim();
+        return cards.flatMap((card, index) => {
+          if (!card || seen.has(card)) return [];
+          seen.add(card);
+          const chartTitle = String(card._config?.card_header || "").trim();
+          const title = chartTitle || (
+            cards.length > 1 && ownerTitle
+              ? `${ownerTitle}-${index + 1}`
+              : ownerTitle
+          );
+          return [{ card, title }];
+        });
+      });
+    return AdvancedHistoryPanel.prototype._downloadChartData.call(
+      this,
+      graphCards.length ? graphCards : this._graphCards,
+    );
   }
 
   _registerDashboardScaleInheritance() {

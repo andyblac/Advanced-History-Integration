@@ -3,6 +3,7 @@ import test from "node:test";
 
 import {
   dashboardPrimaryScaleOptions,
+  dashboardScaleGroupOwners,
   registerDashboardScaleSource,
   releaseDashboardScaleSource,
   scaleOptionsFromPicker,
@@ -27,10 +28,12 @@ test("date-picker followers receive the primary card scale options", () => {
 
   registerDashboardScaleSource(primary, "energy", true, options, () => {});
   assert.deepEqual(received.at(-1), options);
+  assert.deepEqual(dashboardScaleGroupOwners("energy"), [follower, primary]);
 
   releaseDashboardScaleSource(primary);
   assert.equal(received.at(-1), null);
   releaseDashboardScaleSource(follower);
+  assert.deepEqual(dashboardScaleGroupOwners("energy"), []);
 });
 
 test("rendered Auto picker labels expose their resolved SGCC grouping", () => {
