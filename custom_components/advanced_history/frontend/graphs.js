@@ -1203,7 +1203,13 @@ export class GraphMethods {
         card.__advancedHistoryRunningTotalEntities?.has(entityId)
         && Array.isArray(result?.points)
       ) {
-        result = cumulativeRunningTotalSeries(result);
+        // SGCC can align lower-resolution comparison data by inserting null
+        // buckets between every real bucket. A running total is unchanged in
+        // those intervals, so carry it across interior nulls; leave leading
+        // and trailing nulls intact so unavailable and future data stay empty.
+        result = cumulativeRunningTotalSeries(result, {
+          carryInteriorNulls: entity?._compareOf != null,
+        });
       }
       const windowStart = Number(args[3]);
       const windowEnd = Number(args[4]);

@@ -1,14 +1,26 @@
 const VALUE_FIELDS = ["v", "_lastRaw", "_lastMin", "_lastMax", "bMin", "bMax"];
 
-export function cumulativeRunningTotalPoints(points) {
+export function cumulativeRunningTotalPoints(points, { carryInteriorNulls = false } = {}) {
   if (!Array.isArray(points)) return points;
+  const lastNumericIndex = carryInteriorNulls
+    ? points.findLastIndex((point) => (
+      point?.v != null
+      && point.v !== ""
+      && Number.isFinite(Number(point.v))
+    ))
+    : -1;
   let running = 0;
-  return points.map((point) => {
+  let started = false;
+  return points.map((point, index) => {
     if (!point || typeof point !== "object") return point;
-    if (point.v == null || point.v === "") return { ...point };
+    if (point.v == null || point.v === "") {
+      if (!carryInteriorNulls || !started || index >= lastNumericIndex) return { ...point };
+      return { ...point, v: running };
+    }
     const value = Number(point.v);
     if (!Number.isFinite(value)) return { ...point };
     running += value;
+    started = true;
     const transformed = { ...point, v: running };
     for (const field of VALUE_FIELDS) {
       if (Object.prototype.hasOwnProperty.call(point, field)) transformed[field] = running;
@@ -43,9 +55,9 @@ function runningTotalStats(points) {
   };
 }
 
-export function cumulativeRunningTotalSeries(result) {
+export function cumulativeRunningTotalSeries(result, options) {
   if (!result || !Array.isArray(result.points)) return result;
-  const points = cumulativeRunningTotalPoints(result.points);
+  const points = cumulativeRunningTotalPoints(result.points, options);
   const stats = runningTotalStats(points);
   return {
     ...result,

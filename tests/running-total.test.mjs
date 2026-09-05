@@ -56,6 +56,32 @@ test("preserves gaps without resetting the running value", () => {
   assert.deepEqual(transformed.map((point) => point.v), [1, null, 3]);
 });
 
+test("carries comparison totals across interior alignment buckets", () => {
+  const transformed = cumulativeRunningTotalPoints([
+    { t: 1, v: null },
+    { t: 2, v: 1 },
+    { t: 3, v: null },
+    { t: 4, v: 2 },
+    { t: 5, v: null },
+  ], { carryInteriorNulls: true });
+  assert.deepEqual(transformed.map((point) => point.v), [null, 1, 1, 3, null]);
+});
+
+test("recomputes comparison statistics with carried alignment buckets", () => {
+  const transformed = cumulativeRunningTotalSeries({
+    points: [
+      { t: 1, v: 1 },
+      { t: 2, v: null },
+      { t: 3, v: 2 },
+      { t: 4, v: null },
+    ],
+  }, { carryInteriorNulls: true });
+  assert.deepEqual(transformed.points.map((point) => point.v), [1, 1, 3, null]);
+  assert.equal(transformed.stats.avg, 5 / 3);
+  assert.equal(transformed.stats.last, 3);
+  assert.equal(transformed.stats.lastT, 3);
+});
+
 test("recomputes legend statistics from the cumulative series", () => {
   const transformed = cumulativeRunningTotalSeries({
     points: [
