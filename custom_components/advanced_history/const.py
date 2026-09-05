@@ -118,6 +118,7 @@ DEFAULT_MORE_INFO_CARD_OPTIONS = {
     "auto_scale_points": True,
     "card_background_color": "transparent",
     "card_border": False,
+    "card_border_radius": 0,
     "card_padding": 0,
     "card_shadow": False,
     "date_picker_default_mode": "last_24h",
