@@ -241,13 +241,7 @@ function defaultDatePickerMode(start, end, rollingHours) {
   return "last_24h";
 }
 
-export function dashboardCardSnapshots(cards, period = {}) {
-  const group = exportGroup();
-  const mode = defaultDatePickerMode(
-    period.start,
-    period.end,
-    period.rollingHours,
-  );
+export function dashboardCardConfigs(cards) {
   return (cards || []).map((card) => {
     const source = card?.__advancedHistoryConfig || card?._config;
     if (!source || typeof source !== "object" || Array.isArray(source)) return null;
@@ -260,6 +254,18 @@ export function dashboardCardSnapshots(cards, period = {}) {
       if (original.defined) row.aggregate_func = clone(original.value);
       else delete row.aggregate_func;
     }
+    return config;
+  }).filter(Boolean);
+}
+
+export function dashboardCardSnapshots(cards, period = {}) {
+  const group = exportGroup();
+  const mode = defaultDatePickerMode(
+    period.start,
+    period.end,
+    period.rollingHours,
+  );
+  return dashboardCardConfigs(cards).map((config) => {
     for (const key of OMITTED_RUNTIME_KEYS) delete config[key];
     if (config.chart_mode === "state_timeline") delete config.height;
     config.type = `custom:${CARD_TAG}`;
@@ -272,7 +278,7 @@ export function dashboardCardSnapshots(cards, period = {}) {
       ? config.date_picker_modes[0] || mode
       : mode;
     return config;
-  }).filter(Boolean);
+  });
 }
 
 function yamlScalar(value) {

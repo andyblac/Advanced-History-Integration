@@ -14,6 +14,7 @@ import {
   advancedHistoryDashboardCard,
   compactDashboardSnapshot,
   dashboardCardEntityIds,
+  dashboardCardConfigs,
   dashboardCardsWithHiddenEntitiesOnLoad,
   dashboardConfigWithNewView,
   dashboardCardSnapshots,
@@ -150,6 +151,25 @@ test("dashboard export removes the panel-only running-total aggregation", () => 
 
   assert.equal(exported.entities[0].aggregate_func, undefined);
   assert.equal(exported.entities[1].aggregate_func, "max");
+});
+
+test("Advanced History card export removes the panel-only running-total aggregation", () => {
+  const configs = dashboardCardConfigs([{
+    __advancedHistoryConfig: {
+      chart_mode: "timeline",
+      entities: [
+        { entity: "sensor.gas", aggregate_func: "change" },
+        { entity: "sensor.energy", aggregate_func: "change" },
+      ],
+    },
+    __advancedHistoryRunningTotalExportAggregates: {
+      "sensor.gas": { defined: false, value: undefined },
+      "sensor.energy": { defined: true, value: "last" },
+    },
+  }]);
+
+  assert.equal(configs[0].entities[0].aggregate_func, undefined);
+  assert.equal(configs[0].entities[1].aggregate_func, "last");
 });
 
 test("Advanced History dashboard card stores SGCC options only in sgcc_configs", () => {

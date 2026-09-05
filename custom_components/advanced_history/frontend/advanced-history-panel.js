@@ -16,6 +16,7 @@ import { customLocalize, loadTranslations } from "./translations.js";
 import {
   addCardsToDashboard,
   advancedHistoryDashboardCard,
+  dashboardCardConfigs,
   dashboardCardSnapshots,
 } from "./panel-export.js";
 
@@ -199,9 +200,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
       this._captureSnapshot(title),
       this.config,
       title,
-      this._graphCards.map((graphCard) => (
-        graphCard?.__advancedHistoryConfig || graphCard?._config
-      )).filter(Boolean),
+      dashboardCardConfigs(this._graphCards),
       configuredPanelName,
     );
     if (!card) return;
