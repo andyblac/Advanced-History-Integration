@@ -81,8 +81,9 @@ function compactPanelSettings(config = {}) {
   return settings;
 }
 
-function dashboardSnapshot(snapshot) {
+export function compactDashboardSnapshot(snapshot) {
   const next = clone(snapshot);
+  if (!next) return next;
   delete next.schema;
   delete next.name;
   delete next.saved_at;
@@ -169,7 +170,6 @@ export function advancedHistoryDashboardCard(
   snapshot,
   panelConfig = {},
   title = "",
-  entities = [],
   graphConfigs = [],
   panelName = "",
 ) {
@@ -187,7 +187,7 @@ export function advancedHistoryDashboardCard(
     date_picker_group: datePickerGroup,
     ...(normalizedTitle ? { title: normalizedTitle } : {}),
     sgcc_configs: sgccConfigs,
-    snapshot: dashboardSnapshot(snapshot),
+    snapshot: compactDashboardSnapshot(snapshot),
     ...(Object.keys(settings).length ? { settings } : {}),
   };
   return config;

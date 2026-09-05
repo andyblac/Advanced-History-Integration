@@ -3,13 +3,12 @@ import {
   ADVANCED_HISTORY_CARD_SCHEMA,
   ADVANCED_HISTORY_CARD_TAG,
   CARD_TAG,
-  DASHBOARD_SNAPSHOT_SGCC_KEYS,
-  DASHBOARD_SNAPSHOT_SOURCE_KEYS,
   DASHBOARD_STORED_SGCC_OMIT_KEYS,
   DASHBOARD_SYNC_GROUP_KEYS,
 } from "./constants.js";
 import { cardConfigToSnapshot } from "./card-handoff.js";
 import { ensureCardLoaded } from "./config-flow-defaults.js";
+import { compactDashboardSnapshot } from "./panel-export.js";
 import { customLocalize, loadTranslations } from "./translations.js";
 import { panelStyles } from "./styles.js";
 
@@ -146,37 +145,13 @@ export function cardConfigWithTitle(config, title) {
 }
 
 export function dashboardDatePickerVisible(config) {
-  if (Object.prototype.hasOwnProperty.call(config || {}, "show_date_picker")) {
-    return config.show_date_picker !== false;
-  }
-  const embedded = config?.sgcc_configs?.find((item) => (
-    Object.prototype.hasOwnProperty.call(item || {}, "show_date_picker")
-  ));
-  if (embedded) return embedded.show_date_picker !== false;
-  return true;
+  return config?.show_date_picker !== false;
 }
 
 export function compactDashboardSgccConfig(config) {
   const next = clone(config) || {};
   for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) delete next[key];
   if (next.card_background_color === "transparent") delete next.card_background_color;
-  return next;
-}
-
-export function compactDashboardSnapshot(snapshot) {
-  const next = clone(snapshot);
-  if (!next) return next;
-  delete next.schema;
-  delete next.name;
-  delete next.saved_at;
-  delete next.targets;
-  delete next.hidden_targets;
-  delete next.y2_targets;
-  delete next.hidden_y2_targets;
-  for (const key of DASHBOARD_SNAPSHOT_SOURCE_KEYS) delete next[key];
-  next.chart = clone(next.chart || {});
-  delete next.chart.defaults_mode;
-  for (const key of DASHBOARD_SNAPSHOT_SGCC_KEYS) delete next.chart[key];
   return next;
 }
 
@@ -444,41 +419,6 @@ export function snapshotFromSgccConfigs(snapshot, configs) {
   return next;
 }
 
-function fallbackSgccConfigs(config) {
-  const snapshot = config?.snapshot;
-  const chart = snapshot?.chart || {};
-  const configured = chart.card_options || {};
-  const cardOptions = configured.numeric || configured.state
-    ? configured.numeric || configured.state || {}
-    : configured;
-  const y2 = new Set(snapshot?.y2_targets?.entity_id || []);
-  const hidden = new Set([
-    ...(snapshot?.hidden_targets?.entity_id || []),
-    ...(snapshot?.hidden_y2_targets?.entity_id || []),
-  ]);
-  const configuredEntities = Array.isArray(config?.entities) && config.entities.length
-    ? config.entities
-    : [
-      ...(snapshot?.targets?.entity_id || []),
-      ...(snapshot?.hidden_targets?.entity_id || []),
-      ...(snapshot?.y2_targets?.entity_id || []),
-      ...(snapshot?.hidden_y2_targets?.entity_id || []),
-    ];
-  const entities = [...new Set(configuredEntities)].map((entity) => ({
-    entity,
-    ...(clone(chart.entity_options?.[entity]) || {}),
-    ...(y2.has(entity) ? { y_axis: "secondary" } : {}),
-    ...(hidden.has(entity) ? { enabled: false } : {}),
-  }));
-  if (!entities.length) return [];
-  return [{
-    type: `custom:${CARD_TAG}`,
-    ...clone(cardOptions),
-    height: cardOptions.height ?? "auto",
-    entities,
-  }];
-}
-
 export class AdvancedHistorySgccCardEditor extends HTMLElement {
   constructor() {
     super();
@@ -517,7 +457,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
     const storedConfigs = Array.isArray(this._config.sgcc_configs)
       ? this._config.sgcc_configs.filter(Boolean)
       : [];
-    const baseConfigs = storedConfigs.length ? storedConfigs : fallbackSgccConfigs(this._config);
+    const baseConfigs = storedConfigs;
     let snapshot = snapshotFromSgccConfigs(
       this._config.snapshot,
       baseConfigs,
@@ -740,7 +680,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
     const storedConfigs = Array.isArray(this._config.sgcc_configs)
       ? this._config.sgcc_configs.filter(Boolean)
       : [];
-    const configs = storedConfigs.length ? storedConfigs : fallbackSgccConfigs(this._config);
+    const configs = storedConfigs;
     for (const button of this.shadowRoot.querySelectorAll("[data-index]")) {
       const config = configs[Number(button.dataset.index) || 0];
       button.textContent = config?.chart_mode === "state_timeline"
@@ -828,12 +768,6 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       ? this._dashboardConfig.date_picker_group.trim()
       : "";
     if (wrapperGroup) return wrapperGroup;
-    const embedded = this._dashboardConfig?.sgcc_configs?.find((item) => (
-      typeof item?.date_picker_group === "string" && item.date_picker_group.trim()
-    ));
-    const group = embedded?.date_picker_group;
-    const configured = typeof group === "string" ? group.trim() : "";
-    if (configured) return configured;
     const id = String(this._dashboardConfig?.snapshot?.id || "").trim();
     return id ? `advanced-history-${id}` : "advanced-history-dashboard";
   }
@@ -912,12 +846,9 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     const storedConfigs = Array.isArray(this._dashboardConfig?.sgcc_configs)
       ? this._dashboardConfig.sgcc_configs.filter(Boolean)
       : [];
-    const baseConfigs = storedConfigs.length
-      ? storedConfigs
-      : fallbackSgccConfigs(this._dashboardConfig);
     const snapshot = snapshotFromSgccConfigs(
       this._dashboardConfig?.snapshot,
-      baseConfigs,
+      storedConfigs,
     );
     const key = this._dashboardStateStorageKey();
     if (!key) return snapshot;

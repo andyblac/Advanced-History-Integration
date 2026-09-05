@@ -11,6 +11,7 @@ import {
 } from "../custom_components/advanced_history/frontend/constants.js";
 import {
   advancedHistoryDashboardCard,
+  compactDashboardSnapshot,
   dashboardCardEntityIds,
   dashboardCardsWithHiddenEntitiesOnLoad,
   dashboardConfigWithNewView,
@@ -166,7 +167,6 @@ test("Advanced History dashboard card stores SGCC options only in sgcc_configs",
       config_entry_id: "not-exported",
     },
     "Gas",
-    ["sensor.gas", "sensor.temperature", "sensor.gas"],
     [{
       type: "custom:statistics-graph-chart-card",
       entities: ["sensor.gas"],
@@ -212,7 +212,6 @@ test("Advanced History dashboard card stores SGCC options only in sgcc_configs",
     snapshot,
     {},
     "Gas",
-    ["sensor.gas"],
     [{
       type: "custom:statistics-graph-chart-card",
       entities: ["sensor.gas"],
@@ -303,7 +302,6 @@ test("SGCC editor changes retain Advanced History options and native height", as
     applyDashboardRuntimeState,
     cardConfigWithTitle,
     containSgccEditorConfigEvent,
-    compactDashboardSnapshot,
     dashboardConfigWithDateNavigation,
     dashboardDatePickerVisible,
     dashboardRuntimeState,
@@ -327,9 +325,6 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(cardConfigWithTitle(titled, "").title, undefined);
   assert.equal(dashboardDatePickerVisible({}), true);
   assert.equal(dashboardDatePickerVisible({ show_date_picker: false }), false);
-  assert.equal(dashboardDatePickerVisible({
-    sgcc_configs: [{ show_date_picker: false }],
-  }), false);
   assert.equal(dashboardDatePickerVisible({
     show_date_picker: true,
     sgcc_configs: [{ show_date_picker: false }],

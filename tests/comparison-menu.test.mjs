@@ -420,7 +420,7 @@ test("dashboard date control shifts the complete selected period", () => {
   assert.equal(shifted.end.getDate(), 17);
 });
 
-test("dashboard navigation starts SGCC loading before the Energy refresh", () => {
+test("dashboard navigation starts SGCC loading before refreshing the selected period", () => {
   const calls = [];
   const graphCard = {
     _handleEnergyDate: (start, end) => calls.push(["graph", start, end]),

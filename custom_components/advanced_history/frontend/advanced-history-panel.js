@@ -199,10 +199,6 @@ export class AdvancedHistoryPanel extends HTMLElement {
       this._captureSnapshot(title),
       this.config,
       title,
-      this._graphCards.flatMap((graphCard) => (
-        graphCard?.__advancedHistoryConfig?.entities || graphCard?._config?.entities || []
-      )).map((row) => typeof row === "string" ? row : row?.entity || row?.statistic_id)
-        .filter(Boolean),
       this._graphCards.map((graphCard) => (
         graphCard?.__advancedHistoryConfig || graphCard?._config
       )).filter(Boolean),
