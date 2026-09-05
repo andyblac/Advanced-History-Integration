@@ -183,6 +183,15 @@ export function dashboardSgccRuntimeConfig(config, wrapperConfig) {
   return next;
 }
 
+export function leaveHiddenCalendarTab(root) {
+  const calendar = root?.querySelector?.('button[data-mtab="calendar"]');
+  if (!calendar?.classList?.contains?.("active")) return false;
+  const display = root.querySelector?.('button[data-mtab="display"]');
+  if (!display) return false;
+  display.click();
+  return true;
+}
+
 export function dashboardConfigWithSnapshot(config, snapshot) {
   const compact = compactDashboardSnapshot(snapshot);
   if (JSON.stringify(config?.snapshot || null) === JSON.stringify(compact || null)) {
@@ -856,7 +865,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
           .cmp-del,
           .cmp-row .f:has(.cmp-period),
           .cmp-row .f:has(.cmp-back),
-          [data-mt="calendar"],
+          [data-mtab="calendar"],
           [data-mtc="calendar"],
           .overlay-row:has(#energy_date_sync),
           .overlay-row:has(#show_interval_picker),
@@ -868,6 +877,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
         if (token !== this._renderToken || this._editor !== editor) return;
         mountAdvancedHistoryPanel();
         mountManagedStyles();
+        leaveHiddenCalendarTab(editor.shadowRoot);
         syncManagedGroupFields();
       };
       restoreManagedEditorContent();

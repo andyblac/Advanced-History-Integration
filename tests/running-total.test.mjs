@@ -337,6 +337,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
     dashboardRuntimeState,
     dashboardSgccRuntimeConfig,
     loadDashboardRuntimeState,
+    leaveHiddenCalendarTab,
     sgccConfigsWithSnapshotComparisons,
     snapshotFromSgccConfigs,
     stageDashboardComparisonConfig,
@@ -462,6 +463,15 @@ test("SGCC editor changes retain Advanced History options and native height", as
   for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
     assert.equal(managedRuntimeConfig[key], "shared-group");
   }
+  let displayed = false;
+  const calendarTab = { classList: { contains: (value) => value === "active" } };
+  const displayTab = { click: () => { displayed = true; } };
+  assert.equal(leaveHiddenCalendarTab({
+    querySelector: (selector) => (
+      selector.includes('calendar') ? calendarTab : displayTab
+    ),
+  }), true);
+  assert.equal(displayed, true);
 
   const group = `test-${Date.now()}-${Math.random()}`;
   const periodOwner = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
