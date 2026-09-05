@@ -7,6 +7,30 @@ import {
   PeriodSelectorMethods,
 } from "../custom_components/advanced_history/frontend/period-selector.js";
 
+test("fine-detail banner follows the rendered SGCC group picker", () => {
+  const picker = {
+    value: "date",
+    selectedIndex: 0,
+    selectedOptions: [{ textContent: "Date" }],
+    options: [{ textContent: "Date" }],
+  };
+  const card = { shadowRoot: { querySelector: () => picker } };
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _largeRangeDetailProfile: () => ({
+      automatic: false,
+      groupBy: "6h",
+      key: "range",
+    }),
+  });
+
+  assert.deepEqual(context._largeRangeDetailProfileFromCard(card), {
+    automatic: false,
+    groupBy: "date",
+    key: "range",
+    resolutionLabel: "Date",
+  });
+});
+
 test("grouped chart downloads retain one separately named CSV per rendered card", () => {
   const first = { _buildCsvText: () => "first", _config: {} };
   const second = { _buildCsvText: () => "second", _config: { card_header: "Native title" } };

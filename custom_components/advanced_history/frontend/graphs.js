@@ -515,18 +515,24 @@ export class GraphMethods {
         const root = card?.shadowRoot;
         if (!root || this._graphLayoutObservedRoots?.has(root)) return Boolean(root);
         this._guardDashboardLegendLayout(card);
+        root.addEventListener("change", (event) => {
+          if (!event.target?.closest?.('[data-qp="gby"], .sgc-group-by-picker')) return;
+          this._syncLargeRangeDetailBannerFromCard(card);
+        });
         this._graphLayoutMutationObserver?.observe(root, {
           childList: true,
           characterData: true,
           subtree: true,
         });
         this._graphLayoutObservedRoots?.add(root);
+        this._syncLargeRangeDetailBannerFromCard(card);
         schedule();
         return true;
       };
       if (!observeRoot()) requestAnimationFrame(observeRoot);
       card?.updateComplete?.then(() => {
         observeRoot();
+        this._syncLargeRangeDetailBannerFromCard(card);
         schedule();
       });
     };
@@ -1042,6 +1048,30 @@ export class GraphMethods {
       : `fine|${profile.groupBy}`;
   }
 
+  _largeRangeDetailProfileFromCard(card, profile = this._largeRangeDetailProfile()) {
+    if (!profile || profile.automatic) return profile;
+    const picker = card?.shadowRoot?.querySelector(
+      '[data-qp="gby"] select, select[data-qp="gby"], .sgc-group-by-picker select',
+    );
+    const groupBy = String(picker?.value || "").trim();
+    const resolutionLabel = String(
+      picker?.selectedOptions?.[0]?.textContent
+      || picker?.options?.[picker?.selectedIndex]?.textContent
+      || "",
+    ).trim();
+    if (!groupBy && !resolutionLabel) return profile;
+    return {
+      ...profile,
+      ...(groupBy ? { groupBy } : {}),
+      ...(resolutionLabel ? { resolutionLabel } : {}),
+    };
+  }
+
+  _syncLargeRangeDetailBannerFromCard(card) {
+    const profile = this._largeRangeDetailProfileFromCard(card);
+    if (profile && !profile.automatic) this._renderLargeRangeDetailBanner(profile);
+  }
+
   _renderLargeRangeDetailBanner(profile = this._largeRangeDetailProfile()) {
     const banner = this.shadowRoot?.getElementById("detail-banner");
     if (!banner) return;
@@ -1058,9 +1088,11 @@ export class GraphMethods {
       return;
     }
 
-    const resolution = this._customLocalize(
-      `detail_resolution_${profile.automatic ? "auto" : profile.groupBy}`
-    );
+    const resolutionKey = `detail_resolution_${profile.automatic ? "auto" : profile.groupBy}`;
+    const translatedResolution = this._customLocalize(resolutionKey);
+    const resolution = translatedResolution === resolutionKey
+      ? profile.resolutionLabel || profile.groupBy
+      : translatedResolution;
     const text = profile.automatic
       ? this._customLocalize("automatic_detail_active", { resolution })
       : this._customLocalize("fine_detail_warning", { resolution });
