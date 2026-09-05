@@ -8,6 +8,7 @@ import {
 import { TargetPickerMethods } from "../custom_components/advanced_history/frontend/target-picker.js";
 import {
   DASHBOARD_STORED_SGCC_OMIT_KEYS,
+  DASHBOARD_SYNC_GROUP_KEYS,
 } from "../custom_components/advanced_history/frontend/constants.js";
 import {
   advancedHistoryDashboardCard,
@@ -334,6 +335,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
     dashboardConfigWithSnapshot,
     dashboardDatePickerVisible,
     dashboardRuntimeState,
+    dashboardSgccRuntimeConfig,
     loadDashboardRuntimeState,
     sgccConfigsWithSnapshotComparisons,
     snapshotFromSgccConfigs,
@@ -447,6 +449,18 @@ test("SGCC editor changes retain Advanced History options and native height", as
     for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) {
       assert.equal(config[key], undefined);
     }
+  }
+  const managedRuntimeConfig = dashboardSgccRuntimeConfig({
+    type: "custom:statistics-graph-chart-card",
+    zoom_sync_group: "old-group",
+  }, {
+    show_date_picker: true,
+    date_picker_group: "shared-group",
+  });
+  assert.equal(managedRuntimeConfig.show_date_picker, true);
+  assert.equal(managedRuntimeConfig.card_background_color, "transparent");
+  for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+    assert.equal(managedRuntimeConfig[key], "shared-group");
   }
 
   const group = `test-${Date.now()}-${Math.random()}`;

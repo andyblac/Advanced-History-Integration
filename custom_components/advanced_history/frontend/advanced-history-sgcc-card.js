@@ -170,6 +170,19 @@ export function dashboardConfigWithDateNavigation(config, source = {}) {
   return next;
 }
 
+export function dashboardSgccRuntimeConfig(config, wrapperConfig) {
+  const next = {
+    ...clone(config),
+    show_date_picker: dashboardDatePickerVisible(wrapperConfig),
+  };
+  if (next.card_background_color == null || next.card_background_color === "") {
+    next.card_background_color = "transparent";
+  }
+  const group = String(wrapperConfig?.date_picker_group || "").trim();
+  for (const key of DASHBOARD_SYNC_GROUP_KEYS) next[key] = group;
+  return next;
+}
+
 export function dashboardConfigWithSnapshot(config, snapshot) {
   const compact = compactDashboardSnapshot(snapshot);
   if (JSON.stringify(config?.snapshot || null) === JSON.stringify(compact || null)) {
@@ -673,18 +686,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
       baseConfigs,
       snapshot,
       this._config.settings,
-    ).map((config) => {
-      const next = {
-        ...config,
-        show_date_picker: dashboardDatePickerVisible(this._config),
-      };
-      if (next.card_background_color == null || next.card_background_color === "") {
-        next.card_background_color = "transparent";
-      }
-      const group = String(this._config.date_picker_group || "").trim();
-      for (const key of DASHBOARD_SYNC_GROUP_KEYS) next[key] = group;
-      return next;
-    });
+    ).map((config) => dashboardSgccRuntimeConfig(config, this._config));
     if (!configs.length) {
       this.shadowRoot.innerHTML = `<p>${this._customLocalize("dashboard_card_editor_unavailable")}</p>`;
       return;
@@ -760,6 +762,20 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
       this._editor = editor;
       await editor.updateComplete;
       if (token !== this._renderToken) return;
+      const syncManagedGroupFields = () => {
+        const group = String(this._config?.date_picker_group || "").trim();
+        if (editor._config && typeof editor._config === "object") {
+          for (const key of DASHBOARD_SYNC_GROUP_KEYS) editor._config[key] = group;
+        }
+        for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+          const control = editor.shadowRoot?.querySelector(
+            `#${key}, [name="${key}"]`,
+          );
+          if (control && "value" in control && control.value !== group) {
+            control.value = group;
+          }
+        }
+      };
       const mountAdvancedHistoryPanel = () => {
         const editorRoot = editor.shadowRoot?.querySelector(".root");
         if (!editorRoot || editorRoot.querySelector('[data-panel="advanced-history"]')) return;
@@ -808,6 +824,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
             date_picker_group: datePickerGroupInput.value,
           });
           this._config = next;
+          syncManagedGroupFields();
           this.dispatchEvent(new CustomEvent("config-changed", {
             detail: { config: next }, bubbles: true, composed: true,
           }));
@@ -851,6 +868,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
         if (token !== this._renderToken || this._editor !== editor) return;
         mountAdvancedHistoryPanel();
         mountManagedStyles();
+        syncManagedGroupFields();
       };
       restoreManagedEditorContent();
       if (typeof MutationObserver !== "undefined" && editor.shadowRoot) {
