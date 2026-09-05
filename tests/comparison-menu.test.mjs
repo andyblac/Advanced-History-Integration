@@ -1,26 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { EnergyMethods } from "../custom_components/advanced_history/frontend/energy.js";
+import { PeriodSelectorMethods } from "../custom_components/advanced_history/frontend/period-selector.js";
 
 test("dashboard followers retain their card-local comparison selection", () => {
-  const context = Object.create(EnergyMethods.prototype);
+  const context = Object.create(PeriodSelectorMethods.prototype);
 
   assert.equal(context._restoreDashboardLocalComparison({
     compare: "yoy",
     compare_choice: "last_year",
     compare_count: 3,
   }), "yoy");
-  assert.equal(context._energyCompareChoice, "last_year");
-  assert.equal(context._energyCompareCount, 3);
+  assert.equal(context._comparisonChoice, "last_year");
+  assert.equal(context._comparisonCount, 3);
 
   assert.equal(context._restoreDashboardLocalComparison({
     compare: "previous",
     choice: "last_month",
     count: 2,
   }), "previous");
-  assert.equal(context._energyCompareChoice, "last_month");
-  assert.equal(context._energyCompareCount, 2);
+  assert.equal(context._comparisonChoice, "last_month");
+  assert.equal(context._comparisonCount, 2);
 });
 
 test("reconnected dashboard followers restore comparison from SGCC config", () => {
@@ -32,8 +32,8 @@ test("reconnected dashboard followers restore comparison from SGCC config", () =
     setCompare(value) { this.compare = value; },
     subscribe() { return () => {}; },
   };
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
-    _energyRenderToken: token,
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodRenderToken: token,
     _dashboardPeriodStoreFollower: true,
     _pendingRollingCompareRestore: null,
     _pendingPeriodRestore: null,
@@ -42,23 +42,23 @@ test("reconnected dashboard followers restore comparison from SGCC config", () =
       compare_choice: "last_year",
       compare_count: 3,
     }),
-    _createDashboardPeriodStore: () => store,
+    _createPeriodStore: () => store,
     _finishPeriodRestore() {},
     _activateGraphDataSourceTracking() {},
     _syncY2ComparisonToggle() {},
     _syncY1ComparisonToggle() {},
     _largeRangeDetailRenderKey: () => "detail",
     _renderGraphs() {},
-    _syncGraphCardsToEnergyPeriod() {},
-    _renderDashboardComparisonBanner() {},
+    _syncGraphCardsToPeriod() {},
+    _renderComparisonBanner() {},
     _recordChange() {},
   });
 
-  context._bindDashboardPeriodStore(token, {}, {}, false);
+  context._bindPeriodStore(token, {}, {}, false);
 
   assert.equal(store.compare, "yoy");
-  assert.equal(context._energyCompareChoice, "last_year");
-  assert.equal(context._energyCompareCount, 3);
+  assert.equal(context._comparisonChoice, "last_year");
+  assert.equal(context._comparisonCount, 3);
 });
 import {
   GraphMethods,
@@ -68,9 +68,9 @@ import {
 
 test("comparison menu enables the selected comparison type", () => {
   const calls = [];
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
-    _energyCompareChoice: "last_year",
-    _energyCollection: {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _comparisonChoice: "last_year",
+    _periodStore: {
       compare: "",
       setCompare(value) {
         this.compare = value;
@@ -79,14 +79,14 @@ test("comparison menu enables the selected comparison type", () => {
       refresh: () => calls.push(["refresh"]),
     },
     _beginGraphDataSourceCycle: () => calls.push(["cycle"]),
-    _beginEnergyInteractionLoading: () => calls.push(["loading"]),
-    _energyApplyCompareMode: (...args) => calls.push(["apply", ...args]),
+    _beginPeriodInteractionLoading: () => calls.push(["loading"]),
+    _applyComparisonMode: (...args) => calls.push(["apply", ...args]),
     _syncY1ComparisonToggle: (active) => calls.push(["sync", active]),
   });
 
   context._setY1ComparisonEnabled(true);
 
-  assert.equal(context._energyCollection.compare, "yoy");
+  assert.equal(context._periodStore.compare, "yoy");
   assert.deepEqual(calls, [
     ["cycle"],
     ["loading"],
@@ -99,17 +99,17 @@ test("comparison menu enables the selected comparison type", () => {
 
 test("comparison menu clamps count and refreshes an active comparison", () => {
   const calls = [];
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
-    _energyCompareCount: 1,
-    _energyCollection: { compare: "previous" },
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _comparisonCount: 1,
+    _periodStore: { compare: "previous" },
     _beginGraphDataSourceCycle: () => calls.push("cycle"),
-    _energyApplyCompareMode: (...args) => calls.push(args),
+    _applyComparisonMode: (...args) => calls.push(args),
     _recordChange: () => calls.push("record"),
   });
 
   context._setY1ComparisonCount(99);
 
-  assert.equal(context._energyCompareCount, 10);
+  assert.equal(context._comparisonCount, 10);
   assert.deepEqual(calls, ["cycle", ["previous", true], "record"]);
 });
 
@@ -123,18 +123,18 @@ test("comparison menu saves an active period choice immediately", () => {
     },
     refresh: () => calls.push(["refresh"]),
   };
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
-    _energyCollection: collection,
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodStore: collection,
     _beginGraphDataSourceCycle: () => calls.push(["cycle"]),
-    _beginEnergyInteractionLoading: () => calls.push(["loading"]),
-    _energyApplyCompareMode: (...args) => calls.push(["apply", ...args]),
-    _syncEnergyCompareRange: (...args) => calls.push(["range", ...args]),
+    _beginPeriodInteractionLoading: () => calls.push(["loading"]),
+    _applyComparisonMode: (...args) => calls.push(["apply", ...args]),
+    _syncComparisonRange: (...args) => calls.push(["range", ...args]),
     _recordComparisonChange: () => calls.push(["record"]),
   });
 
   context._setY1ComparisonChoice("last_year");
 
-  assert.equal(context._energyCompareChoice, "last_year");
+  assert.equal(context._comparisonChoice, "last_year");
   assert.deepEqual(calls, [
     ["cycle"],
     ["loading"],
@@ -153,16 +153,16 @@ test("dashboard comparison refresh keeps the chart mounted", () => {
     "compare-banner": { hidden: false },
     charts: { hidden: false },
   };
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
     _dashboardCardMode: true,
     _periodRestoreLoading: false,
     _customLocalize: () => "Loading requested range",
     shadowRoot: { getElementById: (id) => elements[id] },
   });
 
-  context._beginEnergyInteractionLoading();
+  context._beginPeriodInteractionLoading();
 
-  assert.equal(context._energyInteractionLoading, true);
+  assert.equal(context._periodInteractionLoading, true);
   assert.equal(elements["period-loading-banner"].hidden, true);
   assert.equal(elements["compare-banner"].hidden, true);
   assert.equal(elements.charts.hidden, false);
@@ -175,14 +175,14 @@ test("panel date refresh keeps the current chart visible", () => {
     "compare-banner": { hidden: false },
     charts: { hidden: true },
   };
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
     _dashboardCardMode: false,
     _periodRestoreLoading: false,
     _customLocalize: () => "Loading requested range",
     shadowRoot: { getElementById: (id) => elements[id] },
   });
 
-  context._beginEnergyInteractionLoading();
+  context._beginPeriodInteractionLoading();
 
   assert.equal(elements["period-loading-banner"].hidden, false);
   assert.equal(elements.charts.hidden, false);
@@ -198,7 +198,7 @@ test("dashboard navigation locks the rendered card height", () => {
       removeProperty: (property) => values.delete(property),
     },
   };
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
     _dashboardCardMode: true,
     _periodRestoreLoading: false,
     _customLocalize: () => "Loading requested range",
@@ -208,7 +208,7 @@ test("dashboard navigation locks the rendered card height", () => {
     },
   });
 
-  context._beginEnergyInteractionLoading();
+  context._beginPeriodInteractionLoading();
 
   assert.equal(values.get("height"), "488px");
   assert.equal(values.get("min-height"), "488px");
@@ -345,8 +345,8 @@ test("dashboard SGCC inherits the wrapper background when transparency is the de
 });
 
 test("dashboard period store publishes local state without an Energy request", async () => {
-  const context = Object.create(EnergyMethods.prototype);
-  const store = context._createDashboardPeriodStore();
+  const context = Object.create(PeriodSelectorMethods.prototype);
+  const store = context._createPeriodStore();
   const updates = [];
   store.subscribe((data) => updates.push(data));
   const start = new Date(2026, 7, 3, 0, 0, 0, 0);
@@ -363,7 +363,7 @@ test("dashboard period store publishes local state without an Energy request", a
   assert.equal(updates[0].end.getTime(), end.getTime());
   assert.equal(updates[0].compareMode, "previous");
 
-  const remounted = context._createDashboardPeriodStore();
+  const remounted = context._createPeriodStore();
   assert.equal(remounted.start.getTime(), start.getTime());
   assert.equal(remounted.end.getTime(), end.getTime());
   assert.equal(remounted.compare, "previous");
@@ -371,7 +371,7 @@ test("dashboard period store publishes local state without an Energy request", a
 
 test("dashboard navigation uses SGCC's native date-picker synchronization", () => {
   let received;
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
     _dashboardCardMode: true,
     _dashboardConfig: { snapshot: { id: "test-card" } },
     _dashboardDatePickerGroup: () => "shared-group",
@@ -382,12 +382,44 @@ test("dashboard navigation uses SGCC's native date-picker synchronization", () =
   const start = new Date("2026-09-01T00:00:00.000Z");
   const end = new Date("2026-09-30T23:59:59.999Z");
 
-  context._syncGraphCardsToEnergyPeriod({ start, end });
+  context._syncGraphCardsToPeriod({ start, end });
 
   assert.equal(received.group, "shared-group");
   assert.equal(received.mode, "custom");
   assert.equal(received.customStart, start.toISOString());
   assert.equal(received.customEnd, end.toISOString());
+});
+
+test("panel period sync reaches remounted SGCC cards without a window listener", () => {
+  let received;
+  let broadcasts = 0;
+  const originalWindow = globalThis.window;
+  const originalCustomEvent = globalThis.CustomEvent;
+  globalThis.window = { dispatchEvent: () => { broadcasts += 1; } };
+  globalThis.CustomEvent = class CustomEvent {};
+  try {
+    const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+      _dashboardCardMode: false,
+      _activePanelTabId: "electric",
+      _graphCards: [{
+        _onDatePickerSyncEvent: (event) => { received = event.detail; },
+      }],
+    });
+    const start = new Date("2026-09-01T00:00:00.000Z");
+    const end = new Date("2026-09-30T23:59:59.999Z");
+
+    context._syncGraphCardsToPeriod({ start, end });
+
+    assert.equal(received.group, "advanced-history-panel-electric");
+    assert.equal(received.customStart, start.toISOString());
+    assert.equal(received.customEnd, end.toISOString());
+    assert.equal(broadcasts, 0);
+  } finally {
+    if (originalWindow === undefined) delete globalThis.window;
+    else globalThis.window = originalWindow;
+    if (originalCustomEvent === undefined) delete globalThis.CustomEvent;
+    else globalThis.CustomEvent = originalCustomEvent;
+  }
 });
 
 test("dashboard runtime drops Energy navigation while preserving SGCC group overrides", () => {
@@ -414,12 +446,12 @@ test("dashboard controller binds local state after its date picker loads", async
   const compareHost = {};
   let bound = false;
   let pickerLoaded = false;
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
     _dashboardCardMode: true,
     _escape: (value) => value,
     _localize: (_key, fallback) => fallback,
     _ensureDashboardDatePickerLoaded: async () => { pickerLoaded = true; },
-    _bindDashboardPeriodStore: (_token, boundHost, boundCompareHost) => {
+    _bindPeriodStore: (_token, boundHost, boundCompareHost) => {
       bound = boundHost === host && boundCompareHost === compareHost;
     },
     shadowRoot: {
@@ -427,9 +459,38 @@ test("dashboard controller binds local state after its date picker loads", async
     },
   });
 
-  await context._renderEnergyController();
+  await context._renderPeriodController();
 
   assert.equal(pickerLoaded, true);
+  assert.equal(bound, true);
+});
+
+test("panel controller uses the same local period store as the dashboard card", async () => {
+  const host = {
+    isConnected: true,
+    innerHTML: "",
+    replaceChildren() { this.innerHTML = ""; },
+  };
+  const compareHost = {};
+  let bound = false;
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _dashboardCardMode: false,
+    _escape: (value) => value,
+    _localize: (_key, fallback) => fallback,
+    _ensureDashboardDatePickerLoaded: async () => {},
+    _loadCardHelpers: async () => {
+      throw new Error("panel period navigation must not load Energy cards");
+    },
+    _bindPeriodStore: (_token, boundHost, boundCompareHost, renderControls) => {
+      bound = boundHost === host && boundCompareHost === compareHost && renderControls;
+    },
+    shadowRoot: {
+      getElementById: (id) => id === "date-controller" ? host : compareHost,
+    },
+  });
+
+  await context._renderPeriodController();
+
   assert.equal(bound, true);
 });
 
@@ -441,7 +502,7 @@ test("hidden dashboard date controls still bind to their shared period group", a
   };
   const compareHost = {};
   let boundRenderControls;
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
     _dashboardCardMode: true,
     _dashboardDatePickerVisible: () => false,
     _escape: (value) => value,
@@ -449,7 +510,7 @@ test("hidden dashboard date controls still bind to their shared period group", a
     _ensureDashboardDatePickerLoaded: async () => {
       throw new Error("hidden controls must not wait for the picker");
     },
-    _bindDashboardPeriodStore: (_token, boundHost, boundCompareHost, renderControls) => {
+    _bindPeriodStore: (_token, boundHost, boundCompareHost, renderControls) => {
       assert.equal(boundHost, host);
       assert.equal(boundCompareHost, compareHost);
       boundRenderControls = renderControls;
@@ -459,12 +520,12 @@ test("hidden dashboard date controls still bind to their shared period group", a
     },
   });
 
-  await context._renderEnergyController();
+  await context._renderPeriodController();
 
   assert.equal(boundRenderControls, false);
 });
 
-test("dashboard SGCC does not expose its local period store as an Energy collection", () => {
+test("dashboard SGCC keeps its local period store out of the HA connection", () => {
   const store = { start: new Date(), end: new Date() };
   const connection = {
     sendMessagePromise: async () => [],
@@ -473,8 +534,7 @@ test("dashboard SGCC does not expose its local period store as an Energy collect
   const card = { __advancedHistorySourceTracker: { record() {} } };
   const context = Object.assign(Object.create(GraphMethods.prototype), {
     _dashboardCardMode: true,
-    _energyCollection: store,
-    _panelEnergyCollectionKey: () => "advanced_history_test",
+    _periodStore: store,
   });
 
   context._setGraphCardHass(card, hass);
@@ -497,11 +557,11 @@ test("rendered SGCC data supplies a source when its request came from cache", ()
 });
 
 test("dashboard date control formats a compact range with a separate year", () => {
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
     _hass: { locale: { language: "en-GB" }, config: { time_zone: "UTC" } },
     _resolvedTimeZone: () => "UTC",
   });
-  const parts = context._dashboardEnergyPeriodParts(
+  const parts = context._periodSelectorParts(
     new Date("2020-08-04T00:00:00.000Z"),
     new Date("2020-08-11T00:00:00.000Z"),
   );
@@ -515,25 +575,89 @@ test("dashboard date control formats a compact range with a separate year", () =
 
 test("dashboard date control shifts the complete selected period", () => {
   let shifted;
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
-    _energyCollection: {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodStore: {
       start: new Date(2026, 7, 4, 0, 0, 0, 0),
       end: new Date(2026, 7, 10, 23, 59, 59, 999),
     },
     _panelTimeRange: null,
-    _setDashboardEnergyPeriod: (start, end) => { shifted = { start, end }; },
+    _setPeriodSelectorRange: (start, end) => { shifted = { start, end }; },
   });
 
-  context._shiftDashboardEnergyPeriod(1);
+  context._shiftPeriodSelectorRange(1);
 
   assert.equal(shifted.start.getDate(), 11);
   assert.equal(shifted.end.getDate(), 17);
 });
 
+test("AHP and AHC Now controls both preserve an active rolling range", () => {
+  for (const dashboardCardMode of [false, true]) {
+    const calls = [];
+    const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+      _dashboardCardMode: dashboardCardMode,
+      _panelRollingHours: 4,
+      _refreshPanelRollingRange: () => calls.push("rolling"),
+      _selectCurrentPeriod: () => calls.push("fixed"),
+    });
+
+    context._selectCurrentOrRollingPeriod();
+
+    assert.deepEqual(calls, ["rolling"]);
+  }
+});
+
+test("picker restore remains guarded until its rendered update is painted", async () => {
+  let releaseFrame;
+  const previousAnimationFrame = globalThis.requestAnimationFrame;
+  globalThis.requestAnimationFrame = (callback) => {
+    releaseFrame = callback;
+    return 1;
+  };
+  try {
+    const picker = { updateComplete: Promise.resolve() };
+    const primary = {};
+    const secondary = {};
+    const controller = {
+      dataset: {},
+      querySelector(selector) {
+        return {
+          ".period-selector-picker": picker,
+          ".period-selector-primary": primary,
+          ".period-selector-secondary": secondary,
+        }[selector];
+      },
+    };
+    const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+      shadowRoot: { querySelector: () => controller },
+      _periodSelectorParts: () => ({ primary: "September", secondary: "", kind: "month" }),
+      _syncPeriodSelectorMenu() {},
+    });
+
+    context._syncPeriodSelector({
+      start: new Date("2026-09-01T00:00:00Z"),
+      end: new Date("2026-09-30T23:59:59Z"),
+    });
+
+    assert.equal(picker.__advancedHistorySyncing, true);
+    await Promise.resolve();
+    assert.equal(typeof releaseFrame, "function");
+    assert.equal(picker.__advancedHistorySyncing, true);
+    releaseFrame();
+    assert.equal(picker.__advancedHistorySyncing, false);
+  } finally {
+    if (previousAnimationFrame === undefined) delete globalThis.requestAnimationFrame;
+    else globalThis.requestAnimationFrame = previousAnimationFrame;
+  }
+});
+
 test("dashboard navigation starts SGCC loading before refreshing the selected period", () => {
   const calls = [];
   const graphCard = {
-    _handleEnergyDate: (start, end) => calls.push(["graph", start, end]),
+    _onDatePickerSyncEvent: ({ detail }) => calls.push([
+      "graph",
+      new Date(detail.customStart),
+      new Date(detail.customEnd),
+    ]),
   };
   const collection = {
     setPeriod(start, end) {
@@ -543,19 +667,20 @@ test("dashboard navigation starts SGCC loading before refreshing the selected pe
     },
     refresh: () => calls.push(["refresh"]),
   };
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
-    _energyCollection: collection,
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodStore: collection,
     _graphCards: [graphCard],
     _panelTimeRange: { start: 600, end: 840 },
     _panelRollingHours: 4,
     _setPanelRollingHours: () => {},
     _updateGraphHourOptionsInPlace: () => calls.push(["hours"]),
     _beginGraphDataSourceCycle: () => {},
-    _beginEnergyInteractionLoading: () => {},
-    _syncDashboardEnergyController: () => {},
+    _beginPeriodInteractionLoading: () => {},
+    _syncPeriodSelector: () => {},
+    _periodSyncGroup: () => "test-period-group",
   });
 
-  context._setDashboardEnergyPeriod(
+  context._setPeriodSelectorRange(
     new Date(2026, 7, 3),
     new Date(2026, 7, 9),
   );
@@ -603,12 +728,12 @@ test("day navigation updates existing SGCC cards without rebuilding them", () =>
     },
     refresh: () => { refreshes += 1; },
   };
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
-    _energyCollection: collection,
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodStore: collection,
     _panelTimeRange: null,
     _graphCards: [{}],
     _beginGraphDataSourceCycle: () => {},
-    _beginEnergyInteractionLoading: () => {},
+    _beginPeriodInteractionLoading: () => {},
     _updateGraphHourOptionsInPlace: () => { graphUpdates += 1; },
     _renderGraphs: () => { graphRenders += 1; },
     _syncPanelTimeRangeControl: () => {},
@@ -622,11 +747,11 @@ test("day navigation updates existing SGCC cards without rebuilding them", () =>
 });
 
 test("calendar comparison legends use their actual year", () => {
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
     _hass: { locale: { language: "en-GB" } },
-    _energyCompareChoice: "previous_period",
-    _energyCompareCount: 4,
-    _energyCollection: {
+    _comparisonChoice: "previous_period",
+    _comparisonCount: 4,
+    _periodStore: {
       compare: "previous",
       start: new Date(2026, 0, 1),
       end: new Date(2027, 0, 1),
@@ -653,11 +778,11 @@ test("calendar comparison legends use their actual year", () => {
 });
 
 test("comparison legend relabeling supports other comparison types", () => {
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
     _hass: { locale: { language: "en-GB" } },
-    _energyCompareChoice: "last_year",
-    _energyCompareCount: 2,
-    _energyCollection: {
+    _comparisonChoice: "last_year",
+    _comparisonCount: 2,
+    _periodStore: {
       compare: "yoy",
       start: new Date(2026, 8, 1),
       end: new Date(2026, 9, 1),
@@ -701,12 +826,12 @@ test("tooltip mutations relabel comparisons before the layout frame", () => {
 });
 
 test("comparison date ranges use abbreviated month names", () => {
-  const context = Object.assign(Object.create(EnergyMethods.prototype), {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
     _hass: { locale: { language: "en-GB" } },
     _resolvedTimeZone: () => "Europe/London",
   });
 
-  const label = context._energyCompactCompareRangeLabel(
+  const label = context._compactComparisonRangeLabel(
     new Date(2026, 7, 24),
     new Date(2026, 7, 30, 23, 59),
     "week",
@@ -718,7 +843,7 @@ test("comparison date ranges use abbreviated month names", () => {
   assert.doesNotMatch(label, /August/);
   assert.doesNotMatch(label, /2026/);
 
-  const historicalLabel = context._energyCompactCompareRangeLabel(
+  const historicalLabel = context._compactComparisonRangeLabel(
     new Date(2025, 7, 4),
     new Date(2025, 7, 10, 23, 59),
     "week",
@@ -726,4 +851,33 @@ test("comparison date ranges use abbreviated month names", () => {
     new Date(2026, 8, 1),
   );
   assert.match(historicalLabel, /2025/);
+});
+
+test("comparison banner labels retain the complete date and time range", () => {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _hass: { locale: { language: "en-GB" } },
+    _resolvedTimeZone: () => "Europe/London",
+  });
+  const label = context._comparisonRangeLabel(
+    new Date("2026-09-05T00:00:00+01:00"),
+    new Date("2026-09-05T23:59:00+01:00"),
+    true,
+    "day",
+  );
+
+  assert.match(label, /5 September 2026, 00:00 – 23:59/);
+});
+
+test("comparison banner uses the visible rolling window instead of its full-day query", () => {
+  const visibleStart = new Date("2026-09-05T13:37:00Z");
+  const visibleEnd = new Date("2026-09-05T15:37:00Z");
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _panelTimeRange: { start: 877, end: 997 },
+    _panelDayPeriod: () => ({ start: visibleStart, end: visibleEnd }),
+  });
+
+  assert.deepEqual(context._comparisonDisplayPeriod({
+    start: new Date("2026-09-04T23:00:00Z"),
+    end: new Date("2026-09-05T22:59:59Z"),
+  }), { start: visibleStart, end: visibleEnd });
 });

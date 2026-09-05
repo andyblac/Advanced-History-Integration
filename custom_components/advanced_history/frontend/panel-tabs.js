@@ -32,49 +32,24 @@ export class PanelTabsMethods {
       || `panel-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
-  _panelEnergyCollectionKeyForId(id) {
-    const safeId = String(id || "panel")
-      .toLowerCase()
-      .replace(/[^a-z0-9_]+/g, "_")
-      .replace(/^_+|_+$/g, "") || "panel";
-    return `energy_advanced_history_${safeId}`;
-  }
-
-  _validPanelEnergyCollectionKey(value) {
-    return typeof value === "string"
-      && /^energy_[a-z0-9_]+$/.test(value)
-      && value.length <= 255;
-  }
-
   _migratePersistedPanelTabs(stored) {
-    // 2.0-beta.1 already stored complete per-panel snapshots. Preserve those
-    // verbatim and add only the stable Energy collection key needed by beta.2.
+    // Older tab records may contain the retired per-panel Energy collection
+    // key. The local period store now uses the stable tab id directly.
     if (!stored || ![1, PANEL_TABS_SCHEMA].includes(stored.schema)) return null;
     if (!Array.isArray(stored.tabs)) return null;
     const migrated = this._clone(stored);
     migrated.schema = PANEL_TABS_SCHEMA;
-    migrated.tabs = migrated.tabs.map((tab) => ({
-      ...tab,
-      energy_collection_key: this._validPanelEnergyCollectionKey(tab?.energy_collection_key)
-        ? tab.energy_collection_key
-        : this._panelEnergyCollectionKeyForId(tab?.id),
-    }));
+    migrated.tabs = migrated.tabs.map((tab) => {
+      const next = { ...tab };
+      delete next.energy_collection_key;
+      return next;
+    });
     return migrated;
   }
 
   _desktopPanelTabsEnabled() {
     return this._desktopPanelLayoutAvailable()
       && this._panelTabsDependencySupported();
-  }
-
-  _panelEnergyCollectionKey() {
-    if (!this._panelTabsDependencySupported()) return null;
-    const tab = this._panelTabs?.find((item) => item.id === this._activePanelTabId);
-    if (tab && !this._validPanelEnergyCollectionKey(tab.energy_collection_key)) {
-      tab.energy_collection_key = this._panelEnergyCollectionKeyForId(tab.id);
-    }
-    return tab?.energy_collection_key
-      || this._panelEnergyCollectionKeyForId(this._activePanelTabId);
   }
 
   _panelTabLabel(index) {
@@ -258,14 +233,14 @@ export class PanelTabsMethods {
     this._largeRangeFineDetail = Boolean(state.large_range_fine_detail);
     this._largeRangeDetailDismissedKey = state.large_range_detail_dismissed_key || null;
     this._largeRangeDetailStateKey = null;
-    this._energyCompare = null;
-    this._energyCompareChoice = state.snapshot?.period?.compare_choice || null;
-    this._energyCompareCount = Math.max(
+    this._comparisonState = null;
+    this._comparisonChoice = state.snapshot?.period?.compare_choice || null;
+    this._comparisonCount = Math.max(
       1,
       Math.min(10, Math.trunc(Number(state.snapshot?.period?.compare_count)) || 1),
     );
-    this._energyComparePeriodKind = null;
-    this._energyResetPending = false;
+    this._comparisonPeriodKind = null;
+    this._periodResetPending = false;
     this._saveLibrary(UNDO_STORAGE_KEY, this._clone(state.undo || []));
     this._saveLibrary(REDO_STORAGE_KEY, this._clone(state.redo || []));
     this._currentSnapshot = this._clone(state.current_snapshot || state.snapshot);
@@ -280,7 +255,6 @@ export class PanelTabsMethods {
     const id = this._panelTabId();
     const tab = {
       id,
-      energy_collection_key: this._panelEnergyCollectionKeyForId(id),
       state: this._blankPanelTabState(),
     };
     this._panelTabs.push(tab);
@@ -317,7 +291,6 @@ export class PanelTabsMethods {
     const tab = {
       id,
       name: String(pending.name || "").trim().slice(0, 40),
-      energy_collection_key: this._panelEnergyCollectionKeyForId(id),
       state,
     };
     this._panelTabs.push(tab);

@@ -43,7 +43,7 @@ export default {
   "graph_editor_note": "Dit zijn de instellingen van Statistics Graph Chart Card. Doelen en attributen blijven beheerd via de pagina Geschiedenis; de entiteitsvermeldingen bepalen hier hun weergave in de grafiek.",
   "graph_editor_load_error": "De grafiekeditor kon niet worden geladen.",
   "graph_code_editor_mapping_error": "De kaartconfiguratie moet een YAML-toewijzing zijn.",
-  "energy_selector_error": "De Energiedatumkiezer kon niet worden geladen.",
+  "period_selector_error": "De periodekiezer kon niet worden geladen.",
   "loading_saved_range": "Gegevens voor het opgeslagen datumbereik laden…",
   "loading_requested_range": "Gegevens voor het aangevraagde bereik laden...",
   "automatic_detail_active": "Automatisch detail gebruikt {resolution} groepering voor dit datumbereik.",

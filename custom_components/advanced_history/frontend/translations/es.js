@@ -43,7 +43,7 @@ export default {
   "graph_editor_note": "Estos son los ajustes de Statistics Graph Chart Card. Los objetivos y atributos se siguen gestionando desde la página Historial; las entradas de entidades controlan aquí su apariencia en el gráfico.",
   "graph_editor_load_error": "No se pudo cargar el editor de gráficos.",
   "graph_code_editor_mapping_error": "La configuración de la tarjeta debe ser un mapa YAML.",
-  "energy_selector_error": "No se pudo cargar el selector de fechas de Energía.",
+  "period_selector_error": "No se pudo cargar el selector de período.",
   "loading_saved_range": "Cargando datos del intervalo de fechas guardado…",
   "loading_requested_range": "Cargando datos del intervalo solicitado...",
   "automatic_detail_active": "El detalle automático usa una agrupación {resolution} para este intervalo de fechas.",

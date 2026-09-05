@@ -43,7 +43,7 @@ export default {
   "graph_editor_note": "Queste sono le impostazioni di Statistics Graph Chart Card. Gli obiettivi e gli attributi restano gestiti dalla pagina Cronologia; le voci delle entità ne controllano qui l’aspetto nel grafico.",
   "graph_editor_load_error": "Impossibile caricare l’editor dei grafici.",
   "graph_code_editor_mapping_error": "La configurazione della scheda deve essere una mappatura YAML.",
-  "energy_selector_error": "Impossibile caricare il selettore delle date di Energia.",
+  "period_selector_error": "Impossibile caricare il selettore del periodo.",
   "loading_saved_range": "Caricamento dei dati per l’intervallo di date salvato…",
   "loading_requested_range": "Caricamento dei dati per l’intervallo richiesto...",
   "automatic_detail_active": "Il dettaglio automatico usa un raggruppamento {resolution} per questo intervallo di date.",

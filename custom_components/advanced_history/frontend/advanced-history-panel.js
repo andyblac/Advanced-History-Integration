@@ -4,7 +4,7 @@ import {
   CARD_TAG,
   DATE_PICKER_AUTO_HIDE_STORAGE_KEY,
 } from "./constants.js";
-import { EnergyMethods } from "./energy.js";
+import { PeriodSelectorMethods } from "./period-selector.js";
 import { DiagnosticsMethods } from "./diagnostics.js";
 import { GraphMethods } from "./graphs.js";
 import { ShareMethods } from "./share.js";
@@ -40,17 +40,17 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._graphCards = [];
     this._cardLoadError = "";
     this._notice = "";
-    this._energyRenderToken = null;
-    this._energyCompare = null;
-    this._energyCompareChoice = null;
-    this._energyCompareCount = 1;
-    this._energyComparePeriodKind = null;
-    this._energyUnsubscribe = null;
+    this._periodRenderToken = null;
+    this._comparisonState = null;
+    this._comparisonChoice = null;
+    this._comparisonCount = 1;
+    this._comparisonPeriodKind = null;
+    this._periodUnsubscribe = null;
     this._nativeTargetPicker = null;
     this._nativeY2TargetPicker = null;
     this._editorAutoColors = new Map();
     this._activeSnapshot = null;
-    this._energyCollection = null;
+    this._periodStore = null;
     this._panelTimeRange = null;
     this._panelRollingHours = null;
     this._panelRollingResumeHours = null;
@@ -77,9 +77,9 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._periodRestoreLoading = false;
     this._periodRestoreExpected = null;
     this._periodRestoreTimer = null;
-    this._energyInteractionLoading = false;
+    this._periodInteractionLoading = false;
     this._dashboardCardLayoutLock = null;
-    this._energyResetPending = false;
+    this._periodResetPending = false;
     try {
       this._datePickerAutoHide = localStorage.getItem(DATE_PICKER_AUTO_HIDE_STORAGE_KEY) === "true";
     } catch (_) {
@@ -231,8 +231,8 @@ export class AdvancedHistoryPanel extends HTMLElement {
 
   async _addCurrentPanelAsNativeCard(button) {
     const cards = dashboardCardSnapshots(this._graphCards, {
-      start: this._energyCollection?.start,
-      end: this._energyCollection?.end,
+      start: this._periodStore?.start,
+      end: this._periodStore?.end,
       rollingHours: this._panelRollingHours,
     });
     if (!cards.length) return;
@@ -282,7 +282,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     if (!this._initialized || !this._hass) return;
     queueMicrotask(() => {
       if (!this.isConnected) return;
-      if (!this._energyUnsubscribe) this._render();
+      if (!this._periodUnsubscribe) this._render();
       if (this._panelRollingHours) this._refreshPanelRollingRange();
       this._scheduleExternalBookmarkRefresh?.();
     });
@@ -299,10 +299,10 @@ export class AdvancedHistoryPanel extends HTMLElement {
       card.__advancedHistorySourceObserver?.disconnect?.();
     }
     this._releaseDashboardCardLayout?.();
-    this._energyRenderToken = null;
-    this._energyUnsubscribe?.();
-    this._energyUnsubscribe = null;
-    this._energyCollection = null;
+    this._periodRenderToken = null;
+    this._periodUnsubscribe?.();
+    this._periodUnsubscribe = null;
+    this._periodStore = null;
     if (this._panelRollingTimer) window.clearTimeout(this._panelRollingTimer);
     this._panelRollingTimer = null;
     if (this._periodRestoreTimer) window.clearTimeout(this._periodRestoreTimer);
@@ -327,7 +327,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
       this._entities = Object.keys(this._hass.states).map((entity_id) => ({ entity_id }));
     }
     await Promise.all([
-      this._loadEnergyTranslations(),
+      this._loadPeriodSelectorTranslations(),
       this._ensureCardLoaded(),
       this._loadSyncedBookmarks(),
       this._loadNativeHistoryPicker().catch((error) => {
@@ -341,7 +341,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._scheduleExternalBookmarkRefresh?.();
   }
 
-  async _loadEnergyTranslations() {
+  async _loadPeriodSelectorTranslations() {
     if (typeof this._hass?.loadFragmentTranslation !== "function") return;
     try {
       const results = await Promise.allSettled([
@@ -353,7 +353,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
         if (result.status === "rejected") console.debug("Advanced History: optional translation fragment unavailable", result.reason);
       }
     } catch (error) {
-      console.warn("Advanced History: Energy translations could not be loaded", error);
+      console.warn("Advanced History: period-selector translations could not be loaded", error);
     }
   }
 
@@ -482,8 +482,8 @@ export class AdvancedHistoryPanel extends HTMLElement {
         ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
         <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>
       </main>
-      ${dependencyMissing ? "" : `<button id="date-controller-reveal" class="energy-nav-reveal-zone" type="button" title="${this._escape(showDatePicker)}" aria-label="${this._escape(showDatePicker)}" ${this._datePickerAutoHide ? "" : "hidden"}></button>
-      <div id="date-controller" class="energy-nav-floating${this._datePickerAutoHide ? " auto-hide" : ""}"></div>`}`;
+      ${dependencyMissing ? "" : `<button id="date-controller-reveal" class="period-selector-reveal-zone" type="button" title="${this._escape(showDatePicker)}" aria-label="${this._escape(showDatePicker)}" ${this._datePickerAutoHide ? "" : "hidden"}></button>
+      <div id="date-controller" class="period-selector-floating${this._datePickerAutoHide ? " auto-hide" : ""}"></div>`}`;
     const menu = this.shadowRoot.getElementById("menu");
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
     this.shadowRoot.getElementById("remove-all")?.addEventListener(
@@ -525,7 +525,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._syncY2ComparisonToggle();
     this._syncY1ComparisonToggle();
     this._syncRunningTotalAxisButtons();
-    this._bindEnergyDatePickerAutoHide?.();
+    this._bindPeriodSelectorAutoHide?.();
     this._bindPanelTabs();
     this._updateUndoRedoButtons();
     if (!dependencyMissing) {
@@ -538,19 +538,17 @@ export class AdvancedHistoryPanel extends HTMLElement {
   }
 
   _renderContent() {
-    this._energyUnsubscribe?.();
-    this._energyUnsubscribe = null;
+    this._periodUnsubscribe?.();
+    this._periodUnsubscribe = null;
     this._cards = [];
     this._graphCards = [];
     if (this._cardLoadError) {
       this._renderGraphs();
       return;
     }
-    this._renderEnergyController();
-    // A newly mounted Energy collection first exposes its previous cached
-    // result. Do not create graph cards from that stale range while a saved
-    // period is being restored; the collection subscriber renders them once
-    // Home Assistant confirms the requested period.
+    this._renderPeriodController();
+    // Saved periods are restored before graph cards are recreated so they do
+    // not briefly query the previously selected range.
     if (!this._periodRestoreLoading) this._renderGraphs();
   }
 
@@ -562,7 +560,7 @@ for (const methods of [
   ShareMethods,
   TargetPickerMethods,
   GraphMethods,
-  EnergyMethods,
+  PeriodSelectorMethods,
   DiagnosticsMethods,
   PanelTabsMethods,
 ]) {

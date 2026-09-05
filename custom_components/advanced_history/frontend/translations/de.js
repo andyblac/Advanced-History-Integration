@@ -43,7 +43,7 @@ export default {
   "graph_editor_note": "Dies sind die Einstellungen der Statistics Graph Chart Card. Ziele und Attribute werden weiterhin auf der Verlaufsseite verwaltet; die Entitätseinträge hier steuern ihre Darstellung im Diagramm.",
   "graph_editor_load_error": "Der Diagrammeditor konnte nicht geladen werden.",
   "graph_code_editor_mapping_error": "Die Kartenkonfiguration muss eine YAML-Zuordnung sein.",
-  "energy_selector_error": "Die Energie-Datumsauswahl konnte nicht geladen werden.",
+  "period_selector_error": "Die Zeitraum-Auswahl konnte nicht geladen werden.",
   "loading_saved_range": "Daten für den gespeicherten Zeitraum werden geladen…",
   "loading_requested_range": "Daten für den angeforderten Zeitraum werden geladen...",
   "automatic_detail_active": "Automatische Details verwenden für diesen Zeitraum eine Gruppierung {resolution}.",

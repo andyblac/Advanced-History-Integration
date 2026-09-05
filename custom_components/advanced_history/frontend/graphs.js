@@ -718,7 +718,7 @@ export class GraphMethods {
     const sourceKey = this._dataSourceCacheKey(mode, series);
     card.__advancedHistorySourceTracker = this._createDataSourceTracker(
       sourceIndicator,
-      Boolean(this._energyCollection),
+      Boolean(this._periodStore),
       sourceKey
     );
     card.__advancedHistoryChartMode = mode;
@@ -877,16 +877,12 @@ export class GraphMethods {
         ? { auto_scale_points: false, group_by: "raw" }
         : {}),
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
-      ...(!this._dashboardCardMode
-        ? {
-            energy_date_sync: true,
-            ...(this._panelEnergyCollectionKey()
-              ? { energy_collection_key: this._panelEnergyCollectionKey() }
-              : {}),
-          }
-        : {}),
       ...this._panelGraphHourOptions(),
     };
+    if (!this._dashboardCardMode) {
+      config.show_date_picker = false;
+      config.date_picker_group = this._periodSyncGroup?.();
+    }
     if (this._dashboardCardMode) {
       config = withoutDashboardWrapperNavigation(config);
       if (config.card_background_color == null || config.card_background_color === "") {
@@ -957,14 +953,12 @@ export class GraphMethods {
       this._cards.push(card);
       this._graphCards.push(card);
       this._observeRenderedGraphDataSource(card);
-      if (this._dashboardCardMode) {
-        this._syncGraphCardsToEnergyPeriod?.();
-      }
+      this._syncGraphCardsToPeriod?.();
       this._graphLayoutObserveCard?.(card);
       card.updateComplete?.then(() => {
         this._applyDashboardGraphBackground(card, config);
-        if (this._dashboardCardMode && this._graphCards?.includes(card)) {
-          this._syncGraphCardsToEnergyPeriod?.();
+        if (this._graphCards?.includes(card)) {
+          this._syncGraphCardsToPeriod?.();
         }
         this._graphLayoutSchedule?.();
       });
@@ -992,8 +986,8 @@ export class GraphMethods {
   }
 
   _largeRangePeriod() {
-    const start = this._energyCollection?.start;
-    const end = this._energyCollection?.end;
+    const start = this._periodStore?.start;
+    const end = this._periodStore?.end;
     const startMs = start?.getTime?.();
     const endMs = end?.getTime?.();
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return null;
@@ -1194,8 +1188,8 @@ export class GraphMethods {
   }
 
   _dataSourceCacheKey(mode, series) {
-    const start = this._energyCollection?.start;
-    const end = this._energyCollection?.end;
+    const start = this._periodStore?.start;
+    const end = this._periodStore?.end;
     const startKey = Number.isFinite(start?.getTime?.()) ? start.toISOString() : "";
     const endKey = Number.isFinite(end?.getTime?.()) ? end.toISOString() : "";
     const compare = this._effectiveCompare?.() || "";
@@ -1218,7 +1212,7 @@ export class GraphMethods {
         // visible window, which its bucketing turns into a flat series.
         const start = this._panelDayPeriod?.()?.start
           || card._energyStart
-          || this._energyCollection?.start;
+          || this._periodStore?.start;
         const startTime = start instanceof Date
           ? start.getTime()
           : new Date(start).getTime();
@@ -1744,8 +1738,8 @@ export class GraphMethods {
 
   _colorAutomaticComparisons(configured, palette, usedColors = new Set()) {
     if (
-      !Array.isArray(this._energyCompare)
-      || this._effectiveCompare() !== this._energyCompare
+      !Array.isArray(this._comparisonState)
+      || this._effectiveCompare() !== this._comparisonState
       || !Array.isArray(configured?.compare)
       || !Array.isArray(palette)
       || palette.length < 2
@@ -1860,14 +1854,10 @@ export class GraphMethods {
         ? "state_timeline"
         : (cardOptions.chart_mode ?? editorMode),
       entities,
-      ...(!this._dashboardCardMode
-        ? {
-            energy_date_sync: true,
-            ...(this._panelEnergyCollectionKey()
-              ? { energy_collection_key: this._panelEnergyCollectionKey() }
-              : {}),
-          }
-        : {}),
+      ...(!this._dashboardCardMode ? {
+        show_date_picker: false,
+        date_picker_group: this._periodSyncGroup?.(),
+      } : {}),
     };
   }
 

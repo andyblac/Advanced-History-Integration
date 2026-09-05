@@ -125,26 +125,74 @@ export const panelStyles = `
   .comparison-menu-period { flex:1 1 auto; min-width:0; padding:2px 7px; }
   .comparison-menu-count { width:48px; padding:2px 5px; }
   .axis-target-divider { flex:0 0 1px; align-self:stretch; margin-top:28px; background:var(--divider-color); }
-  .energy-nav-floating {
+  .period-selector-floating {
     position:fixed; z-index:20; left:16px; right:16px; bottom:max(12px,env(safe-area-inset-bottom));
-    width:min(600px,calc(100vw - 32px)); margin-inline:auto;
+    width:max-content; max-width:calc(100vw - 32px); margin-inline:auto;
     filter:drop-shadow(0 3px 8px rgba(0,0,0,.28));
     transition:transform .24s ease,opacity .18s ease; will-change:transform;
   }
-  .energy-nav-floating.auto-hide:not(.revealed) {
+  .period-selector-floating.auto-hide:not(.revealed) {
     transform:translateY(calc(100% + max(12px,env(safe-area-inset-bottom)) + 8px));
     opacity:0; pointer-events:none;
   }
-  .energy-nav-reveal-zone {
+  .period-selector-reveal-zone {
     position:fixed; z-index:19; right:16px; bottom:0; left:16px;
-    width:min(600px,calc(100vw - 32px)); height:calc(24px + max(12px,env(safe-area-inset-bottom)));
+    width:min(420px,calc(100vw - 32px)); height:calc(24px + max(12px,env(safe-area-inset-bottom)));
     margin-inline:auto; padding:0; border:0; outline:0; background:transparent; cursor:default;
   }
-  .energy-nav-reveal-zone[hidden] { display:none; }
-  .energy-nav-floating > .energy-date-controller {
-    display:block; width:100%; height:56px !important; min-height:0; max-height:56px;
-    --ha-card-border-radius:28px;
+  .period-selector-reveal-zone[hidden] { display:none; }
+  .period-selector-floating > .advanced-history-period-selector {
+    box-sizing:border-box; width:max-content; max-width:100%; height:56px; position:relative;
+    color:var(--primary-text-color);
+    background:var(--ha-card-background,var(--card-background-color));
+    border:1px solid var(--divider-color); border-radius:28px;
   }
+  .period-selector-floating .period-selector-content {
+    width:max-content; max-width:100%; height:100%; padding-inline:8px;
+    display:flex; flex-direction:row; align-items:center; box-sizing:border-box;
+  }
+  .period-selector-floating .period-selector-date-picker {
+    flex:none; min-width:var(--ha-space-2,8px); height:100%; display:flex; flex-direction:row;
+    align-items:center;
+  }
+  .period-selector-floating .period-selector-label {
+    box-sizing:border-box; flex:none; min-width:0; height:100%;
+    padding:0 var(--ha-space-2,8px) 0 0; display:flex; flex-direction:column;
+    align-items:flex-start; justify-content:center; color:inherit; background:transparent;
+    border:0; font:inherit; white-space:nowrap; position:relative; cursor:pointer;
+  }
+  .period-selector-floating .period-selector-primary {
+    font-size:var(--ha-font-size-xl,20px); line-height:var(--ha-line-height-condensed,1.2);
+    font-weight:var(--ha-font-weight-medium,500);
+  }
+  .period-selector-floating .period-selector-secondary {
+    color:var(--secondary-text-color); font-size:var(--ha-font-size-m,14px);
+    line-height:var(--ha-line-height-condensed,1.2);
+  }
+  .period-selector-floating .period-selector-secondary:empty { display:none; }
+  .period-selector-floating .advanced-history-period-selector[data-period-kind="day"] .period-selector-label { min-width:96px; }
+  .period-selector-floating .advanced-history-period-selector[data-period-kind="week"] .period-selector-label { min-width:150px; }
+  .period-selector-floating .advanced-history-period-selector[data-period-kind="month"] .period-selector-label { min-width:128px; }
+  .period-selector-floating .advanced-history-period-selector[data-period-kind="year"] .period-selector-label { min-width:86px; }
+  .period-selector-floating .advanced-history-period-selector[data-period-kind="other"] .period-selector-label { min-width:171px; }
+  .period-selector-floating .period-selector-actions {
+    flex:none; min-width:var(--ha-space-2,8px); height:100%;
+    display:flex; flex-direction:row; align-items:center;
+  }
+  .period-selector-floating .panel-time-range {
+    position:static; flex:none; transform:none; margin-inline:4px;
+  }
+  .period-selector-floating .panel-time-range ha-icon { transform:none; }
+  .period-selector-floating .period-selector-now {
+    margin-inline-start:var(--ha-space-2,8px); flex-shrink:0;
+    --ha-button-theme-color:currentColor;
+  }
+  .period-selector-floating .period-selector-nav,
+  .period-selector-floating .period-selector-menu-button {
+    flex-shrink:0; color:var(--primary-text-color);
+  }
+  .period-selector-floating .period-selector-label:hover { background:var(--secondary-background-color); }
+  .period-selector-floating .period-selector-menu { --ha-dropdown-font-size:14px; font-weight:400; }
   .panel-time-range {
     position:absolute; z-index:2; top:8px; left:50%; transform:translateX(-50%);
     height:40px; padding:0 9px; display:flex; align-items:center; gap:5px;
@@ -326,9 +374,9 @@ export const panelStyles = `
     .detail-banner { align-items:flex-start; flex-wrap:wrap; }
     .detail-banner span { flex:1 1 calc(100% - 84px); }
     .detail-banner ha-button { margin-inline-start:36px; }
-    .energy-nav-floating { left:8px; right:8px; bottom:max(8px,env(safe-area-inset-bottom)); width:calc(100vw - 16px); }
-    .energy-nav-floating.auto-hide:not(.revealed) { transform:translateY(calc(100% + max(8px,env(safe-area-inset-bottom)) + 8px)); }
-    .energy-nav-reveal-zone { right:8px; left:8px; width:calc(100vw - 16px); height:calc(24px + max(8px,env(safe-area-inset-bottom))); }
+    .period-selector-floating { left:8px; right:8px; bottom:max(8px,env(safe-area-inset-bottom)); width:max-content; max-width:calc(100vw - 16px); }
+    .period-selector-floating.auto-hide:not(.revealed) { transform:translateY(calc(100% + max(8px,env(safe-area-inset-bottom)) + 8px)); }
+    .period-selector-reveal-zone { right:8px; left:8px; width:calc(100vw - 16px); height:calc(24px + max(8px,env(safe-area-inset-bottom))); }
     .appbar { padding:0 4px; gap:0; }
     .appbar h1 { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:16px; }
     .appbar .icon-button { flex:0 0 40px; }
@@ -337,6 +385,6 @@ export const panelStyles = `
     .dialog-title { padding:0 14px 0 12px; }
   }
   @media (prefers-reduced-motion:reduce) {
-    .energy-nav-floating { transition:none; }
+    .period-selector-floating { transition:none; }
   }
 `;

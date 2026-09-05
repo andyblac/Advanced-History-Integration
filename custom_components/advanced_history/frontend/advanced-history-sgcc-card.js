@@ -77,50 +77,49 @@ const cardStyles = `
     top:8px; right:8px; min-height:20px; padding:0 6px;
     max-width:calc(100% - 16px); border-radius:10px; font-size:10px;
   }
-  .energy-nav-card { position:relative; z-index:4; width:max-content; max-width:100%; height:46px; }
-  .energy-nav-card > .dashboard-energy-bridge { display:none !important; }
-  .dashboard-energy-controller {
+  .period-selector-card { position:relative; z-index:4; width:max-content; max-width:100%; height:46px; }
+  .advanced-history-period-selector {
     box-sizing:border-box; width:max-content; max-width:100%; height:46px;
     padding:3px 8px; display:flex; align-items:center; gap:4px;
     color:var(--primary-text-color); background:var(--card-background-color);
     border:1px solid var(--divider-color); border-radius:23px;
   }
-  .dashboard-energy-controller ha-date-range-picker {
+  .advanced-history-period-selector ha-date-range-picker {
     flex:0 0 32px; width:32px; --ha-icon-button-size:32px; --mdc-icon-size:20px;
   }
-  .dashboard-period-label {
+  .period-selector-label {
     min-width:0; padding:0 5px 0 0; display:flex; flex-direction:column;
     align-items:flex-start; justify-content:center; color:inherit; background:transparent;
     border:0; font:inherit; white-space:nowrap; cursor:pointer;
   }
-  .dashboard-period-primary { font-size:15px; font-weight:500; line-height:18px; }
-  .dashboard-period-secondary { color:var(--secondary-text-color); font-size:11px; line-height:14px; }
-  .dashboard-period-secondary:empty { display:none; }
-  .dashboard-energy-controller[data-period-kind="day"] .dashboard-period-label { min-width:72px; }
-  .dashboard-energy-controller[data-period-kind="week"] .dashboard-period-label { min-width:112px; }
-  .dashboard-energy-controller[data-period-kind="month"] .dashboard-period-label { min-width:96px; }
-  .dashboard-energy-controller[data-period-kind="year"] .dashboard-period-label { min-width:64px; }
-  .dashboard-energy-controller[data-period-kind="other"] .dashboard-period-label { min-width:128px; }
-  .dashboard-now-button {
+  .period-selector-primary { font-size:15px; font-weight:500; line-height:18px; }
+  .period-selector-secondary { color:var(--secondary-text-color); font-size:11px; line-height:14px; }
+  .period-selector-secondary:empty { display:none; }
+  .advanced-history-period-selector[data-period-kind="day"] .period-selector-label { min-width:72px; }
+  .advanced-history-period-selector[data-period-kind="week"] .period-selector-label { min-width:112px; }
+  .advanced-history-period-selector[data-period-kind="month"] .period-selector-label { min-width:96px; }
+  .advanced-history-period-selector[data-period-kind="year"] .period-selector-label { min-width:64px; }
+  .advanced-history-period-selector[data-period-kind="other"] .period-selector-label { min-width:128px; }
+  .period-selector-now {
     min-width:52px; height:30px; padding:0 10px; color:var(--primary-color);
     background:color-mix(in srgb,var(--primary-color) 16%,transparent);
     border:0; border-radius:15px; font:inherit; font-size:14px; font-weight:500; cursor:pointer;
   }
-  .dashboard-period-nav {
+  .period-selector-nav {
     width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center;
     color:var(--primary-text-color); background:transparent; border:0; border-radius:15px; cursor:pointer;
   }
-  .dashboard-period-nav ha-icon { width:18px; height:18px; --mdc-icon-size:18px; }
-  .dashboard-period-nav:hover, .dashboard-period-label:hover { background:var(--secondary-background-color); }
-  .dashboard-energy-controller .panel-time-range {
+  .period-selector-nav ha-icon { width:18px; height:18px; --mdc-icon-size:18px; }
+  .period-selector-nav:hover, .period-selector-label:hover { background:var(--secondary-background-color); }
+  .advanced-history-period-selector .panel-time-range {
     position:static; transform:none; flex:0 0 auto;
   }
-  .energy-nav-card .panel-time-range {
+  .period-selector-card .panel-time-range {
     height:32px; min-height:32px; padding-inline:7px; gap:4px; border-radius:16px;
     font-size:13px;
   }
-  .energy-nav-card .panel-time-range ha-icon { width:16px; height:16px; flex-basis:16px; }
-  .energy-nav-card .panel-time-range-value { min-width:96px; }
+  .period-selector-card .panel-time-range ha-icon { width:16px; height:16px; flex-basis:16px; }
+  .period-selector-card .panel-time-range-value { min-width:96px; }
   @container (max-width:900px) {
     .dashboard-axis-strip { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
     .dashboard-axis-group.secondary { grid-column:2; }
@@ -1182,13 +1181,13 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     };
   }
 
-  _createDashboardPeriodStore() {
+  _createPeriodStore() {
     const group = this._dashboardDatePickerGroup();
     if (!group) {
       this._dashboardPeriodStoreFollower = false;
-      return super._createDashboardPeriodStore();
+      return super._createPeriodStore();
     }
-    const store = super._createDashboardPeriodStore();
+    const store = super._createPeriodStore();
     const originalSetPeriod = store.setPeriod.bind(store);
     let coordinator = DASHBOARD_PERIOD_GROUP_STORES.get(group);
     this._dashboardPeriodStoreFollower = Boolean(coordinator);
@@ -1348,7 +1347,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       this._entities = Object.keys(this._hass.states || {}).map((entity_id) => ({ entity_id }));
     }
     await Promise.all([
-      this._loadEnergyTranslations(),
+      this._loadPeriodSelectorTranslations(),
       this._ensureCardLoaded(),
     ]);
     this._initialized = true;
@@ -1394,7 +1393,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
               <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" ${hasY1Targets ? "" : "hidden"} role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
             </div>
             <div class="dashboard-date-controls" ${showDatePicker ? "" : "hidden"}>
-              <div id="date-controller" class="energy-nav-card"></div>
+              <div id="date-controller" class="period-selector-card"></div>
               <button id="download-chart-data" class="dashboard-download-button" type="button" title="${this._escape(downloadData)}" aria-label="${this._escape(downloadData)}"><ha-icon icon="mdi:download"></ha-icon></button>
             </div>
             <div class="dashboard-axis-group secondary axis-target-secondary" ${hasY2Targets ? "" : "hidden"}>
@@ -1459,11 +1458,11 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     if (!current?.period) return;
     const stableSnapshotId = String(this._dashboardConfig?.snapshot?.id || "").trim();
     if (stableSnapshotId) current.id = stableSnapshotId;
-    const compare = this._energyCollection?.compare ?? current.period.compare ?? "";
-    const choice = this._energyCompareChoice || current.period.compare_choice || null;
+    const compare = this._periodStore?.compare ?? current.period.compare ?? "";
+    const choice = this._comparisonChoice || current.period.compare_choice || null;
     const count = Math.max(
       1,
-      Math.min(10, Math.trunc(Number(this._energyCompareCount)) || 1),
+      Math.min(10, Math.trunc(Number(this._comparisonCount)) || 1),
     );
     current.period = {
       ...current.period,
@@ -1471,7 +1470,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       compare_choice: choice,
       compare_count: count,
     };
-    const active = compare ? this._energyCompareValue(choice || "previous_period", count) : false;
+    const active = compare ? this._comparisonValue(choice || "previous_period", count) : false;
     current.chart = clone(current.chart || {});
     delete current.chart.compare;
     const previousConfigs = clone(this._dashboardConfig?.sgcc_configs || []);

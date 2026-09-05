@@ -43,7 +43,7 @@ export default {
   "graph_editor_note": "Voici les paramètres de Statistics Graph Chart Card. Les cibles et les attributs restent gérés depuis la page Historique ; les entrées d’entités contrôlent ici leur apparence dans le graphique.",
   "graph_editor_load_error": "L’éditeur de graphiques n’a pas pu être chargé.",
   "graph_code_editor_mapping_error": "La configuration de la carte doit être un mappage YAML.",
-  "energy_selector_error": "Le sélecteur de dates Énergie n’a pas pu être chargé.",
+  "period_selector_error": "Le sélecteur de période n’a pas pu être chargé.",
   "loading_saved_range": "Chargement des données pour la plage de dates enregistrée…",
   "loading_requested_range": "Chargement des données pour la plage demandée...",
   "automatic_detail_active": "Le détail automatique utilise un regroupement {resolution} pour cette période.",

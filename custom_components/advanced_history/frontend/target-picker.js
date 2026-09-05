@@ -144,7 +144,7 @@ export class TargetPickerMethods {
     if (secondary) this._y2Targets = nextTargets;
     else this._targets = nextTargets;
     this._pruneHiddenTargets();
-    if (!this._targetCount()) this._resetEnergySelection();
+    if (!this._targetCount()) this._resetPeriodSelection();
     if (picker) {
       picker.value = structuredClone(nextTargets);
       picker.requestUpdate?.();

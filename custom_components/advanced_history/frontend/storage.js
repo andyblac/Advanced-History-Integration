@@ -426,7 +426,7 @@ export class StorageMethods {
   }
 
   _capturePeriodSnapshot() {
-    const collection = this._energyCollection;
+    const collection = this._periodStore;
     const validDate = (value) => {
       const date = value instanceof Date ? value : value ? new Date(value) : null;
       return date && !Number.isNaN(date.getTime()) ? date : null;
@@ -453,7 +453,7 @@ export class StorageMethods {
       compare: collection
         ? collection.compare ?? ""
         : rollingCompare?.compare ?? fallback?.compare ?? "",
-      compare_choice: this._energyCompareChoice
+      compare_choice: this._comparisonChoice
         || rollingCompare?.choice
         || fallback?.compare_choice
         || null,
@@ -462,7 +462,7 @@ export class StorageMethods {
         Math.min(
           10,
           Math.trunc(Number(
-            this._energyCompareCount
+            this._comparisonCount
             || rollingCompare?.count
             || fallback?.compare_count
           )) || 1,
@@ -672,7 +672,7 @@ export class StorageMethods {
     this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._excludeY2Comparison = false;
-    this._resetEnergySelection();
+    this._resetPeriodSelection();
     this._saveTargets();
     this._recordChange();
     this._clearChartSessionHistory();
@@ -921,7 +921,7 @@ export class StorageMethods {
     this._panelTimeRange = this._clone(chart.time_range) || null;
 
     // Rolling presets restore their duration and comparison settings, but
-    // never their captured timestamps. The active Energy collection rebases
+    // never their captured timestamps. The active period store rebases
     // the window to the current clock when it mounts. Fixed and deliberately
     // paused ranges continue to restore their saved period verbatim.
     this._pendingRollingCompareRestore = rollingHours ? {
@@ -957,18 +957,15 @@ export class StorageMethods {
     this._activeSnapshot = this._clone(snapshot.chart);
     const rollingHours = this._prepareSnapshotRangeRestore(snapshot, loadingSavedRange);
     if (this._activeSnapshot?.compare === undefined) delete this._activeSnapshot.compare;
-    this._energyUnsubscribe?.();
-    this._energyUnsubscribe = null;
-    // Do not let a rolling-range restore update the Energy collection that
-    // belonged to the panel being replaced. _refreshPanelRollingRange() will
-    // wait for _bindEnergyCollection() to attach the new panel collection.
-    if (rollingHours) this._energyCollection = null;
-    if (this._energyCollection && this._pendingPeriodRestore?.start) {
-      // Update the selector synchronously, but leave the refresh to
-      // _bindEnergyCollection(). Starting it here can publish the restored
-      // data before the replacement graph cards have subscribed to Energy.
+    this._periodUnsubscribe?.();
+    this._periodUnsubscribe = null;
+    // A rolling restore is rebased after the replacement panel store mounts.
+    if (rollingHours) this._periodStore = null;
+    if (this._periodStore && this._pendingPeriodRestore?.start) {
+      // Update the selector synchronously; the replacement render publishes
+      // the restored range after its graph cards mount.
       this._applyStoredPeriod(
-        this._energyCollection,
+        this._periodStore,
         this._pendingPeriodRestore,
         false,
         false
@@ -979,7 +976,7 @@ export class StorageMethods {
     this._y2Targets = this._normalizeTargets(snapshot.y2_targets || {});
     this._hiddenY2Targets = this._normalizeTargets(snapshot.hidden_y2_targets || {});
     this._pruneHiddenTargets();
-    if (!this._targetCount()) this._resetEnergySelection(this._energyCollection, true);
+    if (!this._targetCount()) this._resetPeriodSelection(this._periodStore, true);
     this._saveTargets();
     this._notice = "";
     if (recordChange) this._recordChange(snapshot);
@@ -999,9 +996,8 @@ export class StorageMethods {
     current.source_external_bookmark_id = this._loadedExternalBookmarkId || null;
     this._applySnapshot(current, false, true);
     // Keep the saved snapshot itself as the baseline. Recapturing here can
-    // read the previous Energy collection before the restored period has
-    // finished mounting, replacing the bookmark's date, time and comparison
-    // state with stale picker values.
+    // read the previous store before the restored period has finished
+    // mounting and replace the bookmark range with stale picker values.
     this._freshSnapshotSessionFingerprint = this._snapshotFingerprint(current);
     this._loadedBookmarkBaselineFingerprint = this._freshSnapshotSessionFingerprint;
     this._loadedBookmarkDirty = false;
@@ -1147,7 +1143,7 @@ export class StorageMethods {
     if (this._activeSnapshot?.compare !== undefined) {
       return this._activeSnapshot.compare;
     }
-    return this.config.compare !== undefined ? this.config.compare : this._energyCompare;
+    return this.config.compare !== undefined ? this.config.compare : this._comparisonState;
   }
 
   _applyStoredPeriod(collection, period, clearPending = true, refresh = true) {
@@ -1193,8 +1189,8 @@ export class StorageMethods {
     const periodChanged = currentStart !== start.getTime()
       || currentEnd !== end?.getTime();
     const compare = period.compare || "";
-    this._energyCompareChoice = period.compare_choice || null;
-    this._energyCompareCount = Math.max(
+    this._comparisonChoice = period.compare_choice || null;
+    this._comparisonCount = Math.max(
       1,
       Math.min(10, Math.trunc(Number(period.compare_count)) || 1),
     );
@@ -1253,7 +1249,7 @@ export class StorageMethods {
     }
     this._periodRestoreExpected = expected;
     this._periodRestoreLoading = true;
-    this._energyInteractionLoading = false;
+    this._periodInteractionLoading = false;
     const banner = this.shadowRoot?.getElementById("period-loading-banner");
     if (banner) banner.hidden = false;
     const loadingText = this.shadowRoot?.getElementById("period-loading-text");
@@ -1290,60 +1286,6 @@ export class StorageMethods {
     if (banner) banner.hidden = true;
     const charts = this.shadowRoot?.getElementById("charts");
     if (charts) charts.hidden = false;
-  }
-
-  _restoredPeriodMatches(expected, actualStart, actualEnd) {
-    const expectedStart = new Date(expected?.start).getTime();
-    const expectedEnd = expected?.end == null
-      ? undefined
-      : new Date(expected.end).getTime();
-    const start = actualStart instanceof Date
-      ? actualStart.getTime()
-      : new Date(actualStart).getTime();
-    const end = actualEnd == null
-      ? undefined
-      : actualEnd instanceof Date
-        ? actualEnd.getTime()
-        : new Date(actualEnd).getTime();
-    if (!Number.isFinite(expectedStart) || !Number.isFinite(start)) return false;
-    if (start !== expectedStart) return false;
-    if (end === expectedEnd) return true;
-
-    // HA Energy data can describe a full local day using either the final
-    // millisecond of that day or midnight at the start of the next day. Both
-    // boundaries refer to the same selected day and must complete a restore.
-    const dayStart = new Date(expectedStart);
-    dayStart.setHours(0, 0, 0, 0);
-    if (expectedStart !== dayStart.getTime()) return false;
-    const nextDay = new Date(dayStart);
-    nextDay.setDate(nextDay.getDate() + 1);
-    const nextDayTime = nextDay.getTime();
-    const isFullDayEnd = (value) => Number.isFinite(value)
-      && value >= nextDayTime - 60_000
-      && value <= nextDayTime;
-    return isFullDayEnd(expectedEnd) && isFullDayEnd(end);
-  }
-
-  _completePeriodRestoreFromData(data, collection) {
-    const expected = this._periodRestoreExpected;
-    if (!this._periodRestoreLoading || !expected?.start) return false;
-    // setPeriod() updates the collection properties synchronously, while the
-    // native picker updates only from the refreshed EnergyData payload. Use
-    // that payload as the confirmation so stale cached data cannot complete
-    // the restore early.
-    // EnergyData carries the range used for the completed request. Never
-    // substitute the collection properties here: setPeriod() changes those
-    // synchronously before the refreshed data has arrived.
-    const actualStart = data?.start;
-    const actualEnd = data?.end;
-    const expectedCompare = expected.compare || "";
-    const actualCompare = data?.compareMode ?? collection?.compare ?? "";
-    if (
-      !this._restoredPeriodMatches(expected, actualStart, actualEnd)
-      || actualCompare !== expectedCompare
-    ) return false;
-    this._finishPeriodRestore();
-    return true;
   }
 
   _formatSnapshotTime(value) {

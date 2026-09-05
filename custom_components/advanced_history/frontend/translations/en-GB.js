@@ -43,7 +43,7 @@ export default {
   "graph_editor_note": "These are the Statistics Graph Chart Card settings. Targets and attributes remain managed by the History page; entity entries here control their graph appearance.",
   "graph_editor_load_error": "Graph editor could not be loaded.",
   "graph_code_editor_mapping_error": "Card configuration must be a YAML mapping.",
-  "energy_selector_error": "Energy date selector could not be loaded.",
+  "period_selector_error": "Period selector could not be loaded.",
   "loading_saved_range": "Loading data for the saved date range…",
   "loading_requested_range": "Loading data for the range requested...",
   "automatic_detail_active": "Automatic detail is using {resolution} grouping for this date range.",

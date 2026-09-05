@@ -43,7 +43,7 @@ export default {
   "graph_editor_note": "Estas são as configurações do Statistics Graph Chart Card. Os alvos e atributos continuam sendo gerenciados pela página Histórico; as entradas de entidades controlam aqui sua aparência no gráfico.",
   "graph_editor_load_error": "Não foi possível carregar o editor de gráficos.",
   "graph_code_editor_mapping_error": "A configuração do cartão deve ser um mapeamento YAML.",
-  "energy_selector_error": "Não foi possível carregar o seletor de datas de Energia.",
+  "period_selector_error": "Não foi possível carregar o seletor de período.",
   "loading_saved_range": "Carregando dados para o período salvo…",
   "loading_requested_range": "Carregando dados para o período solicitado...",
   "automatic_detail_active": "O detalhe automático usa agrupamento {resolution} para este período.",

@@ -505,8 +505,8 @@ test("SGCC editor changes retain Advanced History options and native height", as
     _dashboardConfig: { date_picker_group: group },
     _dashboardPeriodState: null,
   });
-  const ownerStore = periodOwner._createDashboardPeriodStore();
-  const followerStore = periodFollower._createDashboardPeriodStore();
+  const ownerStore = periodOwner._createPeriodStore();
+  const followerStore = periodFollower._createPeriodStore();
   assert.notEqual(followerStore, ownerStore);
   assert.equal(periodOwner._dashboardPeriodStoreFollower, false);
   assert.equal(periodFollower._dashboardPeriodStoreFollower, true);
@@ -633,8 +633,8 @@ test("SGCC editor changes retain Advanced History options and native height", as
     _dashboardConfig: { date_picker_group: dateOnlyGroup },
     _dashboardPeriodState: null,
   });
-  const firstStore = firstGroupedCard._createDashboardPeriodStore();
-  const secondStore = secondGroupedCard._createDashboardPeriodStore();
+  const firstStore = firstGroupedCard._createPeriodStore();
+  const secondStore = secondGroupedCard._createPeriodStore();
   firstStore.setCompare("yoy");
   firstStore.setPeriod(
     new Date("2026-04-01T00:00:00.000Z"),
@@ -761,9 +761,9 @@ test("SGCC editor changes retain Advanced History options and native height", as
     loadDashboardRuntimeState(runtimeContext._dashboardConfig),
     dashboardRuntimeState(savedRuntime),
   );
-  runtimeContext._energyCollection = { compare: "previous" };
-  runtimeContext._energyCompareChoice = "last_month";
-  runtimeContext._energyCompareCount = 3;
+  runtimeContext._periodStore = { compare: "previous" };
+  runtimeContext._comparisonChoice = "last_month";
+  runtimeContext._comparisonCount = 3;
   runtimeContext._captureSnapshot = () => ({
     ...savedRuntime,
     id: "new-capture-id-that-must-not-replace-card-id",
@@ -799,10 +799,10 @@ test("SGCC editor changes retain Advanced History options and native height", as
     { period: "last_month", periods_back: 2, color: "#222222", show_fill: true, hide_on_load: true },
     { period: "last_month", periods_back: 3, color: "#333333", show_fill: false, hide_on_load: true },
   ];
-  runtimeContext._energyCompareCount = 2;
+  runtimeContext._comparisonCount = 2;
   runtimeContext._recordComparisonChange();
   assert.equal(runtimeContext._dashboardConfig.sgcc_configs[0].entities[0].compare.length, 2);
-  runtimeContext._energyCompareCount = 3;
+  runtimeContext._comparisonCount = 3;
   runtimeContext._recordComparisonChange();
   const restoredComparisonRows = runtimeContext._dashboardConfig.sgcc_configs[0].entities[0].compare;
   assert.equal(restoredComparisonRows.length, 3);
