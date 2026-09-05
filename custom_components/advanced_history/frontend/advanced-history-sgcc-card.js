@@ -926,12 +926,22 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     ) {
       throw new Error("Advanced History SGCC Card requires a valid panel snapshot");
     }
+    let resolvedConfig = config;
+    try {
+      // Comparison controls update the wrapper config immediately, but
+      // Lovelace does not persist runtime config-changed events until the
+      // dashboard is saved. Restore the staged SGCC rows on an ordinary or
+      // forced page refresh, just as the visual editor already does.
+      resolvedConfig = dashboardConfigWithPendingComparison(config);
+    } catch (error) {
+      console.warn("Advanced History card: unable to restore comparison changes", error);
+    }
     this._dashboardPeriodState = null;
-    this._dashboardConfig = clone(config);
+    this._dashboardConfig = clone(resolvedConfig);
     this._panel = {
       config: {
-        ...(clone(config.settings) || {}),
-        title: config.title || "",
+        ...(clone(resolvedConfig.settings) || {}),
+        title: resolvedConfig.title || "",
       },
     };
     if (this._initialized) {
