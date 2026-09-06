@@ -9,8 +9,10 @@ import {
   NATIVE_HISTORY_ATTRIBUTES,
   historyAttributeDisplayName,
   historyAttributeUnit,
+  nativeHistoryAttributeColor,
   nativeHistoryAttributes,
 } from "./history-series.js";
+import { withClimateModeAnnotations } from "./climate.js";
 import {
   mergeStateMaps,
   nativeStateMap,
@@ -901,6 +903,12 @@ export class GraphMethods {
       }
       config = this._applyDashboardChildScaleOptions?.(config) || config;
     }
+    if (mode !== "state_timeline") {
+      const climateEntities = entities.map((entity) => (
+        typeof entity === "string" ? entity : entity?.entity
+      )).filter((entityId) => String(entityId || "").startsWith("climate."));
+      config = withClimateModeAnnotations(config, climateEntities);
+    }
     if (mode !== "state_timeline" && config.height === "auto") {
       // The card's native height:auto implementation only enables its
       // fill-height path when it is hosted in a numeric grid row. AHP owns
@@ -1670,6 +1678,15 @@ export class GraphMethods {
       }
       const unit = historyAttributeUnit(this._hass, entity);
       if (entityOptions.unit == null && unit != null) entityOptions.unit = unit;
+      if (!Object.prototype.hasOwnProperty.call(entityOptions, "color")) {
+        const color = nativeHistoryAttributeColor(
+          this,
+          entity,
+          this._hass.states[entity],
+          attribute,
+        );
+        if (color) entityOptions.color = color;
+      }
     }
     const enabled = this._enabledResolvedEntityIds?.has(entity) !== false;
     const { compare: compareDefaults, ...options } = entityOptions;
