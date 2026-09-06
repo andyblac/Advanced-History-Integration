@@ -151,6 +151,7 @@ test("dashboard export removes the panel-only running-total aggregation", () => 
 
   assert.equal(exported.entities[0].aggregate_func, undefined);
   assert.equal(exported.entities[1].aggregate_func, "max");
+  assert.deepEqual(exported.grid_options, { columns: "full" });
 });
 
 test("Advanced History card export removes the panel-only running-total aggregation", () => {
@@ -227,6 +228,7 @@ test("Advanced History dashboard card stores SGCC options only in sgcc_configs",
   assert.equal(exported.schema, 1);
   assert.equal(exported.title, "Gas");
   assert.equal(exported.show_date_picker, true);
+  assert.deepEqual(exported.grid_options, { columns: "full" });
   assert.equal(exported.date_picker_group, "Gas panel");
   assert.equal(exported.entities, undefined);
   assert.deepEqual(exported.sgcc_configs, [{

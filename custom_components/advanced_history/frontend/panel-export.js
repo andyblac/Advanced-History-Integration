@@ -197,6 +197,7 @@ export function advancedHistoryDashboardCard(
   const config = {
     type: ADVANCED_HISTORY_CARD_TYPE,
     schema: ADVANCED_HISTORY_CARD_SCHEMA,
+    grid_options: { columns: "full" },
     show_date_picker: true,
     date_picker_group: datePickerGroup,
     ...(normalizedTitle ? { title: normalizedTitle } : {}),
@@ -274,6 +275,7 @@ export function dashboardCardSnapshots(cards, period = {}) {
   );
   return dashboardCardConfigs(cards).map((config) => {
     for (const key of OMITTED_RUNTIME_KEYS) delete config[key];
+    config.grid_options = { columns: "full" };
     if (config.chart_mode === "state_timeline") delete config.height;
     config.type = `custom:${CARD_TAG}`;
     config.show_date_picker = true;
