@@ -513,7 +513,10 @@ export class AdvancedHistoryPanel extends HTMLElement {
       "click",
       () => this._requestClearCurrentChart(),
     );
-    this.shadowRoot.getElementById("bookmarks")?.addEventListener("click", () => this._openLibrary());
+    this.shadowRoot.getElementById("bookmarks")?.addEventListener("click", () => {
+      this._collapseTargetSidebars();
+      this._openLibrary();
+    });
     this.shadowRoot.getElementById("chart-history")?.addEventListener("click", () => this._openLibrary("history"));
     this.shadowRoot.getElementById("undo")?.addEventListener("click", () => this._undo());
     this.shadowRoot.getElementById("redo")?.addEventListener("click", () => this._redo());

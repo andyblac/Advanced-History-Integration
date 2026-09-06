@@ -178,7 +178,9 @@ test("target sidebar panes and chips receive axis-specific counts", () => {
   );
 
   context._hass.themes = { darkMode: true };
+  context._targetPrimarySourceFilters = {};
   context._syncTargetSidebars();
+  assert.equal(elements.get("target-sources-chip-primary").active, true);
   assert.equal(
     elements.get("target-sources-chip-secondary").dataset.advancedHistoryThemeMode,
     "dark",
@@ -384,6 +386,22 @@ test("each panel restores its own primary and secondary sidebar state", () => {
   TargetPickerMethods.prototype._restoreTargetSidebarPanelState.call(context, second);
   assert.equal(context._targetPrimarySourcesShown, false);
   assert.equal(context._targetSecondarySourcesShown, true);
+});
+
+test("opening bookmarks can collapse both target sidebars without changing snapshots", () => {
+  const changes = [];
+  const context = {
+    _useTargetSidebar: () => true,
+    _setTargetSidebarShown(axis, shown) { changes.push([axis, shown]); },
+    _syncTargetSidebars() { changes.push(["sync"]); },
+  };
+
+  TargetPickerMethods.prototype._collapseTargetSidebars.call(context);
+  assert.deepEqual(changes, [
+    ["primary", false],
+    ["secondary", false],
+    ["sync"],
+  ]);
 });
 
 test("source filters match native History type and integration rules", () => {

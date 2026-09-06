@@ -103,10 +103,12 @@ export const panelStyles = `
   .target-sources-primary[data-advanced-history-has-targets],
   #target-sources-chip-primary[data-advanced-history-has-targets] {
     --ha-assist-chip-active-container-color:var(--ha-color-green-80,var(--success-color));
+    --ha-assist-chip-filled-container-color:var(--ha-color-green-80,var(--success-color));
   }
   .target-sources-secondary[data-advanced-history-has-targets],
   #target-sources-chip-secondary[data-advanced-history-has-targets] {
     --ha-assist-chip-active-container-color:var(--primary-color);
+    --ha-assist-chip-filled-container-color:var(--primary-color);
   }
   [data-advanced-history-has-targets][data-advanced-history-theme-mode="light"] {
     --advanced-history-axis-chip-foreground:#fff;

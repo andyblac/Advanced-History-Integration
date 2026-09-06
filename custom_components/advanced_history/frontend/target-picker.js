@@ -73,6 +73,13 @@ export class TargetPickerMethods {
     this._persistPanelTabs?.();
   }
 
+  _collapseTargetSidebars() {
+    if (!this._useTargetSidebar()) return;
+    this._setTargetSidebarShown("primary", false);
+    this._setTargetSidebarShown("secondary", false);
+    this._syncTargetSidebars();
+  }
+
   _targetSourceFilters(axis = "primary") {
     return axis === "secondary"
       ? this._targetSecondarySourceFilters || {}
@@ -251,7 +258,9 @@ export class TargetPickerMethods {
       if (chip) {
         chip.label = label;
         chip.count = filterCount;
-        chip.active = count > 0;
+        // Match the filled header chip used while the pane is expanded.
+        // Target presence changes its axis colour, not its filled/outlined shape.
+        chip.active = true;
         chip.dataset.advancedHistoryThemeMode = themeMode;
         if (targetCount > 0) chip.dataset.advancedHistoryHasTargets = "";
         else delete chip.dataset.advancedHistoryHasTargets;
