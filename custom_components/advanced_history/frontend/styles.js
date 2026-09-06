@@ -482,6 +482,32 @@ export const panelStyles = `
     .period-selector-floating { left:8px; right:8px; bottom:max(8px,env(safe-area-inset-bottom)); width:max-content; max-width:calc(100vw - 16px); }
     .period-selector-floating.auto-hide:not(.revealed) { transform:translateY(calc(100% + max(8px,env(safe-area-inset-bottom)) + 8px)); }
     .period-selector-reveal-zone { right:8px; left:8px; width:calc(100vw - 16px); height:calc(24px + max(8px,env(safe-area-inset-bottom))); }
+    .period-selector-floating .period-selector-content { padding-inline:4px; }
+    .period-selector-floating .period-selector-date-picker {
+      flex-basis:36px; width:36px; min-width:36px;
+      --ha-icon-button-size:36px; --mdc-icon-size:20px;
+    }
+    .period-selector-floating .period-selector-label { padding-inline-end:4px; }
+    .period-selector-floating .period-selector-primary { font-size:17px; }
+    .period-selector-floating .period-selector-secondary { font-size:12px; }
+    .period-selector-floating .advanced-history-period-selector[data-period-kind="day"] .period-selector-label { min-width:68px; }
+    .period-selector-floating .advanced-history-period-selector[data-period-kind="week"] .period-selector-label { min-width:118px; }
+    .period-selector-floating .advanced-history-period-selector[data-period-kind="month"] .period-selector-label { min-width:100px; }
+    .period-selector-floating .advanced-history-period-selector[data-period-kind="year"] .period-selector-label { min-width:68px; }
+    .period-selector-floating .advanced-history-period-selector[data-period-kind="other"] .period-selector-label { min-width:138px; }
+    .period-selector-floating .panel-time-range {
+      min-width:96px; height:36px; margin-inline:2px; padding-inline:6px; gap:3px;
+    }
+    .period-selector-floating .panel-time-range-value { min-width:0; font-size:14px; }
+    .period-selector-floating .period-selector-now { margin-inline-start:4px; }
+    .period-selector-floating .period-selector-nav,
+    .period-selector-floating .period-selector-menu-button {
+      flex:0 0 28px; width:28px; min-width:28px; height:36px;
+      display:flex; align-items:center; justify-content:center; align-self:center; line-height:0;
+      --ha-icon-button-size:28px; --mdc-icon-size:20px;
+    }
+    .period-selector-floating .period-selector-nav ha-icon,
+    .period-selector-floating .period-selector-menu-button ha-icon { display:block; margin:auto; }
     .appbar { padding:0 4px; gap:0; }
     .appbar h1 { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; font-size:16px; }
     .appbar .icon-button { flex:0 0 40px; }
