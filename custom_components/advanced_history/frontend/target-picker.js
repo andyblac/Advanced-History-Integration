@@ -815,6 +815,7 @@ export class TargetPickerMethods {
       input.addEventListener(type, (event) => event.stopPropagation());
     }
     input.addEventListener("keydown", (event) => {
+      event.stopPropagation();
       if (event.key === "Enter") {
         event.preventDefault();
         input.blur();
@@ -824,6 +825,7 @@ export class TargetPickerMethods {
         chip.focus();
       }
     });
+    input.addEventListener("keyup", (event) => event.stopPropagation());
     input.addEventListener("blur", () => finish(true), { once: true });
     input.focus();
     input.select();

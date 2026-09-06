@@ -241,6 +241,7 @@ test("leaving an unchanged inline name edit preserves automatic naming", async (
     addEventListener(type, listener) { listeners[type] = listener; },
     focus() {},
     select() {},
+    blur() { listeners.blur?.(); },
     remove() {},
   };
   const label = {
@@ -277,6 +278,18 @@ test("leaving an unchanged inline name edit preserves automatic naming", async (
       chip,
       "sensor.gas",
     );
+    let keydownStopped = false;
+    let keydownPrevented = false;
+    listeners.keydown({
+      key: "Enter",
+      stopPropagation() { keydownStopped = true; },
+      preventDefault() { keydownPrevented = true; },
+    });
+    assert.equal(keydownStopped, true);
+    assert.equal(keydownPrevented, true);
+    let keyupStopped = false;
+    listeners.keyup({ stopPropagation() { keyupStopped = true; } });
+    assert.equal(keyupStopped, true);
     listeners.blur();
   } finally {
     if (previousDocument === undefined) delete globalThis.document;
