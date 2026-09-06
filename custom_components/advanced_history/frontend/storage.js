@@ -893,6 +893,21 @@ export class StorageMethods {
     return true;
   }
 
+  _renameBookmark(id, name) {
+    const nextName = String(name || "").trim();
+    if (!nextName) return false;
+    const items = this._loadLibrary(BOOKMARKS_STORAGE_KEY);
+    const index = items.findIndex((item) => item.id === id);
+    if (index === -1 || items[index].name === nextName) return false;
+    items[index] = { ...items[index], name: nextName };
+    if (!this._saveLibrary(BOOKMARKS_STORAGE_KEY, items)) return false;
+    if (this._loadedBookmarkId === id && this._currentSnapshot) {
+      this._currentSnapshot.name = nextName;
+      this._saveCurrentSnapshot(this._currentSnapshot);
+    }
+    return true;
+  }
+
   _clearLoadedBookmark(id = null) {
     if (id && this._loadedBookmarkId !== id) return;
     this._loadedBookmarkId = null;
@@ -1328,6 +1343,9 @@ export class StorageMethods {
     if (!items.length) return `<div class="library-empty">${this._escape(this._localize("ui.components.media-browser.no_items", "No items"))}</div>`;
     const { readOnly = false, ownerUserId = null, showOwner = false } = options;
     const deleteLabel = this._localize("ui.common.delete", "Delete");
+    const renameLabel = this._localize("ui.common.rename", "Rename");
+    const saveLabel = this._localize("ui.common.save", "Save");
+    const cancelLabel = this._localize("ui.common.cancel", "Cancel");
     const updateLabel = this._customLocalize("update_bookmark");
     const reorderLabel = this._customLocalize("reorder_bookmark");
     const visibleLabel = this._customLocalize("visible_to_everyone");
@@ -1341,7 +1359,9 @@ export class StorageMethods {
           <span class="library-name">${this._escape(name)}</span>
           <span class="library-summary">${showOwner && item._owner_name ? `${this._escape(item._owner_name)} · ` : ""}${this._escape(this._snapshotSummary(item))}</span>
         </button>
+        ${!readOnly && isBookmarks ? `<form class="bookmark-rename-editor" data-rename-form="${this._escape(item.id)}" hidden><input maxlength="80" value="${this._escape(name)}" aria-label="${this._escape(renameLabel)}"><button type="submit" title="${this._escape(saveLabel)}" aria-label="${this._escape(saveLabel)}"><ha-icon icon="mdi:check"></ha-icon></button><button type="button" data-cancel-rename title="${this._escape(cancelLabel)}" aria-label="${this._escape(cancelLabel)}"><ha-icon icon="mdi:close"></ha-icon></button></form>` : ""}
         ${!readOnly && isBookmarks && this._bookmarkHasChanges(item) ? `<button class="update" data-update-snapshot="${this._escape(item.id)}" title="${this._escape(updateLabel)}"><ha-icon icon="mdi:update"></ha-icon></button>` : ""}
+        ${!readOnly && isBookmarks ? `<button class="rename" data-rename-snapshot="${this._escape(item.id)}" title="${this._escape(renameLabel)}" aria-label="${this._escape(`${renameLabel}: ${name}`)}"><ha-icon icon="mdi:pencil-outline"></ha-icon></button>` : ""}
         ${canPublish ? `<button class="visibility ${item.visible_everyone ? "active" : ""}" data-toggle-visible="${this._escape(item.id)}" data-owner-user-id="${this._escape(item._owner_user_id || ownerUserId || this._hass.user.id)}" aria-pressed="${item.visible_everyone ? "true" : "false"}" title="${this._escape(visibleLabel)}"><ha-icon icon="${item.visible_everyone ? "mdi:account-multiple" : "mdi:account-multiple-outline"}"></ha-icon></button>` : ""}
         ${readOnly ? "" : `<button class="delete" data-delete-snapshot="${this._escape(item.id)}" title="${this._escape(deleteLabel)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>`}
       </div>`;
@@ -1620,6 +1640,55 @@ export class StorageMethods {
     backdrop.querySelectorAll("[data-update-snapshot]").forEach((button) => button.addEventListener("click", () => {
       if (this._updateBookmark(button.dataset.updateSnapshot)) this._renderLibrary(kind);
     }));
+    backdrop.querySelectorAll("[data-rename-snapshot]").forEach((button) => button.addEventListener("click", () => {
+      const row = button.closest("[data-bookmark-row]");
+      const editor = row?.querySelector("[data-rename-form]");
+      const input = editor?.querySelector("input");
+      if (!row || !editor || !input) return;
+      row.classList.add("renaming");
+      row.querySelector(".library-main").hidden = true;
+      editor.hidden = false;
+      button.hidden = true;
+      input.focus();
+      input.select();
+    }));
+    backdrop.querySelectorAll("[data-rename-form]").forEach((form) => {
+      const finishRename = (savedName = null) => {
+        const row = form.closest("[data-bookmark-row]");
+        const main = row?.querySelector(".library-main");
+        const rename = row?.querySelector("[data-rename-snapshot]");
+        const input = form.querySelector("input");
+        const label = main?.querySelector(".library-name");
+        if (savedName !== null) {
+          if (label) label.textContent = savedName;
+        }
+        if (input && label) input.value = label.textContent;
+        row?.classList.remove("renaming");
+        if (main) main.hidden = false;
+        form.hidden = true;
+        if (rename) rename.hidden = false;
+      };
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const input = form.querySelector("input");
+        const name = input?.value.trim();
+        if (!name) {
+          input?.focus();
+          return;
+        }
+        const currentName = form.closest("[data-bookmark-row]")
+          ?.querySelector(".library-name")?.textContent;
+        if (name !== currentName && !this._renameBookmark(form.dataset.renameForm, name)) {
+          input?.focus();
+          return;
+        }
+        finishRename(name);
+      });
+      form.querySelector("[data-cancel-rename]")?.addEventListener("click", () => finishRename());
+      form.querySelector("input")?.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") finishRename();
+      });
+    });
     backdrop.querySelectorAll("[data-delete-snapshot]").forEach((button) => button.addEventListener("click", async () => {
       if (isBookmarks) {
         const bookmark = items.find((item) => item.id === button.dataset.deleteSnapshot);

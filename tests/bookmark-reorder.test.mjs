@@ -54,4 +54,39 @@ test("only editable bookmark rows expose reorder handles", () => {
   assert.match(editable, /data-bookmark-row="three"/);
   assert.doesNotMatch(shared, /data-drag-bookmark/);
   assert.doesNotMatch(history, /data-drag-bookmark/);
+  assert.match(editable, /data-rename-snapshot="one"/);
+  assert.doesNotMatch(shared, /data-rename-snapshot/);
+  assert.doesNotMatch(history, /data-rename-snapshot/);
+});
+
+test("bookmark rename preserves the snapshot and syncs the personal library", () => {
+  const saves = [];
+  const current = { id: "current", name: "One" };
+  const context = Object.assign(Object.create(StorageMethods.prototype), {
+    _loadedBookmarkId: "one",
+    _currentSnapshot: current,
+    _loadLibrary: () => bookmarks.map((bookmark) => ({ ...bookmark })),
+    _saveLibrary: (key, items) => {
+      saves.push({ key, items });
+      return true;
+    },
+    _saveCurrentSnapshot: (snapshot) => saves.push({ current: { ...snapshot } }),
+  });
+
+  assert.equal(context._renameBookmark("one", "  New name  "), true);
+  assert.equal(saves[0].items[0].name, "New name");
+  assert.equal(saves[0].items[0].id, "one");
+  assert.equal(current.name, "New name");
+  assert.deepEqual(saves[1].current, current);
+});
+
+test("bookmark rename rejects blank, unknown, and unchanged names", () => {
+  const context = Object.assign(Object.create(StorageMethods.prototype), {
+    _loadLibrary: () => bookmarks.map((bookmark) => ({ ...bookmark })),
+    _saveLibrary: () => assert.fail("invalid rename must not be saved"),
+  });
+
+  assert.equal(context._renameBookmark("one", "  "), false);
+  assert.equal(context._renameBookmark("missing", "New name"), false);
+  assert.equal(context._renameBookmark("one", "One"), false);
 });

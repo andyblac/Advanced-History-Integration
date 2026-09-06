@@ -311,17 +311,22 @@ export const panelStyles = `
   .library-save button, .library-row button { min-width:40px; height:40px; padding:0 12px; border:0; border-radius:8px; cursor:pointer; color:var(--primary-color); background:transparent; font-weight:500; }
   .library-save button { color:var(--text-primary-color,white); background:var(--primary-color); }
   .library-list { flex:1; min-height:0; overflow:auto; padding:10px; }
-  .library-row { min-height:58px; padding:5px 8px 5px 14px; display:flex; align-items:center; gap:8px; border-radius:8px; }
+  .library-row { min-height:58px; padding:5px 8px 5px 14px; display:flex; align-items:center; gap:4px; border-radius:8px; }
   .library-row:hover { background:var(--secondary-background-color); }
   .library-row.dragging { opacity:.46; background:var(--secondary-background-color); }
   .library-row .bookmark-drag-handle { width:32px; min-width:32px; padding:4px; color:var(--secondary-text-color); cursor:grab; }
   .library-row .bookmark-drag-handle:active { cursor:grabbing; }
   .library-row .bookmark-drag-handle ha-icon { width:20px; height:20px; }
   .library-main { flex:1; min-width:0; border:0; padding:0; cursor:pointer; color:var(--primary-text-color); background:transparent; text-align:left; }
+  .bookmark-rename-editor { flex:1; min-width:0; display:flex; align-items:center; gap:4px; }
+  .bookmark-rename-editor[hidden] { display:none; }
+  .bookmark-rename-editor input { flex:1; min-width:0; height:40px; padding:0 10px; color:var(--primary-text-color); background:var(--card-background-color); border:1px solid var(--primary-color); border-radius:8px; font:inherit; }
+  .bookmark-rename-editor button { flex:0 0 40px; padding:8px; }
   .library-name { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500; }
   .library-summary { display:block; margin-top:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--secondary-text-color); font-size:12px; }
   .library-row .delete { width:40px; padding:8px; color:var(--secondary-text-color); }
   .library-row .update { width:40px; padding:8px; color:var(--primary-color); }
+  .library-row .rename { width:40px; padding:8px; color:var(--secondary-text-color); }
   .library-row .visibility { width:40px; padding:8px; color:var(--secondary-text-color); }
   .library-row .visibility.active { color:var(--primary-color); }
   .library-empty { padding:40px 20px; color:var(--secondary-text-color); text-align:center; }
