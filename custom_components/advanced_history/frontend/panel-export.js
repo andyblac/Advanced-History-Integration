@@ -92,6 +92,8 @@ export function compactDashboardSnapshot(snapshot) {
   delete next.hidden_targets;
   delete next.y2_targets;
   delete next.hidden_y2_targets;
+  delete next.target_filters;
+  delete next.y2_target_filters;
   for (const key of DASHBOARD_SNAPSHOT_SOURCE_KEYS) delete next[key];
   next.chart = clone(next.chart || {});
   delete next.chart.defaults_mode;

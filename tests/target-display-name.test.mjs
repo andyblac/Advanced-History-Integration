@@ -3,21 +3,142 @@ import test from "node:test";
 
 import { TargetPickerMethods } from "../custom_components/advanced_history/frontend/target-picker.js";
 
-test("target visibility clicks are limited to the target icon", () => {
-  const chip = {};
-  const icon = { dataset: { advancedHistoryVisibilityToggle: "" } };
-  const label = { dataset: {} };
-  const iconEvent = { composedPath: () => [icon, chip] };
-  const labelEvent = { composedPath: () => [label, chip] };
+test("single-clicking a target row toggles its chart visibility", () => {
+  const chip = {
+    localName: "ha-target-picker-item-row",
+    type: "entity",
+    itemId: "sensor.gas",
+  };
+  const label = { localName: "span" };
+  // HA 2026.9 renders the row content inside its own native button. That is
+  // the row hit target, not one of Advanced History's action controls.
+  const nativeRowButton = { localName: "button", dataset: {} };
+  const calls = [];
+  let callback;
+  const previousWindow = globalThis.window;
+  globalThis.window = {
+    setTimeout(next) {
+      callback = next;
+      return 1;
+    },
+    clearTimeout() {},
+  };
+  const context = {
+    _targets: { entity_id: ["sensor.gas"] },
+    _y2Targets: { entity_id: [] },
+    _nativeTargetChipEventDetails:
+      TargetPickerMethods.prototype._nativeTargetChipEventDetails,
+    _toggleTargetVisibility: (...args) => calls.push(args),
+  };
 
-  assert.equal(
-    TargetPickerMethods.prototype._nativeTargetChipIconClicked(iconEvent, chip),
-    true,
+  try {
+    TargetPickerMethods.prototype._nativeTargetChipClicked.call(context, {
+      detail: 1,
+      composedPath: () => [label, nativeRowButton, chip],
+    }, "primary");
+    // HA may redraw the native row before the single-click delay completes.
+    // The action must use the identifier captured from the original event.
+    chip.itemId = undefined;
+    callback();
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+
+  assert.deepEqual(calls, [["primary", "entity_id", "sensor.gas"]]);
+});
+
+test("redrawn native rows retain their decorated entity identifier", () => {
+  const chip = {
+    localName: "ha-target-picker-item-row",
+    type: "",
+    itemId: undefined,
+    dataset: {
+      advancedHistoryItemType: "entity",
+      advancedHistoryItemId: "climate.lounge",
+    },
+  };
+  const context = {
+    _targets: { entity_id: ["climate.lounge"] },
+    _y2Targets: { entity_id: [] },
+  };
+
+  const details = TargetPickerMethods.prototype._nativeTargetChipEventDetails.call(
+    context,
+    { composedPath: () => [chip] },
+    "primary",
   );
-  assert.equal(
-    TargetPickerMethods.prototype._nativeTargetChipIconClicked(labelEvent, chip),
-    false,
+
+  assert.equal(details.kind, "entity_id");
+  assert.equal(details.itemId, "climate.lounge");
+});
+
+test("native 2026.9 rows receive direct visibility listeners", () => {
+  const listeners = {};
+  const options = {};
+  const chip = {
+    localName: "ha-target-picker-item-row",
+    dataset: {},
+    addEventListener(type, listener, value) {
+      listeners[type] = listener;
+      options[type] = value;
+    },
+  };
+  const calls = [];
+  const context = {
+    _nativeTargetChipClicked: (...args) => calls.push(["click", ...args]),
+    _nativeTargetChipDoubleClicked: (...args) => calls.push(["dblclick", ...args]),
+  };
+
+  TargetPickerMethods.prototype._bindNativeTargetRowVisibility.call(
+    context,
+    chip,
+    "secondary",
   );
+  // Re-syncing the same row must not stack duplicate handlers.
+  TargetPickerMethods.prototype._bindNativeTargetRowVisibility.call(
+    context,
+    chip,
+    "secondary",
+  );
+  const clickEvent = {};
+  const doubleClickEvent = {};
+  listeners.click(clickEvent);
+  listeners.dblclick(doubleClickEvent);
+
+  assert.equal(chip.dataset.advancedHistoryVisibilityBound, "secondary");
+  assert.deepEqual(options, {
+    click: { capture: true },
+    dblclick: { capture: true },
+  });
+  assert.deepEqual(calls, [
+    ["click", clickEvent, "secondary"],
+    ["dblclick", doubleClickEvent, "secondary"],
+  ]);
+});
+
+test("target-row action buttons do not toggle chart visibility", () => {
+  const chip = {
+    localName: "ha-target-picker-item-row",
+    type: "entity",
+    itemId: "sensor.gas",
+  };
+  const attributes = {
+    localName: "button",
+    dataset: { advancedHistorySeries: "sensor.gas" },
+  };
+  const context = {
+    _targets: { entity_id: ["sensor.gas"] },
+    _y2Targets: { entity_id: [] },
+  };
+
+  const details = TargetPickerMethods.prototype._nativeTargetChipEventDetails.call(
+    context,
+    { composedPath: () => [attributes, chip] },
+    "primary",
+  );
+
+  assert.equal(details, undefined);
 });
 
 test("double-click starts inline editing for an explicit entity target", () => {
@@ -63,6 +184,53 @@ test("double-click starts inline editing for an explicit entity target", () => {
   ]);
 });
 
+test("native 2026.9 target rows are recognised as editable targets", () => {
+  const row = {
+    localName: "ha-target-picker-item-row",
+    type: "entity",
+    itemId: "climate.lounge",
+  };
+  const context = {
+    _targets: { entity_id: ["climate.lounge"] },
+    _y2Targets: { entity_id: [] },
+  };
+  const details = TargetPickerMethods.prototype._nativeTargetChipEventDetails.call(
+    context,
+    { composedPath: () => [row] },
+    "primary",
+  );
+
+  assert.equal(details.chip, row);
+  assert.equal(details.kind, "entity_id");
+});
+
+test("native target discovery includes legacy chips and 2026.9 item rows", () => {
+  const chip = { localName: "ha-target-picker-value-chip" };
+  const row = { localName: "ha-target-picker-item-row" };
+  const group = {
+    shadowRoot: {
+      querySelectorAll(selector) {
+        assert.equal(selector, "ha-target-picker-item-row:not([sub-entry])");
+        return [row];
+      },
+    },
+  };
+  const targetPicker = {
+    shadowRoot: {
+      querySelectorAll(selector) {
+        if (selector === "ha-target-picker-value-chip") return [chip];
+        if (selector === "ha-target-picker-item-group") return [group];
+        return [];
+      },
+    },
+  };
+
+  assert.deepEqual(
+    TargetPickerMethods.prototype._nativeTargetPickerItems(targetPicker),
+    [chip, row],
+  );
+});
+
 test("leaving an unchanged inline name edit preserves automatic naming", async () => {
   const listeners = {};
   const input = {
@@ -97,6 +265,8 @@ test("leaving an unchanged inline name edit preserves automatic naming", async (
     _localize: (_key, fallback) => fallback,
     _setTargetDisplayName: (...args) => saves.push(args),
     _entityDisplayName: () => "Gas meter · Back Garden",
+    _nativeTargetItemControlHost:
+      TargetPickerMethods.prototype._nativeTargetItemControlHost,
   };
   const previousDocument = globalThis.document;
   globalThis.document = { createElement: () => input };

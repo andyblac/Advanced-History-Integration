@@ -1,4 +1,315 @@
+import { TARGET_SIDEBAR_STATE_STORAGE_KEY } from "./constants.js";
+
 export class TargetPickerMethods {
+  _homeAssistantVersionAtLeast(year, month) {
+    const match = String(this._hass?.config?.version || "").match(/^(\d{4})\.(\d+)/);
+    if (!match) return false;
+    const installed = [Number(match[1]), Number(match[2])];
+    return installed[0] > year || (installed[0] === year && installed[1] >= month);
+  }
+
+  _useTargetSidebar() {
+    return !this.config.use_legacy_target_picker
+      && this._homeAssistantVersionAtLeast(2026, 9);
+  }
+
+  _targetSidebarShown(axis = "primary") {
+    const state = axis === "secondary"
+      ? this._targetSecondarySourcesShown
+      : this._targetPrimarySourcesShown;
+    return typeof state === "boolean"
+      ? state
+      : !this._narrow;
+  }
+
+  _restoreTargetSidebarState() {
+    try {
+      const saved = JSON.parse(
+        localStorage.getItem(TARGET_SIDEBAR_STATE_STORAGE_KEY) || "null"
+      );
+      if (typeof saved?.primary === "boolean") {
+        this._targetPrimarySourcesShown = saved.primary;
+      }
+      if (typeof saved?.secondary === "boolean") {
+        this._targetSecondarySourcesShown = saved.secondary;
+      }
+    } catch (_) { /* Keep the responsive defaults when storage is unavailable or invalid. */ }
+  }
+
+  _saveTargetSidebarState() {
+    try {
+      localStorage.setItem(TARGET_SIDEBAR_STATE_STORAGE_KEY, JSON.stringify({
+        primary: this._targetSidebarShown("primary"),
+        secondary: this._targetSidebarShown("secondary"),
+      }));
+    } catch (_) { /* Sidebar interaction must still work when storage is unavailable. */ }
+  }
+
+  _captureTargetSidebarPanelState() {
+    return {
+      primary: this._targetSidebarShown("primary"),
+      secondary: this._targetSidebarShown("secondary"),
+    };
+  }
+
+  _restoreTargetSidebarPanelState(state) {
+    if (
+      typeof state?.primary === "boolean"
+      && typeof state?.secondary === "boolean"
+    ) {
+      this._targetPrimarySourcesShown = state.primary;
+      this._targetSecondarySourcesShown = state.secondary;
+      return;
+    }
+    this._targetPrimarySourcesShown = undefined;
+    this._targetSecondarySourcesShown = undefined;
+    this._restoreTargetSidebarState();
+  }
+
+  _setTargetSidebarShown(axis, shown) {
+    if (axis === "secondary") this._targetSecondarySourcesShown = Boolean(shown);
+    else this._targetPrimarySourcesShown = Boolean(shown);
+    this._saveTargetSidebarState();
+    this._persistPanelTabs?.();
+  }
+
+  _targetSourceFilters(axis = "primary") {
+    return axis === "secondary"
+      ? this._targetSecondarySourceFilters || {}
+      : this._targetPrimarySourceFilters || {};
+  }
+
+  _normalizeTargetSourceFilters(value) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+    return Object.fromEntries(
+      ["types", "integrations"].flatMap((key) => {
+        const items = value[key];
+        if (!Array.isArray(items)) return [];
+        const normalized = [...new Set(
+          items.filter((item) => typeof item === "string" && item.length <= 255)
+        )];
+        return normalized.length ? [[key, normalized]] : [];
+      })
+    );
+  }
+
+  _restoreTargetSourceFilters(snapshot) {
+    this._targetPrimarySourceFilters = this._normalizeTargetSourceFilters(
+      snapshot?.target_filters
+    );
+    this._targetSecondarySourceFilters = this._normalizeTargetSourceFilters(
+      snapshot?.y2_target_filters
+    );
+  }
+
+  _targetSourceFilterCount(axis = "primary") {
+    return Object.values(this._targetSourceFilters(axis))
+      .filter((value) => Array.isArray(value) && value.length).length;
+  }
+
+  _targetSourceFiltersChanged(event, axis = "primary") {
+    const filters = this._normalizeTargetSourceFilters(event.detail?.value);
+    if (axis === "secondary") this._targetSecondarySourceFilters = filters;
+    else this._targetPrimarySourceFilters = filters;
+    const picker = axis === "secondary"
+      ? this._nativeY2TargetPicker
+      : this._nativeTargetPicker;
+    if (picker?.localName === "ha-sources-picker") {
+      picker.filters = structuredClone(filters);
+      picker.requestUpdate?.();
+    }
+    this._syncTargetSidebars();
+    this._notice = "";
+    this.shadowRoot?.querySelector(".notice")?.remove();
+    this._recordChange(null, true);
+    this._renderGraphs();
+  }
+
+  _entityMatchesSourceFilters(entityId, axis = "primary") {
+    const filters = this._targetSourceFilters(axis);
+    const types = Array.isArray(filters.types) ? filters.types : [];
+    if (types.length) {
+      const separator = entityId.indexOf(".");
+      const domain = separator === -1 ? entityId : entityId.slice(0, separator);
+      const state = this._hass?.states?.[entityId];
+      const deviceClass = state?.attributes?.device_class || "none";
+      if (!types.includes(domain) && !types.includes(`${domain}/${deviceClass}`)) {
+        return false;
+      }
+    }
+
+    const integrations = Array.isArray(filters.integrations)
+      ? filters.integrations
+      : [];
+    if (integrations.length) {
+      const registry = this._hass?.entities?.[entityId]
+        || this._entities.find((entity) => entity.entity_id === entityId);
+      if (!registry?.platform || !integrations.includes(registry.platform)) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  async _requestClearTargetSources(axis = "primary") {
+    const targets = axis === "secondary" ? this._y2Targets : this._targets;
+    if (!this._targetCount(targets) && !this._targetSourceFilterCount(axis)) return true;
+    if (typeof window.loadCardHelpers !== "function") return false;
+    const helpers = await window.loadCardHelpers();
+    if (typeof helpers.showConfirmationDialog !== "function") return false;
+    const title = this._customLocalize("clear_axis_targets_title");
+    let closed = false;
+    const dialogPromise = helpers.showConfirmationDialog(this, {
+      title,
+      text: this._customLocalize("clear_axis_targets_message"),
+      dismissText: this._localize("ui.common.cancel", "Cancel"),
+      confirmText: this._localize("ui.common.clear", "Clear"),
+      destructive: true,
+    });
+    const stopCloseButtonSearch = this._addNativeConfirmationCloseButton(
+      title,
+      () => { closed = true; },
+    );
+    const confirmed = await dialogPromise;
+    stopCloseButtonSearch();
+    if (closed || !confirmed) return false;
+    this._clearTargetSources(axis);
+    return true;
+  }
+
+  _clearTargetSources(axis = "primary") {
+    const secondary = axis === "secondary";
+    if (secondary) {
+      this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
+      this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
+      this._targetSecondarySourceFilters = {};
+      this._excludeY2Comparison = false;
+    } else {
+      this._targets = { area_id: [], device_id: [], entity_id: [] };
+      this._hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
+      this._targetPrimarySourceFilters = {};
+    }
+    const picker = axis === "secondary"
+      ? this._nativeY2TargetPicker
+      : this._nativeTargetPicker;
+    if (picker?.localName === "ha-sources-picker") {
+      picker.filters = {};
+      picker.value = { area_id: [], device_id: [], entity_id: [] };
+      picker.requestUpdate?.();
+    }
+    if (!this._targetCount()) this._resetPeriodSelection();
+    this._saveTargets();
+    this._incomingTargetOverride = true;
+    this._recordChange(null, true);
+    this._clearUndoRedoHistory();
+    this._notice = "";
+    const removeAll = this.shadowRoot.getElementById("remove-all");
+    if (removeAll) removeAll.hidden = !this._targetCount();
+    this._syncAxisTargetLayout();
+    this._syncY2ComparisonToggle();
+    this._syncY1ComparisonToggle();
+    this._syncNativeTargetVisibility(axis);
+    this._syncTargetSidebars();
+    this.shadowRoot.querySelector(".notice")?.remove();
+    this._renderGraphs();
+  }
+
+  _syncTargetSidebars() {
+    if (!this._useTargetSidebar()) return;
+    for (const axis of ["primary", "secondary"]) {
+      const secondary = axis === "secondary";
+      const pane = this.shadowRoot?.getElementById(`target-sources-pane-${axis}`);
+      const chip = this.shadowRoot?.getElementById(`target-sources-chip-${axis}`);
+      const targetCount = this._targetCount(secondary ? this._y2Targets : this._targets);
+      const filterCount = this._targetSourceFilterCount(axis);
+      const count = targetCount + filterCount;
+      const shown = this._targetSidebarShown(axis);
+      const label = this._customLocalize(secondary ? "secondary_axis" : "primary_axis");
+      const themeMode = this._hass?.themes?.darkMode ? "dark" : "light";
+      if (pane) {
+        pane.narrow = this._narrow;
+        pane.label = label;
+        pane.count = count;
+        pane.dataset.advancedHistoryThemeMode = themeMode;
+        if (targetCount > 0) pane.dataset.advancedHistoryHasTargets = "";
+        else delete pane.dataset.advancedHistoryHasTargets;
+        void this._syncTargetSidebarChipWeight(pane, targetCount > 0);
+        void this._syncTargetSidebarHeader(pane, secondary);
+        pane.hidden = !shown;
+        if (!pane.dataset.advancedHistoryBound) {
+          pane.dataset.advancedHistoryBound = "true";
+          pane.addEventListener("close-filter-pane", () => {
+            this._setTargetSidebarShown(axis, false);
+            this._syncTargetSidebars();
+          });
+          pane.addEventListener(
+            "clear-filter",
+            () => this._requestClearTargetSources(axis),
+          );
+        }
+      }
+      if (chip) {
+        chip.label = label;
+        chip.count = filterCount;
+        chip.active = count > 0;
+        chip.dataset.advancedHistoryThemeMode = themeMode;
+        if (targetCount > 0) chip.dataset.advancedHistoryHasTargets = "";
+        else delete chip.dataset.advancedHistoryHasTargets;
+        void this._syncTargetSidebarChipWeight(chip, targetCount > 0);
+        chip.hidden = shown && !this._narrow;
+        if (!chip.dataset.advancedHistoryBound) {
+          chip.dataset.advancedHistoryBound = "true";
+          chip.addEventListener("click", () => {
+            this._setTargetSidebarShown(axis, true);
+            this._syncTargetSidebars();
+          });
+        }
+      }
+    }
+    const toolbar = this.shadowRoot?.querySelector(".target-sidebar-toolbar");
+    if (toolbar) {
+      toolbar.hidden = !this._narrow
+        && this._targetSidebarShown("primary")
+        && (!this._secondaryAxisEditable() || this._targetSidebarShown("secondary"));
+    }
+  }
+
+  async _syncTargetSidebarChipWeight(host, bold) {
+    await host?.updateComplete;
+    const chip = host?.localName === "ha-filter-pane"
+      ? host.shadowRoot?.querySelector("ha-filter-pane-chip")
+      : host;
+    await chip?.updateComplete;
+    const assistChip = chip?.shadowRoot?.querySelector("ha-assist-chip");
+    if (!assistChip) return;
+    if (bold) {
+      // ha-filter-pane may reset its nested chip after the pane transition.
+      // A populated axis must remain natively active in either layout state.
+      assistChip.active = true;
+      assistChip.style.setProperty(
+        "--md-assist-chip-label-text-weight",
+        "var(--ha-font-weight-bold,700)",
+      );
+      assistChip.requestUpdate?.();
+    } else {
+      assistChip.style.removeProperty("--md-assist-chip-label-text-weight");
+    }
+  }
+
+  async _syncTargetSidebarHeader(pane, mirrored) {
+    await pane?.updateComplete;
+    if (!pane?.shadowRoot) return;
+    let style = pane.shadowRoot.querySelector(
+      "style[data-advanced-history-header-layout]"
+    );
+    if (!style) {
+      style = document.createElement("style");
+      style.dataset.advancedHistoryHeaderLayout = "";
+      pane.shadowRoot.append(style);
+    }
+    style.textContent = mirrored ? ".header{flex-direction:row-reverse}" : "";
+  }
+
   _secondaryAxisEditable() {
     if (this._narrow) return false;
     return typeof globalThis.matchMedia !== "function"
@@ -13,7 +324,12 @@ export class TargetPickerMethods {
   async _loadNativeHistoryPicker(requireHistoryPanel = false) {
     if (
       customElements.get("ha-target-picker")
-      && (!requireHistoryPanel || customElements.get("ha-panel-history"))
+      && (!requireHistoryPanel || (
+        customElements.get("ha-panel-history")
+        && customElements.get("ha-filter-pane")
+        && customElements.get("ha-filter-pane-chip")
+        && customElements.get("ha-sources-picker")
+      ))
     ) return;
 
     let node = this;
@@ -84,7 +400,12 @@ export class TargetPickerMethods {
 
     await historyRoute.load();
     await customElements.whenDefined("ha-target-picker");
-    if (requireHistoryPanel) await customElements.whenDefined("ha-panel-history");
+    if (requireHistoryPanel) {
+      await customElements.whenDefined("ha-panel-history");
+      await customElements.whenDefined("ha-filter-pane");
+      await customElements.whenDefined("ha-filter-pane-chip");
+      await customElements.whenDefined("ha-sources-picker");
+    }
   }
 
   async _renderNativeTargetPicker(axis = "primary") {
@@ -94,14 +415,31 @@ export class TargetPickerMethods {
     );
     if (!host) return;
     try {
-      await this._loadNativeHistoryPicker();
+      await this._loadNativeHistoryPicker(this._useTargetSidebar());
       if (!host.isConnected) return;
-      const picker = document.createElement("ha-target-picker");
+      this._syncTargetSidebars();
+      const useSourcesPicker = this._useTargetSidebar();
+      const picker = document.createElement(
+        useSourcesPicker ? "ha-sources-picker" : "ha-target-picker"
+      );
       picker.hass = this._targetPickerHass();
       picker.value = structuredClone(secondary ? this._y2Targets : this._targets);
-      picker.narrow = this._narrow;
-      picker.setAttribute("add-on-top", "");
-      picker.setAttribute("compact", "");
+      if (useSourcesPicker) {
+        picker.filters = structuredClone(this._targetSourceFilters(axis));
+        picker.entitySources = Object.fromEntries(
+          this._entities
+            .filter((entity) => entity.entity_id && entity.platform)
+            .map((entity) => [entity.entity_id, { domain: entity.platform }]),
+        );
+        picker.addEventListener(
+          "source-filters-changed",
+          (event) => this._targetSourceFiltersChanged(event, axis),
+        );
+      } else {
+        picker.narrow = this._narrow;
+        picker.setAttribute("add-on-top", "");
+        picker.setAttribute("compact", "");
+      }
       picker.addEventListener("value-changed", (event) => this._nativeTargetsChanged(event, axis));
       picker.addEventListener("click", (event) => this._nativeTargetChipClicked(event, axis));
       picker.addEventListener("dblclick", (event) => this._nativeTargetChipDoubleClicked(event, axis));
@@ -125,7 +463,13 @@ export class TargetPickerMethods {
     const otherTargets = secondary ? this._targets : this._y2Targets;
     const picker = secondary ? this._nativeY2TargetPicker : this._nativeTargetPicker;
     const otherPicker = secondary ? this._nativeTargetPicker : this._nativeY2TargetPicker;
-    const nextTargets = this._normalizeTargets(event.detail?.value || {});
+    const incomingTargets = event.detail?.value || {};
+    const warnAboutBroadY2Target = this._shouldWarnAboutBroadTarget(
+      axis,
+      currentTargets,
+      incomingTargets,
+    );
+    const nextTargets = this._normalizeTargets(incomingTargets);
     const clearedAxis = Boolean(this._targetCount(currentTargets) && !this._targetCount(nextTargets));
     const clearedChart = clearedAxis && !this._targetCount(otherTargets);
     if (clearedChart) {
@@ -155,6 +499,13 @@ export class TargetPickerMethods {
     }
     this._saveTargets();
     this._recordChange(null, true);
+    if (warnAboutBroadY2Target) {
+      this.dispatchEvent(new CustomEvent("hass-notification", {
+        detail: { message: this._customLocalize("y2_broad_target_warning") },
+        bubbles: true,
+        composed: true,
+      }));
+    }
     this._notice = "";
     const removeAll = this.shadowRoot.getElementById("remove-all");
     if (removeAll) removeAll.hidden = !this._targetCount();
@@ -163,8 +514,23 @@ export class TargetPickerMethods {
     this._syncY1ComparisonToggle();
     this._syncNativeTargetVisibility(axis);
     this._syncNativeTargetVisibility(secondary ? "primary" : "secondary");
+    this._syncTargetSidebars();
     this.shadowRoot.querySelector(".notice")?.remove();
     this._renderGraphs();
+  }
+
+  _broadTargetAdded(currentTargets, incomingTargets) {
+    const list = (value) => value == null ? [] : Array.isArray(value) ? value : [value];
+    return Object.keys(incomingTargets || {}).some((kind) => {
+      if (kind === "entity_id" || !kind.endsWith("_id")) return false;
+      const current = new Set(list(currentTargets?.[kind]));
+      return list(incomingTargets[kind]).some((id) => !current.has(id));
+    });
+  }
+
+  _shouldWarnAboutBroadTarget(axis, currentTargets, incomingTargets) {
+    return axis === "secondary"
+      && this._broadTargetAdded(currentTargets, incomingTargets);
   }
 
   _syncAxisTargetLayout() {
@@ -289,8 +655,8 @@ export class TargetPickerMethods {
 
   _nativeTargetChipClicked(event, axis = "primary") {
     const details = this._nativeTargetChipEventDetails(event, axis);
-    if (!details || !this._nativeTargetChipIconClicked(event, details.chip)) return;
-    const { chip, kind, targets } = details;
+    if (!details) return;
+    const { chip, kind, itemId } = details;
     this._targetChipClickTimers ||= new WeakMap();
     const pending = this._targetChipClickTimers.get(chip);
     if (pending) window.clearTimeout(pending);
@@ -300,41 +666,45 @@ export class TargetPickerMethods {
     }
     const timer = window.setTimeout(() => {
       this._targetChipClickTimers.delete(chip);
-      if (targets[kind]?.includes(chip.itemId)) {
-        this._toggleTargetVisibility(axis, kind, chip.itemId);
-      }
+      this._toggleTargetVisibility(axis, kind, itemId);
     }, 240);
     this._targetChipClickTimers.set(chip, timer);
-  }
-
-  _nativeTargetChipIconClicked(event, chip) {
-    const path = event.composedPath();
-    const chipIndex = path.indexOf(chip);
-    if (chipIndex < 0) return false;
-    return path.slice(0, chipIndex).some((node) => (
-      node?.dataset?.advancedHistoryVisibilityToggle !== undefined
-    ));
   }
 
   _nativeTargetChipEventDetails(event, axis = "primary") {
     const path = event.composedPath();
     const chipIndex = path.findIndex(
-      (node) => node?.localName === "ha-target-picker-value-chip"
+      (node) => [
+        "ha-target-picker-value-chip",
+        "ha-target-picker-item-row",
+      ].includes(node?.localName)
     );
     if (chipIndex < 0) return;
-    const usedChipControl = path.slice(0, chipIndex).some((node) =>
-      node?.localName === "button" ||
-      node?.localName === "ha-icon-button" ||
-      node?.classList?.contains("expand-btn") ||
-      String(node?.getAttribute?.("part") || "").includes("remove")
-    );
+    const usedChipControl = path.slice(0, chipIndex).some((node) => (
+      node?.dataset?.advancedHistoryControls !== undefined
+      || node?.dataset?.advancedHistorySeries !== undefined
+      || node?.dataset?.advancedHistoryRunningTotal !== undefined
+      || node?.dataset?.advancedHistoryNameInput !== undefined
+      || node?.localName === "ha-icon-button"
+      || node?.classList?.contains("expand-btn")
+      || String(node?.getAttribute?.("part") || "").includes("remove")
+    ));
     if (usedChipControl) return;
     const chip = path[chipIndex];
-    if (!chip?.type || !chip.itemId) return;
-    const kind = `${chip.type}_id`;
+    const type = chip?.type
+      || chip?.getAttribute?.("type")
+      || chip?.dataset?.advancedHistoryItemType;
+    const itemId = chip?.itemId
+      || chip?.dataset?.advancedHistoryItemId
+      || chip?.shadowRoot?.querySelector?.("[data-advanced-history-series]")
+        ?.dataset?.advancedHistorySeries
+      || chip?.shadowRoot?.querySelector?.("[data-advanced-history-running-total]")
+        ?.dataset?.advancedHistoryRunningTotal;
+    if (!type || !itemId) return;
+    const kind = `${type}_id`;
     const targets = axis === "secondary" ? this._y2Targets : this._targets;
     if (!targets[kind]) return;
-    return { chip, kind, targets };
+    return { chip, kind, itemId, targets };
   }
 
   _nativeTargetChipDoubleClicked(event, axis = "primary") {
@@ -345,7 +715,7 @@ export class TargetPickerMethods {
     this._targetChipClickTimers?.delete(details.chip);
     event.preventDefault();
     event.stopPropagation();
-    void this._beginTargetNameEdit(details.chip, details.chip.itemId);
+    void this._beginTargetNameEdit(details.chip, details.itemId);
   }
 
   _setTargetDisplayName(entity, value) {
@@ -379,15 +749,18 @@ export class TargetPickerMethods {
 
   async _beginTargetNameEdit(chip, entity) {
     await chip.updateComplete;
-    const tag = chip.shadowRoot?.querySelector("wa-tag");
-    if (!tag || tag.querySelector("[data-advanced-history-name-input]")) return;
+    const host = this._nativeTargetItemControlHost(chip);
+    if (!host || host.querySelector("[data-advanced-history-name-input]")) return;
+    const rowHost = chip.localName === "ha-target-picker-item-row";
     const currentName = this._entityName(entity);
-    const controls = tag.querySelector("[data-advanced-history-controls]");
-    const label = [...tag.childNodes].find((node) => {
-      if (node === controls || !String(node.textContent || "").trim()) return false;
-      if (node.nodeType === 3) return true;
-      return !node.matches?.("button, ha-icon, input, [data-advanced-history-controls]");
-    });
+    const controls = host.querySelector("[data-advanced-history-controls]");
+    const label = rowHost
+      ? host.querySelector("[slot='headline']")
+      : [...host.childNodes].find((node) => {
+        if (node === controls || !String(node.textContent || "").trim()) return false;
+        if (node.nodeType === 3) return true;
+        return !node.matches?.("button, ha-icon, input, [data-advanced-history-controls]");
+      });
     const previousDisplay = label?.style?.display;
     const previousText = label?.textContent || "";
     if (label?.nodeType === 3) label.textContent = "";
@@ -398,6 +771,7 @@ export class TargetPickerMethods {
     input.value = currentName;
     input.maxLength = 100;
     input.dataset.advancedHistoryNameInput = "";
+    if (rowHost) input.slot = "headline";
     input.setAttribute("aria-label", this._localize("ui.common.rename", "Rename"));
     input.style.cssText = [
       `width:${Math.min(260, Math.max(90, (currentName.length + 1) * 8.5))}px`,
@@ -412,7 +786,7 @@ export class TargetPickerMethods {
       "outline:0",
       "font:inherit",
     ].join(";");
-    tag.insertBefore(input, controls || null);
+    host.insertBefore(input, rowHost ? label : (controls || null));
 
     let finished = false;
     const finish = (save) => {
@@ -459,25 +833,46 @@ export class TargetPickerMethods {
     this[syncKey] = syncId;
     const apply = async () => {
       await picker.updateComplete;
+      const targetPicker = picker.localName === "ha-sources-picker"
+        ? picker.shadowRoot?.querySelector("ha-target-picker")
+        : picker;
+      if (!targetPicker) return;
+      await targetPicker.updateComplete;
       await new Promise((resolve) =>
         requestAnimationFrame(() => requestAnimationFrame(resolve))
       );
       if (
         picker !== this[pickerKey] ||
         syncId !== this[syncKey] ||
-        !picker.shadowRoot
+        !targetPicker.shadowRoot
       ) return;
-      let axisStyle = picker.shadowRoot.querySelector("style[data-advanced-history-axis]");
+      const useResolvedEntityRows = this._useTargetSidebar();
+      const resolvedEntityIds = useResolvedEntityRows
+        ? this._resolvedEntityIdsForAxis(axis)
+        : [...(targets.entity_id || [])];
+      const resolvedEntityIdSet = new Set(resolvedEntityIds);
+      if (useResolvedEntityRows) {
+        await this._syncResolvedEntityTargetGroup(
+          targetPicker,
+          axis,
+          resolvedEntityIds,
+        );
+      }
+      if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
+      let axisStyle = targetPicker.shadowRoot.querySelector("style[data-advanced-history-axis]");
       if (!axisStyle) {
         axisStyle = document.createElement("style");
         axisStyle.dataset.advancedHistoryAxis = axis;
-        picker.shadowRoot.append(axisStyle);
+        targetPicker.shadowRoot.append(axisStyle);
       }
       axisStyle.textContent = [
         "ha-generic-picker{--ha-generic-picker-width:min(800px,calc(100vw - 32px));--ha-generic-picker-max-width:calc(100vw - 32px)}",
+        useResolvedEntityRows
+          ? "ha-target-picker-item-group[type='entity']:not([data-advanced-history-resolved-axis]){display:none}"
+          : "",
         secondary ? ".add-target-wrapper,.items{justify-content:flex-end}" : "",
       ].join("");
-      const genericPicker = picker.shadowRoot.querySelector("ha-generic-picker");
+      const genericPicker = targetPicker.shadowRoot.querySelector("ha-generic-picker");
       if (genericPicker) {
         await genericPicker.updateComplete;
         if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
@@ -496,10 +891,20 @@ export class TargetPickerMethods {
         }
       }
       const entityIds = new Set(targets.entity_id || []);
-      const chips = [
-        ...picker.shadowRoot.querySelectorAll("ha-target-picker-value-chip"),
-      ];
-      picker.shadowRoot
+      await Promise.all(
+        [...targetPicker.shadowRoot.querySelectorAll("ha-target-picker-item-group")]
+          .map((group) => group.updateComplete)
+      );
+      if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
+      const nativeParentEntityIds = new Set([
+        ...this._nativeParentResolvedEntityIds(targetPicker),
+        ...await this._resolvedParentEntityIds(axis, targets),
+      ]);
+      if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
+      if (secondary) this._nativeSecondaryParentEntityIds = nativeParentEntityIds;
+      else this._nativePrimaryParentEntityIds = nativeParentEntityIds;
+      const chips = this._nativeTargetPickerItems(targetPicker);
+      targetPicker.shadowRoot
         .querySelectorAll(
           "[data-advanced-history-series], [data-advanced-history-running-total]"
         )
@@ -508,73 +913,92 @@ export class TargetPickerMethods {
         "[data-advanced-history-controls], [data-advanced-history-series], [data-advanced-history-running-total]"
       ).forEach((button) => button.remove()));
       const axisRunningTotalActive = this._axisRunningTotalActive(axis);
-      const pickerHass = this._targetPickerHass();
       chips.forEach((chip) => {
-        const kind = `${chip.type}_id`;
-        if (kind === "entity_id") {
-          chip.hass = pickerHass;
-          chip.requestUpdate?.();
-        }
-        const hidden = Boolean(hiddenTargets[kind]?.includes(chip.itemId));
+        const type = chip.type || chip.getAttribute?.("type");
+        const itemId = chip.itemId;
+        if (type) chip.dataset.advancedHistoryItemType = type;
+        if (itemId) chip.dataset.advancedHistoryItemId = itemId;
+        this._bindNativeTargetRowVisibility(chip, axis);
+        const kind = `${type}_id`;
+        const hidden = Boolean(hiddenTargets[kind]?.includes(itemId));
         const unavailable = kind === "entity_id" && (
-          !this._hass.states[chip.itemId]
-          || this._hass.states[chip.itemId].state === "unavailable"
+          !this._hass.states[itemId]
+          || this._hass.states[itemId].state === "unavailable"
         );
         const name = kind === "area_id"
-          ? this._areaName(chip.itemId)
+          ? this._areaName(itemId)
           : kind === "device_id"
-            ? this._deviceName(chip.itemId)
-            : this._entityName(chip.itemId);
-        const explicitEntity = (
+            ? this._deviceName(itemId)
+            : this._entityName(itemId);
+        const resolvedEntity = (
           kind === "entity_id"
-          && entityIds.has(chip.itemId)
+          && resolvedEntityIdSet.has(itemId)
         );
-        chip.style.cursor = "";
+        chip.style.cursor = "pointer";
         chip.style.opacity = hidden ? ".45" : "";
         chip.style.filter = hidden ? "grayscale(1)" : "";
-        chip.removeAttribute("role");
-        chip.removeAttribute("aria-pressed");
+        chip.setAttribute("role", "button");
+        chip.setAttribute("aria-pressed", hidden ? "true" : "false");
         const title = this._customLocalize(hidden ? "show_target" : "hide_target", { target: name });
-        if (explicitEntity) {
-          chip.setAttribute("title", this._customLocalize("double_click_rename_target"));
+        if (resolvedEntity) {
+          chip.setAttribute(
+            "title",
+            `${title}. ${this._customLocalize("double_click_rename_target")}`,
+          );
         } else {
-          chip.removeAttribute("title");
+          chip.setAttribute("title", title);
         }
         const applyAxisColor = async () => {
           await chip.updateComplete;
           if (picker !== this[pickerKey] || syncId !== this[syncKey]) return;
           const tag = chip.shadowRoot?.querySelector("wa-tag");
-          if (!tag) return;
+          const row = chip.shadowRoot?.querySelector(
+            "ha-list-item-button, ha-list-item-base"
+          );
+          if (!tag && !row) return;
           const icon = chip.shadowRoot?.querySelector(
             "ha-state-icon, ha-icon, [slot='start'], [slot='prefix'], [slot='icon'], [part~='icon']"
           );
-          if (icon) {
-            icon.dataset.advancedHistoryVisibilityToggle = "";
-            icon.setAttribute("role", "button");
-            icon.setAttribute("aria-label", title);
-            icon.setAttribute("aria-pressed", hidden ? "true" : "false");
-            icon.setAttribute("title", title);
-            icon.style.cursor = "pointer";
-          }
           const axisColor = unavailable
             ? "var(--state-unavailable-color, var(--error-color, #db4437))"
             : secondary
               ? "var(--primary-color)"
               : null;
-          if (axisColor) {
+          if (tag && axisColor) {
             tag.style.borderColor = axisColor;
             tag.style.setProperty("--background-color", axisColor);
-          } else {
+          } else if (tag) {
             tag.style.removeProperty("border-color");
             tag.style.removeProperty("--background-color");
           }
+          if (row && icon) {
+            if (axisColor) icon.style.color = axisColor;
+            else icon.style.removeProperty("color");
+          }
+          const removeButton = chip.shadowRoot?.querySelector(
+            "ha-icon-button[slot='end']"
+          );
+          if (removeButton) {
+            if (
+              resolvedEntity
+              && (
+                !entityIds.has(itemId)
+                || nativeParentEntityIds.has(itemId)
+                || this._entityResolvedByParentTarget(targets, itemId)
+              )
+            ) {
+              removeButton.style.display = "none";
+            } else {
+              removeButton.style.removeProperty("display");
+            }
+          }
         };
         void applyAxisColor();
-        const showSeries = explicitEntity && this._seriesChoices(chip.itemId).length > 1;
+        const showSeries = resolvedEntity && this._seriesChoices(itemId).length > 1;
         const showRunningTotal = (
           !axisRunningTotalActive
-          && explicitEntity
-          && this._runningTotalEligible(chip.itemId)
+          && resolvedEntity
+          && this._runningTotalEligible(itemId)
         );
         if (showSeries || showRunningTotal) {
           void this._syncTargetChipControls(
@@ -590,6 +1014,140 @@ export class TargetPickerMethods {
     void apply();
   }
 
+  _bindNativeTargetRowVisibility(chip, axis = "primary") {
+    if (
+      chip?.localName !== "ha-target-picker-item-row"
+      || chip.dataset.advancedHistoryVisibilityBound !== undefined
+    ) return;
+    chip.dataset.advancedHistoryVisibilityBound = axis;
+    chip.addEventListener(
+      "click",
+      (event) => this._nativeTargetChipClicked(event, axis),
+      { capture: true },
+    );
+    chip.addEventListener(
+      "dblclick",
+      (event) => this._nativeTargetChipDoubleClicked(event, axis),
+      { capture: true },
+    );
+  }
+
+  _nativeTargetPickerItems(targetPicker) {
+    const root = targetPicker?.shadowRoot;
+    if (!root) return [];
+    const items = [...root.querySelectorAll("ha-target-picker-value-chip")];
+    for (const group of root.querySelectorAll("ha-target-picker-item-group")) {
+      if (!group.shadowRoot) continue;
+      items.push(...group.shadowRoot.querySelectorAll(
+        "ha-target-picker-item-row:not([sub-entry])"
+      ));
+    }
+    return [...new Set(items)];
+  }
+
+  _nativeParentResolvedEntityIds(targetPicker) {
+    const ids = new Set();
+    const root = targetPicker?.shadowRoot;
+    if (!root) return ids;
+    for (const group of root.querySelectorAll("ha-target-picker-item-group")) {
+      if (group.dataset.advancedHistoryResolvedAxis !== undefined) continue;
+      for (const row of group.shadowRoot?.querySelectorAll(
+        "ha-target-picker-item-row:not([sub-entry])"
+      ) || []) {
+        if (row.type === "entity") continue;
+        for (const entityId of row._entries?.referenced_entities || []) {
+          ids.add(entityId);
+        }
+      }
+    }
+    return ids;
+  }
+
+  async _resolvedParentEntityIds(axis, targets) {
+    const target = Object.fromEntries(
+      ["area_id", "device_id", "floor_id", "label_id"].flatMap((kind) => {
+        const ids = Array.isArray(targets?.[kind]) ? targets[kind] : [];
+        return ids.length ? [[kind, ids]] : [];
+      })
+    );
+    const key = JSON.stringify(target);
+    this._resolvedParentEntityCache ||= {};
+    const cached = this._resolvedParentEntityCache[axis];
+    if (cached?.key === key) return cached.promise;
+    const promise = Object.keys(target).length
+      ? this._hass.callWS({
+        type: "extract_from_target",
+        target,
+        expand_group: false,
+        primary_entities_only: false,
+      }).then((result) => new Set(result?.referenced_entities || []))
+        .catch((error) => {
+          console.warn("Advanced History: parent target resolution failed", error);
+          return new Set();
+        })
+      : Promise.resolve(new Set());
+    this._resolvedParentEntityCache[axis] = { key, promise };
+    return promise;
+  }
+
+  async _syncResolvedEntityTargetGroup(
+    targetPicker,
+    axis,
+    entityIds,
+  ) {
+    const host = targetPicker.shadowRoot?.querySelector(".item-groups");
+    if (!host) return null;
+    let group = host.querySelector(
+      `ha-target-picker-item-group[data-advanced-history-resolved-axis="${axis}"]`
+    );
+    if (!entityIds.length) {
+      group?.remove();
+      return null;
+    }
+    if (!group) {
+      group = document.createElement("ha-target-picker-item-group");
+      group.dataset.advancedHistoryResolvedAxis = axis;
+      group.type = "entity";
+      group.addEventListener("remove-target-item", (event) => {
+        event.stopPropagation();
+        const id = event.detail?.id;
+        const targets = axis === "secondary" ? this._y2Targets : this._targets;
+        const nativeParentEntityIds = axis === "secondary"
+          ? this._nativeSecondaryParentEntityIds
+          : this._nativePrimaryParentEntityIds;
+        if (
+          !targets.entity_id.includes(id)
+          || nativeParentEntityIds?.has(id)
+          || this._entityResolvedByParentTarget(targets, id)
+        ) return;
+        this._nativeTargetsChanged({
+          detail: {
+            value: {
+              ...targets,
+              entity_id: targets.entity_id.filter((entityId) => entityId !== id),
+            },
+          },
+        }, axis);
+      });
+      host.prepend(group);
+    }
+    const entitySignature = JSON.stringify(entityIds);
+    if (group.dataset.advancedHistoryEntitySignature !== entitySignature) {
+      group.dataset.advancedHistoryEntitySignature = entitySignature;
+      group.hass = this._targetPickerHass();
+      group.items = { entity: entityIds };
+      group.requestUpdate?.();
+    }
+    await group.updateComplete;
+    return group;
+  }
+
+  _nativeTargetItemControlHost(item) {
+    return item?.shadowRoot?.querySelector(
+      "wa-tag, ha-list-item-button, ha-list-item-base"
+    ) || null;
+  }
+
   async _syncTargetChipControls(
     chip,
     name,
@@ -598,27 +1156,32 @@ export class TargetPickerMethods {
     showRunningTotal,
   ) {
     await chip.updateComplete;
-    const host = chip.shadowRoot?.querySelector("wa-tag");
+    const host = this._nativeTargetItemControlHost(chip);
     if (!host) return;
     host.querySelectorAll(
       "[data-advanced-history-controls], [data-advanced-history-series], [data-advanced-history-running-total]"
     ).forEach((button) => button.remove());
     const controls = document.createElement("span");
     controls.dataset.advancedHistoryControls = "";
+    const rowHost = chip.localName === "ha-target-picker-item-row";
+    if (rowHost) controls.slot = "end";
     controls.style.cssText = [
       "display:inline-flex",
       "align-items:center",
       "gap:0",
-      "margin-inline:-5px -3px",
+      `margin-inline:${rowHost ? "0" : "-5px -3px"}`,
       "padding:0",
       "line-height:0",
     ].join(";");
-    if (showSeries) this._syncSeriesButton(chip, name, controls);
+    if (showSeries) this._syncSeriesButton(chip, name, axis, controls);
     if (showRunningTotal) this._syncRunningTotalButton(chip, name, axis, controls);
-    host.append(controls);
+    const removeButton = rowHost
+      ? host.querySelector("ha-icon-button[slot='end']")
+      : null;
+    host.insertBefore(controls, removeButton);
   }
 
-  _syncSeriesButton(chip, name, host = null) {
+  _syncSeriesButton(chip, name, axis = "primary", host = null) {
     const entity = chip.itemId;
     const button = document.createElement("button");
     button.type = "button";
@@ -647,7 +1210,7 @@ export class TargetPickerMethods {
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      this._openSeriesDialog(entity);
+      this._openSeriesDialog(entity, axis);
     });
     if (host) host.append(button);
     else chip.insertAdjacentElement("afterend", button);
@@ -834,7 +1397,9 @@ export class TargetPickerMethods {
         typeof options.attribute === "string"
       )
       .map(([, options]) => options.attribute);
-    const nativeAttributes = this._nativeHistorySeries(entity).map((item) => item.attribute);
+    const nativeAttributes = this._nativeHistorySeries(entity)
+      .map((item) => item.attribute)
+      .filter((attribute) => typeof attribute === "string" && attribute);
     const metadataAttributes = new Set([
       "assumed_state",
       "attribution",
@@ -897,8 +1462,8 @@ export class TargetPickerMethods {
     ];
   }
 
-  _openSeriesDialog(entity) {
-    if (!this._targets.entity_id.includes(entity)) return;
+  _openSeriesDialog(entity, axis = "primary") {
+    if (!this._seriesTargetAvailable(entity, axis)) return;
     this.shadowRoot.querySelector(".series-backdrop")?.remove();
     const name = this._entityDisplayName(entity);
     const choices = this._seriesChoices(entity);
@@ -1015,11 +1580,16 @@ export class TargetPickerMethods {
     this.shadowRoot.append(backdrop);
   }
 
+  _seriesTargetAvailable(entity, axis = "primary") {
+    const targets = axis === "secondary" ? this._y2Targets : this._targets;
+    return this._targetsResolveItem(targets, "entity_id", entity);
+  }
+
   _toggleTargetVisibility(axis, kind, id) {
     const secondary = axis === "secondary";
     const targets = secondary ? this._y2Targets : this._targets;
     const hiddenTargets = secondary ? this._hiddenY2Targets : this._hiddenTargets;
-    if (!targets[kind]?.includes(id)) return;
+    if (!this._targetsResolveItem(targets, kind, id)) return;
     const hidden = new Set(hiddenTargets[kind] || []);
     if (hidden.has(id)) hidden.delete(id);
     else hidden.add(id);
@@ -1035,11 +1605,33 @@ export class TargetPickerMethods {
       ["_y2Targets", "_hiddenY2Targets"],
     ]) {
       const hidden = this._normalizeTargets(this[hiddenKey] || {});
-      for (const kind of ["area_id", "device_id", "entity_id"]) {
+      for (const kind of ["area_id", "device_id"]) {
         hidden[kind] = hidden[kind].filter((id) => this[targetsKey][kind].includes(id));
+      }
+      if (this._entities.length) {
+        hidden.entity_id = hidden.entity_id.filter((id) => (
+          this._targetsResolveItem(this[targetsKey], "entity_id", id)
+        ));
       }
       this[hiddenKey] = hidden;
     }
+  }
+
+  _targetsResolveItem(targets, kind, id) {
+    if (targets[kind]?.includes(id)) return true;
+    if (kind !== "entity_id") return false;
+    return this._entityResolvedByParentTarget(targets, id);
+  }
+
+  _entityResolvedByParentTarget(targets, id) {
+    const entity = this._entities.find((item) => item.entity_id === id);
+    if (!entity) return false;
+    const device = entity.device_id
+      ? this._devices.find((item) => item.id === entity.device_id)
+      : null;
+    const areaId = entity.area_id || device?.area_id;
+    return targets.device_id.includes(entity.device_id)
+      || targets.area_id.includes(areaId);
   }
 
   _targetCount(targets) {
@@ -1056,12 +1648,10 @@ export class TargetPickerMethods {
 
   _resolvedEntityIds() {
     const deviceById = new Map(this._devices.map((device) => [device.id, device]));
-    const resolve = (targets, hiddenTargets) => {
+    const resolve = (targets, hiddenTargets, axis) => {
       const hidden = this._normalizeTargets(hiddenTargets || {});
-      const ids = new Set(targets.entity_id);
-      const enabled = new Set(
-        targets.entity_id.filter((id) => !hidden.entity_id.includes(id))
-      );
+      const ids = new Set();
+      const enabled = new Set();
       const selectedDevices = new Set(targets.device_id);
       const selectedAreas = new Set(targets.area_id);
       const enabledDevices = new Set(
@@ -1074,14 +1664,37 @@ export class TargetPickerMethods {
         if (entity.disabled_by || (!this.config.include_hidden && entity.hidden_by)) continue;
         const device = entity.device_id ? deviceById.get(entity.device_id) : null;
         const areaId = entity.area_id || device?.area_id;
-        if (selectedDevices.has(entity.device_id) || selectedAreas.has(areaId)) ids.add(entity.entity_id);
-        if (enabledDevices.has(entity.device_id) || enabledAreas.has(areaId)) enabled.add(entity.entity_id);
+        const directlySelected = targets.entity_id.includes(entity.entity_id);
+        if (
+          directlySelected
+          || selectedDevices.has(entity.device_id)
+          || selectedAreas.has(areaId)
+        ) ids.add(entity.entity_id);
+        if (
+          (
+            directlySelected
+            || enabledDevices.has(entity.device_id)
+            || enabledAreas.has(areaId)
+          )
+          && !hidden.entity_id.includes(entity.entity_id)
+        ) enabled.add(entity.entity_id);
       }
-      return { ids, enabled };
+      // Retain unavailable or removed explicit entities after the registry
+      // entries, while keeping area/device expansion in one stable order.
+      for (const entityId of targets.entity_id) {
+        ids.add(entityId);
+        if (!hidden.entity_id.includes(entityId)) enabled.add(entityId);
+      }
+      return {
+        ids: new Set([...ids].filter((id) => this._entityMatchesSourceFilters(id, axis))),
+        enabled: new Set(
+          [...enabled].filter((id) => this._entityMatchesSourceFilters(id, axis))
+        ),
+      };
     };
-    const primary = resolve(this._targets, this._hiddenTargets);
+    const primary = resolve(this._targets, this._hiddenTargets, "primary");
     const secondary = this._secondaryAxisVisible()
-      ? resolve(this._y2Targets, this._hiddenY2Targets)
+      ? resolve(this._y2Targets, this._hiddenY2Targets, "secondary")
       : { ids: new Set(), enabled: new Set() };
     const available = [...new Set([...primary.ids, ...secondary.ids])]
       .filter((id) => this._hass.states[id]);
@@ -1096,6 +1709,13 @@ export class TargetPickerMethods {
       return limited;
     }
     return available;
+  }
+
+  _resolvedEntityIdsForAxis(axis = "primary") {
+    const available = this._resolvedEntityIds();
+    return axis === "secondary"
+      ? available.filter((id) => this._y2ResolvedEntityIds.has(id))
+      : available.filter((id) => !this._y2ResolvedEntityIds.has(id));
   }
 
   _areaName(id) { return this._areas.find((area) => area.area_id === id)?.name || id || this._localize("ui.components.device-picker.no_area", "No area"); }

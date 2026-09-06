@@ -49,6 +49,11 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._periodUnsubscribe = null;
     this._nativeTargetPicker = null;
     this._nativeY2TargetPicker = null;
+    this._targetPrimarySourcesShown = undefined;
+    this._targetSecondarySourcesShown = undefined;
+    this._restoreTargetSidebarState?.();
+    this._targetPrimarySourceFilters = {};
+    this._targetSecondarySourceFilters = {};
     this._editorAutoColors = new Map();
     this._activeSnapshot = null;
     this._periodStore = null;
@@ -430,6 +435,39 @@ export class AdvancedHistoryPanel extends HTMLElement {
     const hasY2Targets = secondaryAxisEditable && Boolean(this._targetCount(this._y2Targets));
     const y1TargetClass = !hasY1Targets && hasY2Targets ? " axis-target-compact" : "";
     const y2TargetClass = !hasY2Targets && hasY1Targets ? " axis-target-compact" : "";
+    const useTargetSidebar = !dependencyMissing && this._useTargetSidebar();
+    const primaryTargetControls = `<div class="axis-target-group axis-target-primary${y1TargetClass}">
+      <div class="axis-target-label">
+        <button id="toggle-y1-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("primary_axis"))}" aria-label="${this._escape(this._customLocalize("primary_axis"))}" aria-pressed="true">Y1</button>${useTargetSidebar ? "" : `<span>${this._escape(this._customLocalize("primary_axis"))}</span>`}
+        <div class="axis-comparison-menu-shell">
+          <button id="toggle-y1-comparison" class="axis-compare-toggle axis-compare-primary" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-pressed="false"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+          <ha-dropdown id="y1-comparison-menu" class="axis-comparison-menu" placement="bottom-start" distance="7"></ha-dropdown>
+        </div>
+        <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
+      </div>
+      <div id="target-picker-host" class="native-target-picker">
+        <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+      </div>
+    </div>`;
+    const secondaryTargetControls = secondaryAxisEditable ? `<div class="axis-target-group axis-target-secondary${y2TargetClass}">
+      <div class="axis-target-label">
+        <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
+        <button id="toggle-y2-comparison" class="axis-compare-toggle${this._excludeY2Comparison ? "" : " active"}" type="button" hidden aria-pressed="${this._excludeY2Comparison ? "false" : "true"}"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+        <button id="toggle-y2-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("secondary_axis"))}" aria-label="${this._escape(this._customLocalize("secondary_axis"))}" aria-pressed="true">Y2</button>${useTargetSidebar ? "" : `<span>${this._escape(this._customLocalize("secondary_axis"))}</span>`}
+      </div>
+      <div id="y2-target-picker-host" class="native-target-picker">
+        <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+      </div>
+    </div>` : "";
+    const centerContent = `
+      <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
+        <ha-circular-progress active size="small"></ha-circular-progress>
+        <span id="period-loading-text">${this._escape(this._customLocalize("loading_requested_range"))}</span>
+      </section>
+      ${dependencyMissing ? "" : `<section id="compare-banner" class="compare-banner" hidden></section>`}
+      <section id="detail-banner" class="detail-banner" hidden></section>
+      ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
+      <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>`;
     this._nativeTargetPicker = null;
     this._nativeY2TargetPicker = null;
     this.shadowRoot.innerHTML = `
@@ -445,41 +483,27 @@ export class AdvancedHistoryPanel extends HTMLElement {
         <button id="redo" class="icon-button" title="${this._escape(redo)}"><ha-icon icon="mdi:redo"></ha-icon></button>
         <button id="remove-all" class="icon-button" title="${this._escape(removeAll)}" ${this._targetCount() ? "" : "hidden"}><ha-icon icon="mdi:filter-remove-outline"></ha-icon></button>
       </header>
-      <main class="content${this._datePickerAutoHide ? " date-picker-auto-hide" : ""}">
-        ${dependencyMissing ? "" : `<section class="filters axis-targets">
-          <div class="axis-target-group axis-target-primary${y1TargetClass}">
-            <div class="axis-target-label">
-              <button id="toggle-y1-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("primary_axis"))}" aria-label="${this._escape(this._customLocalize("primary_axis"))}" aria-pressed="true">Y1</button><span>${this._escape(this._customLocalize("primary_axis"))}</span>
-              <div class="axis-comparison-menu-shell">
-                <button id="toggle-y1-comparison" class="axis-compare-toggle axis-compare-primary" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-pressed="false"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
-                <ha-dropdown id="y1-comparison-menu" class="axis-comparison-menu" placement="bottom-start" distance="7"></ha-dropdown>
-              </div>
-              <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
+      <main class="content${useTargetSidebar ? " target-sidebar-layout" : ""}${this._datePickerAutoHide ? " date-picker-auto-hide" : ""}">
+        ${useTargetSidebar ? `
+          <ha-filter-pane id="target-sources-pane-primary" class="target-sources-pane target-sources-primary">
+            <section class="target-sidebar-targets">${primaryTargetControls}</section>
+          </ha-filter-pane>
+          <div class="target-sidebar-content">
+            <div class="target-sidebar-toolbar">
+              <ha-filter-pane-chip id="target-sources-chip-primary"></ha-filter-pane-chip>
+              <span class="spacer"></span>
+              ${secondaryAxisEditable ? `<ha-filter-pane-chip id="target-sources-chip-secondary"></ha-filter-pane-chip>` : ""}
             </div>
-            <div id="target-picker-host" class="native-target-picker">
-              <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
-            </div>
+            ${centerContent}
           </div>
-          ${secondaryAxisEditable ? `<div class="axis-target-divider" aria-hidden="true"></div>
-          <div class="axis-target-group axis-target-secondary${y2TargetClass}">
-            <div class="axis-target-label">
-              <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
-              <button id="toggle-y2-comparison" class="axis-compare-toggle${this._excludeY2Comparison ? "" : " active"}" type="button" hidden aria-pressed="${this._excludeY2Comparison ? "false" : "true"}"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
-              <button id="toggle-y2-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("secondary_axis"))}" aria-label="${this._escape(this._customLocalize("secondary_axis"))}" aria-pressed="true">Y2</button><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
-            </div>
-            <div id="y2-target-picker-host" class="native-target-picker">
-              <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
-            </div>
-          </div>` : ""}
-        </section>`}
-        <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
-          <ha-circular-progress active size="small"></ha-circular-progress>
-          <span id="period-loading-text">${this._escape(this._customLocalize("loading_requested_range"))}</span>
-        </section>
-        ${dependencyMissing ? "" : `<section id="compare-banner" class="compare-banner" hidden></section>`}
-        <section id="detail-banner" class="detail-banner" hidden></section>
-        ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
-        <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>
+          ${secondaryAxisEditable ? `<ha-filter-pane id="target-sources-pane-secondary" class="target-sources-pane target-sources-secondary">
+            <section class="target-sidebar-targets">${secondaryTargetControls}</section>
+          </ha-filter-pane>` : ""}` : `
+          ${dependencyMissing ? "" : `<section class="filters axis-targets">
+            ${primaryTargetControls}
+            ${secondaryAxisEditable ? `<div class="axis-target-divider" aria-hidden="true"></div>${secondaryTargetControls}` : ""}
+          </section>`}
+          ${centerContent}`}
       </main>
       ${dependencyMissing ? "" : `<button id="date-controller-reveal" class="period-selector-reveal-zone" type="button" title="${this._escape(showDatePicker)}" aria-label="${this._escape(showDatePicker)}" ${this._datePickerAutoHide ? "" : "hidden"}></button>
       <div id="date-controller" class="period-selector-floating${this._datePickerAutoHide ? " auto-hide" : ""}"></div>`}`;
@@ -527,6 +551,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._bindPeriodSelectorAutoHide?.();
     this._bindPanelTabs();
     this._updateUndoRedoButtons();
+    this._syncTargetSidebars();
     if (!dependencyMissing) {
       void this._renderNativeTargetPicker("primary").then(() => {
         if (secondaryAxisEditable) return this._renderNativeTargetPicker("secondary");

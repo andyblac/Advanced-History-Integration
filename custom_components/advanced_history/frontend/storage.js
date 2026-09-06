@@ -60,6 +60,7 @@ export class StorageMethods {
       this._hiddenTargets = this._normalizeTargets(incomingSnapshot.hidden_targets || {});
       this._y2Targets = this._normalizeTargets(incomingSnapshot.y2_targets || {});
       this._hiddenY2Targets = this._normalizeTargets(incomingSnapshot.hidden_y2_targets || {});
+      this._restoreTargetSourceFilters(incomingSnapshot);
       incomingSnapshot.chart = this._normalizeSnapshotChart(incomingSnapshot.chart);
       this._excludeY2Comparison = Boolean(incomingSnapshot.chart.exclude_y2_comparison);
       this._comparisonBannerVisible = incomingSnapshot.chart.show_comparison_banner !== false;
@@ -134,6 +135,7 @@ export class StorageMethods {
       this._hiddenTargets = this._normalizeTargets(previous.hidden_targets || {});
       this._y2Targets = this._normalizeTargets(previous.y2_targets || {});
       this._hiddenY2Targets = this._normalizeTargets(previous.hidden_y2_targets || {});
+      this._restoreTargetSourceFilters(previous);
       this._pruneHiddenTargets();
     }
   }
@@ -509,6 +511,8 @@ export class StorageMethods {
       hidden_targets: this._clone(this._hiddenTargets),
       y2_targets: this._clone(this._y2Targets),
       hidden_y2_targets: this._clone(this._hiddenY2Targets),
+      target_filters: this._clone(this._targetPrimarySourceFilters),
+      y2_target_filters: this._clone(this._targetSecondarySourceFilters),
       chart,
       period,
       source_bookmark_id: this._loadedBookmarkId || null,
@@ -527,6 +531,8 @@ export class StorageMethods {
       hidden_targets: snapshot.hidden_targets,
       y2_targets: snapshot.y2_targets,
       hidden_y2_targets: snapshot.hidden_y2_targets,
+      target_filters: snapshot.target_filters,
+      y2_target_filters: snapshot.y2_target_filters,
       chart: snapshot.chart,
       period,
     });
@@ -990,6 +996,7 @@ export class StorageMethods {
     this._hiddenTargets = this._normalizeTargets(snapshot.hidden_targets || {});
     this._y2Targets = this._normalizeTargets(snapshot.y2_targets || {});
     this._hiddenY2Targets = this._normalizeTargets(snapshot.hidden_y2_targets || {});
+    this._restoreTargetSourceFilters(snapshot);
     this._pruneHiddenTargets();
     if (!this._targetCount()) this._resetPeriodSelection(this._periodStore, true);
     this._saveTargets();

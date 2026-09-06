@@ -8,6 +8,7 @@ import {
   withoutClimateModeAnnotations,
 } from "../custom_components/advanced_history/frontend/climate.js";
 import { nativeHistoryAttributeColor } from "../custom_components/advanced_history/frontend/history-series.js";
+import { GraphMethods } from "../custom_components/advanced_history/frontend/graphs.js";
 
 test("uses the current and single target temperature attributes", () => {
   assert.deepEqual(climateHistoryAttributes({
@@ -16,6 +17,65 @@ test("uses the current and single target temperature attributes", () => {
       temperature: 21,
     },
   }), ["current_temperature", "temperature"]);
+});
+
+test("keeps the climate state alongside its native temperature series", () => {
+  const context = {
+    _hass: {
+      states: {
+        "climate.lounge": {
+          state: "heat",
+          attributes: { current_temperature: 19, temperature: 21 },
+        },
+      },
+    },
+    _seriesKey: GraphMethods.prototype._seriesKey,
+  };
+
+  assert.deepEqual(
+    GraphMethods.prototype._nativeHistorySeries.call(context, "climate.lounge"),
+    [
+      { entity: "climate.lounge", attribute: null, key: "climate.lounge" },
+      {
+        entity: "climate.lounge",
+        attribute: "current_temperature",
+        key: "climate.lounge::current_temperature",
+      },
+      {
+        entity: "climate.lounge",
+        attribute: "temperature",
+        key: "climate.lounge::temperature",
+      },
+    ],
+  );
+});
+
+test("keeps humidifier and water-heater states alongside native attributes", () => {
+  const context = {
+    _hass: {
+      states: {
+        "humidifier.room": {
+          state: "on",
+          attributes: { current_humidity: 48, humidity: 50 },
+        },
+        "water_heater.tank": {
+          state: "heat_pump",
+          attributes: { current_temperature: 49, temperature: 55 },
+        },
+      },
+    },
+    _seriesKey: GraphMethods.prototype._seriesKey,
+  };
+
+  for (const [entity, attributes] of [
+    ["humidifier.room", ["current_humidity", "humidity"]],
+    ["water_heater.tank", ["current_temperature", "temperature"]],
+  ]) {
+    const series = GraphMethods.prototype._nativeHistorySeries.call(context, entity);
+    assert.equal(series[0].key, entity);
+    assert.equal(series[0].attribute, null);
+    assert.deepEqual(series.slice(1).map(({ attribute }) => attribute), attributes);
+  }
 });
 
 test("uses the target range instead of the single target temperature", () => {

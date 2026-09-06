@@ -77,6 +77,7 @@ export class PanelTabsMethods {
       notice: this._notice || "",
       large_range_fine_detail: Boolean(this._largeRangeFineDetail),
       large_range_detail_dismissed_key: this._largeRangeDetailDismissedKey || null,
+      target_sidebar_state: this._captureTargetSidebarPanelState(),
     };
   }
 
@@ -184,6 +185,8 @@ export class PanelTabsMethods {
       hidden_targets: { area_id: [], device_id: [], entity_id: [] },
       y2_targets: { area_id: [], device_id: [], entity_id: [] },
       hidden_y2_targets: { area_id: [], device_id: [], entity_id: [] },
+      target_filters: {},
+      y2_target_filters: {},
       chart,
       period: {
         start: start.toISOString(),
@@ -209,6 +212,7 @@ export class PanelTabsMethods {
       notice: "",
       large_range_fine_detail: false,
       large_range_detail_dismissed_key: null,
+      target_sidebar_state: this._captureTargetSidebarPanelState(),
     };
   }
 
@@ -232,6 +236,7 @@ export class PanelTabsMethods {
     this._notice = state.notice || "";
     this._largeRangeFineDetail = Boolean(state.large_range_fine_detail);
     this._largeRangeDetailDismissedKey = state.large_range_detail_dismissed_key || null;
+    this._restoreTargetSidebarPanelState(state.target_sidebar_state);
     this._largeRangeDetailStateKey = null;
     this._comparisonState = null;
     this._comparisonChoice = state.snapshot?.period?.compare_choice || null;

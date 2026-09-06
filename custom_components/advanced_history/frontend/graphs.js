@@ -21,6 +21,7 @@ import { cumulativeRunningTotalSeries } from "./running-total.js";
 
 const DATA_SOURCE_CACHE = new Map();
 const ENTITY_OPTION_REMOVALS = "__advanced_history_remove_options";
+const MIN_NUMERIC_GRAPH_HEIGHT = 320;
 const EXTENDED_ENTITY_COLORS = Object.freeze([
   // The card's compact palette already covers red, blue, green, orange,
   // purple and teal. Start its extension with a visibly separate colour so
@@ -270,20 +271,28 @@ export class GraphMethods {
     }
     const numeric = series.filter((item) => this._isNumeric(item));
     const states = series.filter((item) => !this._isNumeric(item));
-    const multipleCharts = Boolean(numeric.length && states.length);
+    const numericGroups = this._numericSeriesGroups(numeric);
+    const multipleCharts = numericGroups.length + (states.length ? 1 : 0) > 1;
     this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
     // Establish the available chart region before configuring cards with the
     // card's native height:auto + numeric grid-row contract.
-    this._configureDynamicGraphLayout(host, Boolean(numeric.length), Boolean(states.length));
-    if (numeric.length) {
+    this._configureDynamicGraphLayout(
+      host,
+      Boolean(numeric.length),
+      Boolean(states.length),
+      numericGroups.length,
+    );
+    if (numericGroups.length) {
       const numericMode = this._cardOptions("timeline").chart_mode || "timeline";
-      this._createGraph(
-        host,
-        numeric,
-        multipleCharts ? this._customLocalize("numeric_history") : "",
-        numericMode,
-        detail,
-      );
+      for (const group of numericGroups) {
+        this._createGraph(
+          host,
+          group.series,
+          multipleCharts ? this._numericSeriesGroupTitle(group) : "",
+          numericMode,
+          detail,
+        );
+      }
     }
     if (states.length) {
       this._createGraph(
@@ -392,11 +401,13 @@ export class GraphMethods {
     card.setConfig(fittedConfig);
   }
 
-  _configureDynamicGraphLayout(host, hasNumeric, hasState) {
+  _configureDynamicGraphLayout(host, hasNumeric, hasState, numericChartCount = hasNumeric ? 1 : 0) {
     const configuredNumericHeight = this._cardOptions("timeline").height;
-    const autoNumericHeight = hasNumeric && (
+    const usesAutomaticNumericHeight = hasNumeric && (
       configuredNumericHeight == null || configuredNumericHeight === "auto"
     );
+    const autoNumericHeight = numericChartCount === 1 && usesAutomaticNumericHeight;
+    host.classList.toggle("auto-numeric-height", usesAutomaticNumericHeight);
     host.classList.toggle("dynamic-numeric", autoNumericHeight);
     host.classList.toggle("has-state-graph", autoNumericHeight && hasState);
     if (!autoNumericHeight) {
@@ -431,7 +442,7 @@ export class GraphMethods {
           ? Math.min(viewportHeight, controllerTop)
           : viewportHeight;
       const top = Math.max(0, host.getBoundingClientRect().top);
-      const available = Math.max(240, Math.floor(bottom - top - 16));
+      const available = Math.max(MIN_NUMERIC_GRAPH_HEIGHT, Math.floor(bottom - top - 16));
       const numericShell = host.querySelector(".graph-shell.numeric-graph");
       const numericCard = numericShell?.querySelector(CARD_TAG);
       const cardRoot = numericCard?.shadowRoot;
@@ -450,7 +461,7 @@ export class GraphMethods {
       observe(detailLegend);
       const numericRequirement = this._numericCardRequiredHeight(numericCard);
       const layoutHeight = this._dashboardCardMode
-        ? Math.max(240, numericRequirement)
+        ? Math.max(MIN_NUMERIC_GRAPH_HEIGHT, numericRequirement)
         : available;
       if (hasState) {
         host.style.removeProperty("height");
@@ -461,7 +472,7 @@ export class GraphMethods {
         const stateShell = host.querySelector(".graph-shell.state-graph");
         const stateHeight = Math.ceil(stateShell?.getBoundingClientRect().height || 0);
         const numericHeight = `${Math.max(
-          240,
+          MIN_NUMERIC_GRAPH_HEIGHT,
           layoutHeight - stateHeight - 16,
           numericRequirement,
         )}px`;
@@ -671,6 +682,17 @@ export class GraphMethods {
     for (const entry of entries) {
       if (this._legendEntryHidden(entry) !== hide) entry.click();
     }
+    const secondary = axis === "secondary";
+    const targets = secondary ? this._y2Targets : this._targets;
+    const hiddenTargets = secondary ? this._hiddenY2Targets : this._hiddenTargets;
+    const entityIds = this._resolvedEntityIdsForAxis(axis);
+    for (const kind of ["area_id", "device_id", "entity_id"]) {
+      hiddenTargets[kind] = hide
+        ? [...(kind === "entity_id" ? entityIds : targets[kind])]
+        : [];
+    }
+    this._recordChange(null, true);
+    this._syncNativeTargetVisibility?.(axis);
     this._syncDashboardSgccVisibilityFromCards?.();
     this._syncAxisVisibilityButtons();
   }
@@ -1581,13 +1603,91 @@ export class GraphMethods {
     return !(hasNumeric && hasState);
   }
 
+  _numericSeriesGroup(value) {
+    const { entity, attribute } = this._seriesDescriptor(value);
+    const state = this._hass.states[entity];
+    const domain = entity.split(".")[0];
+    const nativeAttributeUnit = attribute
+      ? historyAttributeUnit(this._hass, entity)
+      : undefined;
+    const unit = nativeAttributeUnit
+      || state?.attributes?.unit_of_measurement
+      || "";
+    const specialDeviceClasses = {
+      climate: "temperature",
+      humidifier: "humidity",
+      water_heater: "temperature",
+    };
+    const deviceClass = specialDeviceClasses[domain]
+      || state?.attributes?.device_class
+      || "";
+    return {
+      key: `${unit}\u0000${deviceClass}`,
+      unit,
+      deviceClass,
+      domain,
+    };
+  }
+
+  _numericSeriesGroups(series) {
+    if (this._activeSnapshot?.single_graph) {
+      return series.length ? [{ key: "single", unit: "", deviceClass: "", series }] : [];
+    }
+    const groups = new Map();
+    const secondarySeries = [];
+    for (const item of series) {
+      const { entity } = this._seriesDescriptor(item);
+      if (this._y2ResolvedEntityIds?.has(entity)) {
+        secondarySeries.push(item);
+        continue;
+      }
+      const group = this._numericSeriesGroup(item);
+      if (!groups.has(group.key)) groups.set(group.key, { ...group, series: [] });
+      groups.get(group.key).series.push(item);
+    }
+    if (secondarySeries.length) {
+      let primaryGroup = groups.values().next().value;
+      if (!primaryGroup) {
+        const group = this._numericSeriesGroup(secondarySeries[0]);
+        primaryGroup = { ...group, series: [] };
+        groups.set(group.key, primaryGroup);
+      }
+      // Y2 is explicitly chosen to overlay a second scale on the chart. It
+      // must not become a separate unit/device-class graph of its own.
+      primaryGroup.series.push(...secondarySeries);
+    }
+    return [...groups.values()];
+  }
+
+  _numericSeriesGroupTitle(group) {
+    const unit = String(group.unit || "").trim();
+    const deviceClass = String(group.deviceClass || "").trim();
+    if (!deviceClass) return unit || this._customLocalize("numeric_history");
+    const fallback = deviceClass
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const className = this._localize(
+      `component.sensor.entity_component.${deviceClass}.name`,
+      fallback,
+    );
+    return unit ? `${className} (${unit})` : className;
+  }
+
   _nativeHistorySeries(entity) {
     const state = this._hass.states[entity];
-    return nativeHistoryAttributes(entity, state).map((attribute) => ({
+    const attributeSeries = nativeHistoryAttributes(entity, state).map((attribute) => ({
       entity,
       attribute,
       key: this._seriesKey(entity, attribute),
     }));
+    // Home Assistant's multi-value domains are both numeric and categorical:
+    // their measurement attributes form a line chart while their operating
+    // state remains useful history in its own right. Keep the base state so
+    // AHP can render a state timeline alongside the native attribute series.
+    const domain = entity.split(".", 1)[0];
+    return ["climate", "humidifier", "water_heater"].includes(domain)
+      ? [{ entity, attribute: null, key: this._seriesKey(entity) }, ...attributeSeries]
+      : attributeSeries;
   }
 
   _seriesDescriptors(

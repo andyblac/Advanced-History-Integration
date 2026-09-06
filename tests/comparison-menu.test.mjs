@@ -385,6 +385,23 @@ test("axis badges hide and restore every main legend series on their axis", () =
   };
   const context = Object.assign(Object.create(GraphMethods.prototype), {
     _graphCards: [card],
+    _targets: {
+      area_id: ["living_room"],
+      device_id: [],
+      entity_id: ["sensor.gas", "sensor.power"],
+    },
+    _hiddenTargets: { area_id: [], device_id: [], entity_id: ["sensor.gas"] },
+    _y2Targets: {
+      area_id: [],
+      device_id: [],
+      entity_id: ["sensor.temperature"],
+    },
+    _hiddenY2Targets: { area_id: [], device_id: [], entity_id: [] },
+    _resolvedEntityIdsForAxis: (axis) => axis === "secondary"
+      ? ["sensor.temperature"]
+      : ["sensor.gas", "sensor.power"],
+    _recordChange: (...args) => buttonState.set("record-change", args),
+    _syncNativeTargetVisibility: (axis) => buttonState.set("sync-axis", axis),
     shadowRoot: { getElementById: (id) => buttons[id] },
   });
 
@@ -396,6 +413,13 @@ test("axis badges hide and restore every main legend series on their axis", () =
   assert.equal(context._legendEntryHidden(temperature), false);
   assert.equal(buttonState.get("y1:all-hidden"), true);
   assert.equal(buttonState.get("y1:aria-pressed"), "false");
+  assert.deepEqual(context._hiddenTargets, {
+    area_id: ["living_room"],
+    device_id: [],
+    entity_id: ["sensor.gas", "sensor.power"],
+  });
+  assert.deepEqual(buttonState.get("record-change"), [null, true]);
+  assert.equal(buttonState.get("sync-axis"), "primary");
 
   context._toggleAxisLegendVisibility("primary");
   assert.equal(context._legendEntryHidden(gas), false);
@@ -403,6 +427,11 @@ test("axis badges hide and restore every main legend series on their axis", () =
   assert.equal(context._legendEntryHidden(temperature), false);
   assert.equal(buttonState.get("y1:all-hidden"), false);
   assert.equal(buttonState.get("y1:aria-pressed"), "true");
+  assert.deepEqual(context._hiddenTargets, {
+    area_id: [],
+    device_id: [],
+    entity_id: [],
+  });
 });
 
 test("dashboard SGCC inherits the wrapper background when transparency is the default", () => {

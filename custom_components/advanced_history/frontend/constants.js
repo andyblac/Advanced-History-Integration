@@ -56,6 +56,7 @@ export const UNDO_STORAGE_KEY = "advanced-history-panel.undo.v1";
 export const REDO_STORAGE_KEY = "advanced-history-panel.redo.v1";
 export const PANEL_TABS_STORAGE_KEY = "advanced-history-panel.tabs.v1";
 export const DATE_PICKER_AUTO_HIDE_STORAGE_KEY = "advanced-history-panel.date-picker-auto-hide.v1";
+export const TARGET_SIDEBAR_STATE_STORAGE_KEY = "advanced-history-panel.target-sidebars.v1";
 // Schema 2 added stable per-panel metadata. Retired collection keys are
 // stripped while loading older records.
 export const PANEL_TABS_SCHEMA = 2;
