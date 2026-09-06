@@ -31,6 +31,46 @@ test("fine-detail banner follows the rendered SGCC group picker", () => {
   });
 });
 
+test("fine-detail group picker changes become bookmark overrides", () => {
+  const picker = {
+    value: "interval",
+    selectedIndex: 0,
+    selectedOptions: [{ textContent: "Interval" }],
+    options: [{ textContent: "Interval" }],
+  };
+  const card = { shadowRoot: { querySelector: () => picker } };
+  let recorded = 0;
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _activeSnapshot: {
+      defaults_mode: "overrides",
+      card_options: { numeric: { show_fill: true }, state: {} },
+      entity_options: {},
+    },
+    _clone: (value) => structuredClone(value),
+    _largeRangeDetailProfile: () => ({
+      automatic: false,
+      groupBy: "6h",
+      key: "range",
+    }),
+    _recordChange: (_snapshot, bookmarkEdit) => {
+      assert.equal(bookmarkEdit, true);
+      recorded += 1;
+    },
+  });
+
+  assert.equal(context._persistFineDetailGroupSelection(card), true);
+  assert.deepEqual(context._activeSnapshot.card_options.numeric, {
+    show_fill: true,
+    auto_scale_points: false,
+    group_by: "interval",
+    show_group_by_picker: true,
+  });
+  assert.deepEqual(context._activeSnapshot.card_options.state, {});
+  assert.equal(recorded, 1);
+  assert.equal(context._persistFineDetailGroupSelection(card), false);
+  assert.equal(recorded, 1);
+});
+
 test("grouped chart downloads retain one separately named CSV per rendered card", () => {
   const first = { _buildCsvText: () => "first", _config: {} };
   const second = { _buildCsvText: () => "second", _config: { card_header: "Native title" } };

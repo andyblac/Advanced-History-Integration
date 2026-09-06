@@ -520,6 +520,7 @@ export class GraphMethods {
         root.addEventListener("change", (event) => {
           if (!event.target?.closest?.('[data-qp="gby"], .sgc-group-by-picker')) return;
           this._syncLargeRangeDetailBannerFromCard(card);
+          this._persistFineDetailGroupSelection(card);
         });
         this._graphLayoutMutationObserver?.observe(root, {
           childList: true,
@@ -1078,6 +1079,37 @@ export class GraphMethods {
   _syncLargeRangeDetailBannerFromCard(card) {
     const profile = this._largeRangeDetailProfileFromCard(card);
     if (profile && !profile.automatic) this._renderLargeRangeDetailBanner(profile);
+  }
+
+  _persistFineDetailGroupSelection(card) {
+    const profile = this._largeRangeDetailProfileFromCard(card);
+    if (!profile || profile.automatic || !profile.groupBy) return false;
+    const snapshot = this._activeSnapshot ||= {
+      defaults_mode: "overrides",
+      card_options: {},
+      entity_options: {},
+    };
+    const configured = snapshot.card_options;
+    const typed = configured
+      && typeof configured === "object"
+      && !Array.isArray(configured)
+      && (configured.numeric || configured.state);
+    const numeric = this._clone(
+      typed ? configured.numeric || {} : configured || {},
+    );
+    if (
+      numeric.auto_scale_points === false
+      && numeric.group_by === profile.groupBy
+      && numeric.show_group_by_picker === true
+    ) return false;
+    numeric.auto_scale_points = false;
+    numeric.group_by = profile.groupBy;
+    numeric.show_group_by_picker = true;
+    snapshot.card_options = typed
+      ? { ...this._clone(configured), numeric }
+      : numeric;
+    this._recordChange(null, true);
+    return true;
   }
 
   _renderLargeRangeDetailBanner(profile = this._largeRangeDetailProfile()) {
