@@ -1496,9 +1496,21 @@ export class StorageMethods {
   }
 
   async _openLibrary(kind = "bookmarks") {
-    if (this.shadowRoot.querySelector(".backdrop") || this._libraryOpening) return;
+    if (
+      this.shadowRoot.querySelector(".backdrop, .library-dialog-host")
+      || this._libraryOpening
+    ) return;
     this._libraryOpening = true;
     try {
+      if (
+        this._narrow
+        && !customElements.get("ha-adaptive-dialog")
+        && this._homeAssistantVersionAtLeast?.(2026, 9)
+      ) {
+        try {
+          await this._loadNativeHistoryPicker?.(true);
+        } catch (_) { /* Retain the existing full-screen mobile fallback. */ }
+      }
       if (kind === "bookmarks") {
         await this._refreshSyncedBookmarks();
         if (this._bookmarkLibraryView !== "mine" && this._bookmarkLibraryView !== "shared") {
@@ -1512,7 +1524,7 @@ export class StorageMethods {
   }
 
   _renderLibrary(kind) {
-    this.shadowRoot.querySelector(".backdrop")?.remove();
+    this.shadowRoot.querySelector(".library-dialog-host")?.remove();
     const isBookmarks = kind === "bookmarks";
     const key = isBookmarks ? BOOKMARKS_STORAGE_KEY : HISTORY_STORAGE_KEY;
     const bookmarkState = isBookmarks ? this._bookmarkLibraryState() : null;
@@ -1521,18 +1533,41 @@ export class StorageMethods {
     const clearLabel = this._customLocalize(isBookmarks ? "clear_bookmarks" : "clear_history");
     const copyShareLink = this._customLocalize("copy_share_link");
     const close = this._localize("ui.common.close", "Close");
-    const backdrop = document.createElement("div");
-    backdrop.className = "backdrop";
-    backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${title}">
-      <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${title}</h2><span class="count">${items.length}${isBookmarks ? "" : ` / ${HISTORY_LIMIT}`}</span></header>
+    const itemCount = `${items.length}${isBookmarks ? "" : ` / ${HISTORY_LIMIT}`}`;
+    const body = `
       ${isBookmarks ? this._bookmarkTabs() : ""}
       ${isBookmarks && !bookmarkState.readOnly ? `<div class="library-save"><input id="bookmark-name" maxlength="80" placeholder="${this._escape(this._customLocalize("bookmark_name"))}" value="${this._escape(this._snapshotLabel())}"><button data-action="save-current">${this._escape(this._customLocalize("save_current"))}</button></div>` : ""}
-      <div class="library-list">${this._libraryRows(items, isBookmarks, bookmarkState || {})}</div>
-      <footer class="dialog-actions">${!isBookmarks || !bookmarkState.readOnly ? `<button data-action="clear" style="margin-right:auto" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</button>` : `<span style="margin-right:auto"></span>`}${isBookmarks ? `<button data-action="share" ${this._targetCount() ? "" : "disabled"}>${this._escape(copyShareLink)}</button>` : ""}<button data-action="close">${this._escape(close)}</button></footer>
-    </section>`;
-    backdrop.addEventListener("click", (event) => { if (event.target === backdrop) backdrop.remove(); });
-    backdrop.querySelector('[data-action="close"]').addEventListener("click", () => backdrop.remove());
-    backdrop.querySelector('[data-action="close-dialog"]').addEventListener("click", () => backdrop.remove());
+      <div class="library-list">${this._libraryRows(items, isBookmarks, bookmarkState || {})}</div>`;
+    const useAdaptiveDialog = Boolean(
+      this._narrow && customElements.get("ha-adaptive-dialog")
+    );
+    const backdrop = document.createElement(useAdaptiveDialog ? "ha-adaptive-dialog" : "div");
+    backdrop.className = useAdaptiveDialog
+      ? "library-dialog-host library-adaptive-dialog"
+      : "library-dialog-host backdrop";
+    if (useAdaptiveDialog) {
+      backdrop.open = true;
+      backdrop.setAttribute("flexcontent", "");
+      backdrop.headerTitle = `${title}: ${itemCount}`;
+      backdrop.innerHTML = `<section class="library-mobile-content">${body}</section>
+        <ha-dialog-footer slot="footer">
+          ${!isBookmarks || !bookmarkState.readOnly ? `<ha-button slot="secondaryAction" data-action="clear" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</ha-button>` : ""}
+          ${isBookmarks ? `<ha-button slot="secondaryAction" data-action="share" ${this._targetCount() ? "" : "disabled"}>${this._escape(copyShareLink)}</ha-button>` : ""}
+          <ha-button slot="primaryAction" data-action="close" data-dialog="close">${this._escape(close)}</ha-button>
+        </ha-dialog-footer>`;
+      backdrop.addEventListener("closed", () => backdrop.remove());
+    } else {
+      backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${title}">
+        <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${title}</h2><span class="count">${itemCount}</span></header>
+        ${body}
+        <footer class="dialog-actions">${!isBookmarks || !bookmarkState.readOnly ? `<button data-action="clear" style="margin-right:auto" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</button>` : `<span style="margin-right:auto"></span>`}${isBookmarks ? `<button data-action="share" ${this._targetCount() ? "" : "disabled"}>${this._escape(copyShareLink)}</button>` : ""}<button data-action="close">${this._escape(close)}</button></footer>
+      </section>`;
+      backdrop.addEventListener("click", (event) => {
+        if (event.target === backdrop) backdrop.remove();
+      });
+    }
+    backdrop.querySelector('[data-action="close"]')?.addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector('[data-action="close-dialog"]')?.addEventListener("click", () => backdrop.remove());
     backdrop.querySelector('[data-action="save-current"]')?.addEventListener("click", () => {
       const input = backdrop.querySelector("#bookmark-name");
       if (this._saveCurrentBookmark(input.value)) backdrop.remove();

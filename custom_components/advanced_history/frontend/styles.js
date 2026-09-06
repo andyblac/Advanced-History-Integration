@@ -379,6 +379,14 @@ export const panelStyles = `
     width:min(680px,100%); height:min(760px,90vh); display:flex; flex-direction:column; overflow:hidden;
     color:var(--primary-text-color); background:var(--card-background-color); border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,.35);
   }
+  .library-adaptive-dialog {
+    --dialog-content-padding:0;
+    --ha-bottom-sheet-height:calc(100dvh - var(--ha-space-12,48px));
+  }
+  .library-mobile-content {
+    width:100%; height:100%; min-height:0; display:flex; flex-direction:column; overflow:hidden;
+    color:var(--primary-text-color); background:var(--card-background-color);
+  }
   .library-save { padding:14px 18px; display:flex; gap:10px; border-bottom:1px solid var(--divider-color); }
   .bookmark-user-tabs { min-height:48px; padding:0 12px; display:flex; gap:4px; overflow-x:auto; border-bottom:1px solid var(--divider-color); scrollbar-width:thin; }
   .bookmark-user-tabs button { position:relative; flex:0 0 auto; min-width:88px; padding:0 14px; border:0; color:var(--secondary-text-color); background:transparent; cursor:pointer; font:inherit; font-weight:500; }
