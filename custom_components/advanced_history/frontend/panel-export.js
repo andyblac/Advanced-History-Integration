@@ -133,13 +133,20 @@ function dashboardGraphConfig(config, panelConfig = {}) {
       const entity = row?.entity || row?.statistic_id;
       if (!entity) return raw;
       const key = row.attribute ? `${entity}::${row.attribute}` : entity;
-      return Object.assign(
+      const merged = Object.assign(
         {},
         ...templates.map(clone),
         clone(configuredEntities[entity] || {}),
         clone(configuredEntities[key] || {}),
         row,
       );
+      // The rendered AHP row is authoritative about whether comparison is
+      // active. Configured compare objects can contain useful styling, but
+      // must not turn comparison back on when the runtime row omitted it.
+      if (!Object.prototype.hasOwnProperty.call(row, "compare")) {
+        delete merged.compare;
+      }
+      return merged;
     });
   }
   for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) delete next[key];

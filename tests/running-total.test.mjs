@@ -270,6 +270,36 @@ test("Advanced History dashboard card stores SGCC options only in sgcc_configs",
   assert.equal(customBackground.sgcc_configs[0].card_background_color, "#123456");
 });
 
+test("dashboard export does not enable configured comparison styling", () => {
+  const exported = advancedHistoryDashboardCard(
+    {
+      targets: { entity_id: ["sensor.gas"], area_id: [], device_id: [] },
+      chart: {},
+      period: {
+        start: "2026-09-05T12:00:00.000Z",
+        end: "2026-09-05T13:00:00.000Z",
+        compare: "",
+      },
+    },
+    {
+      card_options: {
+        numeric: { entities: { compare: { opacity: 0.5 } } },
+      },
+      entity_options: {
+        "sensor.gas": { compare: { line_style: "dashed" } },
+      },
+    },
+    "Gas",
+    [{
+      type: "custom:statistics-graph-chart-card",
+      entities: [{ entity: "sensor.gas" }],
+    }],
+    "Gas panel",
+  );
+
+  assert.equal(exported.sgcc_configs[0].entities[0].compare, undefined);
+});
+
 test("dashboard export generates a UUID date-picker group without a configured panel name", () => {
   const exported = advancedHistoryDashboardCard({
     targets: { entity_id: ["sensor.gas"] },
