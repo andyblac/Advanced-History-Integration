@@ -74,9 +74,14 @@ export const panelStyles = `
   .target-sidebar-layout.date-picker-auto-hide .target-sidebar-content { padding-bottom:16px; }
   .target-sources-pane {
     /* Match native History: target chips need more room than a plain filter list. */
-    --ha-filter-pane-width:340px; position:sticky; top:var(--header-height,64px);
+    --ha-filter-pane-width:340px;
+    --md-assist-chip-label-text-size:16px;
+    position:sticky; top:var(--header-height,64px);
     height:calc(100vh - var(--header-height,64px)); z-index:2;
     background:var(--primary-background-color);
+  }
+  .target-sidebar-toolbar ha-filter-pane-chip {
+    --md-assist-chip-label-text-size:16px;
   }
   .target-sources-pane[hidden],
   .target-sidebar-toolbar ha-filter-pane-chip[hidden] { display:none !important; }

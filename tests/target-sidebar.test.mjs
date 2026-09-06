@@ -117,6 +117,14 @@ test("target sidebar panes and chips receive axis-specific counts", () => {
     _targetCount(targets) {
       return targets.area_id.length + targets.device_id.length + targets.entity_id.length;
     },
+    _resolvedEntityIds() {
+      this._y2ResolvedEntityIds = new Set(["sensor.two", "sensor.three"]);
+      return [
+        ...(this._targets.entity_id.length ? ["sensor.one"] : []),
+        "sensor.two",
+        "sensor.three",
+      ];
+    },
     _secondaryAxisEditable() { return true; },
     clearedAxes: [],
     _requestClearTargetSources(axis) { this.clearedAxes.push(axis); },
@@ -138,10 +146,19 @@ test("target sidebar panes and chips receive axis-specific counts", () => {
 
   assert.equal(elements.get("target-sources-pane-primary").count, 2);
   assert.equal(elements.get("target-sources-pane-secondary").count, 2);
-  assert.equal(elements.get("target-sources-chip-primary").label, "Primary axis");
-  assert.equal(elements.get("target-sources-chip-secondary").label, "Secondary axis");
+  assert.equal(elements.get("target-sources-pane-primary").resultCount, 1);
+  assert.equal(elements.get("target-sources-pane-secondary").resultCount, 2);
+  assert.equal(elements.get("target-sources-pane-primary").label, "Primary axis: 1");
+  assert.equal(elements.get("target-sources-pane-secondary").label, "Secondary axis: 2");
+  assert.equal(elements.get("target-sources-chip-primary").label, "Primary axis: 1");
+  assert.equal(elements.get("target-sources-chip-secondary").label, "Secondary axis: 2");
   assert.equal(elements.get("target-sources-chip-primary").count, 1);
   assert.equal(elements.get("target-sources-chip-secondary").count, 0);
+  assert.match(elements.get("target-sources-chip-primary").path, /^M8 13C6\.14/);
+  assert.equal(
+    elements.get("target-sources-pane-primary").path,
+    elements.get("target-sources-chip-primary").path,
+  );
   assert.equal(
     elements.get("target-sources-chip-primary").dataset.advancedHistoryHasTargets,
     "",
@@ -167,6 +184,8 @@ test("target sidebar panes and chips receive axis-specific counts", () => {
   context._targets = { area_id: [], device_id: [], entity_id: [] };
   context._targetPrimarySourceFilters = { types: ["sensor/temperature"] };
   context._syncTargetSidebars();
+  assert.equal(elements.get("target-sources-pane-primary").label, "Primary axis: 0");
+  assert.equal(elements.get("target-sources-chip-primary").label, "Primary axis: 0");
   assert.equal(elements.get("target-sources-chip-primary").active, true);
   assert.equal(
     elements.get("target-sources-chip-primary").dataset.advancedHistoryHasTargets,
@@ -180,7 +199,7 @@ test("target sidebar panes and chips receive axis-specific counts", () => {
   context._hass.themes = { darkMode: true };
   context._targetPrimarySourceFilters = {};
   context._syncTargetSidebars();
-  assert.equal(elements.get("target-sources-chip-primary").active, true);
+  assert.equal(elements.get("target-sources-chip-primary").active, false);
   assert.equal(
     elements.get("target-sources-chip-secondary").dataset.advancedHistoryThemeMode,
     "dark",

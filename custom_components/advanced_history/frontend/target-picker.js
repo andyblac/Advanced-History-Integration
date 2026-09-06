@@ -1,5 +1,7 @@
 import { TARGET_SIDEBAR_STATE_STORAGE_KEY } from "./constants.js";
 
+const TARGET_SOURCES_ICON_PATH = "M8 13C6.14 13 4.59 14.28 4.14 16H2V18H4.14C4.59 19.72 6.14 21 8 21S11.41 19.72 11.86 18H22V16H11.86C11.41 14.28 9.86 13 8 13M8 19C6.9 19 6 18.1 6 17C6 15.9 6.9 15 8 15S10 15.9 10 17C10 18.1 9.1 19 8 19M19.86 6C19.41 4.28 17.86 3 16 3S12.59 4.28 12.14 6H2V8H12.14C12.59 9.72 14.14 11 16 11S19.41 9.72 19.86 8H22V6H19.86M16 9C14.9 9 14 8.1 14 7C14 5.9 14.9 5 16 5S18 5.9 18 7C18 8.1 17.1 9 16 9Z";
+
 export class TargetPickerMethods {
   _homeAssistantVersionAtLeast(year, month) {
     const match = String(this._hass?.config?.version || "").match(/^(\d{4})\.(\d+)/);
@@ -223,6 +225,15 @@ export class TargetPickerMethods {
 
   _syncTargetSidebars() {
     if (!this._useTargetSidebar()) return;
+    const hasTargets = Boolean(
+      this._targetCount(this._targets) || this._targetCount(this._y2Targets)
+    );
+    const resolvedEntityIds = hasTargets ? this._resolvedEntityIds() : [];
+    const y2EntityIds = this._y2ResolvedEntityIds || new Set();
+    const entityCounts = {
+      primary: resolvedEntityIds.filter((id) => !y2EntityIds.has(id)).length,
+      secondary: resolvedEntityIds.filter((id) => y2EntityIds.has(id)).length,
+    };
     for (const axis of ["primary", "secondary"]) {
       const secondary = axis === "secondary";
       const pane = this.shadowRoot?.getElementById(`target-sources-pane-${axis}`);
@@ -230,13 +241,19 @@ export class TargetPickerMethods {
       const targetCount = this._targetCount(secondary ? this._y2Targets : this._targets);
       const filterCount = this._targetSourceFilterCount(axis);
       const count = targetCount + filterCount;
+      const entityCount = entityCounts[axis];
       const shown = this._targetSidebarShown(axis);
-      const label = this._customLocalize(secondary ? "secondary_axis" : "primary_axis");
+      const axisLabel = this._customLocalize(secondary ? "secondary_axis" : "primary_axis");
+      // Match Home Assistant's native History chip: the selected source total
+      // is part of the label, while the blue badge is reserved for filters.
+      const label = count ? `${axisLabel}: ${entityCount}` : axisLabel;
       const themeMode = this._hass?.themes?.darkMode ? "dark" : "light";
       if (pane) {
         pane.narrow = this._narrow;
         pane.label = label;
+        pane.path = TARGET_SOURCES_ICON_PATH;
         pane.count = count;
+        pane.resultCount = targetCount ? entityCount : undefined;
         pane.dataset.advancedHistoryThemeMode = themeMode;
         if (targetCount > 0) pane.dataset.advancedHistoryHasTargets = "";
         else delete pane.dataset.advancedHistoryHasTargets;
@@ -247,7 +264,8 @@ export class TargetPickerMethods {
           pane.dataset.advancedHistoryBound = "true";
           pane.addEventListener("close-filter-pane", () => {
             this._setTargetSidebarShown(axis, false);
-            this._syncTargetSidebars();
+            if (typeof this._render === "function") this._render();
+            else this._syncTargetSidebars();
           });
           pane.addEventListener(
             "clear-filter",
@@ -257,10 +275,9 @@ export class TargetPickerMethods {
       }
       if (chip) {
         chip.label = label;
+        chip.path = TARGET_SOURCES_ICON_PATH;
         chip.count = filterCount;
-        // Match the filled header chip used while the pane is expanded.
-        // Target presence changes its axis colour, not its filled/outlined shape.
-        chip.active = true;
+        chip.active = count > 0;
         chip.dataset.advancedHistoryThemeMode = themeMode;
         if (targetCount > 0) chip.dataset.advancedHistoryHasTargets = "";
         else delete chip.dataset.advancedHistoryHasTargets;
@@ -269,8 +286,10 @@ export class TargetPickerMethods {
         if (!chip.dataset.advancedHistoryBound) {
           chip.dataset.advancedHistoryBound = "true";
           chip.addEventListener("click", () => {
-            this._setTargetSidebarShown(axis, true);
-            this._syncTargetSidebars();
+            const shown = this._targetSidebarShown(axis);
+            this._setTargetSidebarShown(axis, this._narrow ? !shown : true);
+            if (typeof this._render === "function") this._render();
+            else this._syncTargetSidebars();
           });
         }
       }
