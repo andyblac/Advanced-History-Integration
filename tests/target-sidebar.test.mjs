@@ -36,6 +36,32 @@ test("primary and secondary target panes keep independent visibility", () => {
   );
 });
 
+test("native target sheets make the secondary axis editable on mobile", () => {
+  const context = {
+    _narrow: true,
+    _hass: { config: { version: "2026.9.0" } },
+    config: { use_legacy_target_picker: false },
+    _homeAssistantVersionAtLeast: TargetPickerMethods.prototype._homeAssistantVersionAtLeast,
+    _useTargetSidebar: TargetPickerMethods.prototype._useTargetSidebar,
+  };
+
+  assert.equal(
+    TargetPickerMethods.prototype._secondaryAxisEditable.call(context),
+    true,
+  );
+  context.config.use_legacy_target_picker = true;
+  assert.equal(
+    TargetPickerMethods.prototype._secondaryAxisEditable.call(context),
+    false,
+  );
+  context.config.use_legacy_target_picker = false;
+  context._hass.config.version = "2026.8.9";
+  assert.equal(
+    TargetPickerMethods.prototype._secondaryAxisEditable.call(context),
+    false,
+  );
+});
+
 test("broad-target detection ignores entity additions and unchanged targets", () => {
   const current = {
     area_id: ["lounge"],

@@ -75,13 +75,13 @@ export const panelStyles = `
   .target-sources-pane {
     /* Match native History: target chips need more room than a plain filter list. */
     --ha-filter-pane-width:340px;
-    --md-assist-chip-label-text-size:16px;
+    --md-assist-chip-label-text-size:14px;
     position:sticky; top:var(--header-height,64px);
     height:calc(100vh - var(--header-height,64px)); z-index:2;
     background:var(--primary-background-color);
   }
   .target-sidebar-toolbar ha-filter-pane-chip {
-    --md-assist-chip-label-text-size:16px;
+    --md-assist-chip-label-text-size:14px;
   }
   .target-sources-pane[hidden],
   .target-sidebar-toolbar ha-filter-pane-chip[hidden] { display:none !important; }
@@ -289,9 +289,7 @@ export const panelStyles = `
   }
   .panel-time-range-value { min-width:105px; white-space:nowrap; font-weight:500; }
   @media (max-width:520px) {
-    .panel-time-range { left:43%; padding:0 7px; gap:3px; }
     .panel-time-range ha-icon { display:none; }
-    .panel-time-range-value { min-width:96px; }
   }
   .native-target-picker { flex:1; min-width:0; }
   .native-target-picker ha-target-picker { display:block; width:100%; }
@@ -468,7 +466,9 @@ export const panelStyles = `
   @media (max-width:768px) {
     .desktop-panel-only, .panel-tabs-shell { display:none !important; }
     .axis-target-secondary, .axis-target-divider { display:none !important; }
+    .target-sidebar-layout .target-sidebar-targets .axis-target-secondary { display:contents !important; }
     .axis-target-primary .axis-target-label { display:none; }
+    .target-sidebar-layout .axis-target-primary .axis-target-label { display:flex; }
     .axis-target-primary { flex:1 1 auto; width:100%; }
   }
   @media (max-width:600px) {

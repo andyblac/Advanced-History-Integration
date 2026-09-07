@@ -339,7 +339,10 @@ export class TargetPickerMethods {
   }
 
   _secondaryAxisEditable() {
-    if (this._narrow) return false;
+    // The native 2026.9 filter pane presents each axis in its own mobile
+    // sheet, so Y2 no longer needs to be suppressed on narrow layouts. Keep
+    // the established single-axis behavior for the legacy inline picker.
+    if (this._narrow) return this._useTargetSidebar();
     return typeof globalThis.matchMedia !== "function"
       || globalThis.matchMedia("(min-width: 769px)").matches;
   }
