@@ -68,7 +68,7 @@ export const panelStyles = `
     display:flex; align-items:stretch;
   }
   .target-sidebar-content {
-    order:2; flex:1 1 auto; min-width:0; max-width:1400px; margin:0 auto;
+    order:2; flex:1 1 auto; min-width:0; max-width:none; margin:0;
     padding:0 16px calc(72px + max(12px,env(safe-area-inset-bottom)));
   }
   .target-sidebar-layout.date-picker-auto-hide .target-sidebar-content { padding-bottom:16px; }
