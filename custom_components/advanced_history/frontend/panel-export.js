@@ -192,7 +192,7 @@ export function advancedHistoryDashboardCard(
     .map((config) => {
       const next = dashboardGraphConfig(config, panelConfig);
       for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
-        if (!Object.prototype.hasOwnProperty.call(next, key)) next[key] = datePickerGroup;
+        next[key] = datePickerGroup;
       }
       return next;
     });

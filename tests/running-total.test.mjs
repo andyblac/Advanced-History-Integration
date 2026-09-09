@@ -220,6 +220,8 @@ test("Advanced History dashboard card stores SGCC options only in sgcc_configs",
       entities: ["sensor.gas"],
       energy_date_sync: true,
       energy_collection_key: "energy_advanced_history_panel_test",
+      date_picker_group: "advanced-history-panel-private-group",
+      tooltip_sync_group: "custom-tooltips",
     }],
     "Gas panel",
   );
@@ -522,18 +524,21 @@ test("SGCC editor changes retain Advanced History options and native height", as
   const overriddenGroups = dashboardConfigWithDateNavigation({
     date_picker_group: "old-group",
     sgcc_configs: [{
+      date_picker_group: "panel-private-group",
       tooltip_sync_group: "custom-tooltips",
       zoom_sync_group: "old-group",
     }],
   }, { date_picker_group: "new-group" });
+  assert.equal(overriddenGroups.sgcc_configs[0].date_picker_group, "new-group");
   assert.equal(
     overriddenGroups.sgcc_configs[0].tooltip_sync_group,
-    "custom-tooltips",
+    "new-group",
   );
   assert.equal(overriddenGroups.sgcc_configs[0].zoom_sync_group, "new-group");
   assert.equal(overriddenGroups.sgcc_configs[0].group_by_picker_group, "new-group");
   const managedRuntimeConfig = dashboardSgccRuntimeConfig({
     type: "custom:statistics-graph-chart-card",
+    date_picker_group: "panel-private-group",
     zoom_sync_group: "old-group",
   }, {
     show_date_picker: true,
@@ -544,7 +549,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
   for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
     assert.equal(
       managedRuntimeConfig[key],
-      key === "zoom_sync_group" ? "old-group" : "shared-group",
+      "shared-group",
     );
   }
   let displayed = false;
@@ -652,10 +657,17 @@ test("SGCC editor changes retain Advanced History options and native height", as
     start: "2026-08-01T00:00:00.000Z",
     end: "2026-09-01T00:00:00.000Z",
   });
+  assert.deepEqual(runtime.comparison, {
+    compare: "",
+    compare_choice: "last_year",
+    compare_count: 2,
+  });
   assert.deepEqual(restored.period, {
-    compare: "previous",
+    compare: "",
     start: "2026-08-01T00:00:00.000Z",
     end: "2026-09-01T00:00:00.000Z",
+    compare_choice: "last_year",
+    compare_count: 2,
   });
   assert.deepEqual(restored.chart.running_total_axes, { primary: true });
   assert.equal(restored.chart.show_comparison_banner, false);
@@ -850,6 +862,15 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(runtimeContext._dashboardConfig.snapshot.period.compare_choice, "last_month");
   assert.equal(runtimeContext._dashboardConfig.snapshot.period.compare_count, 3);
   assert.equal(runtimeContext._dashboardConfig.sgcc_configs[0].entities[0].compare.length, 3);
+  assert.deepEqual(storedRuntime.comparison, {
+    compare: "previous",
+    compare_choice: "last_month",
+    compare_count: 3,
+  });
+  assert.deepEqual(
+    runtimeContext._loadDashboardSnapshot().period,
+    runtimeContext._dashboardConfig.snapshot.period,
+  );
   const directPreviewConfigs = sgccConfigsWithSnapshotComparisons(
     runtimeContext._dashboardConfig.sgcc_configs,
     runtimeContext._dashboardConfig.snapshot,
@@ -882,6 +903,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
     type: "custom:statistics-graph-chart-card",
     entities: [{ entity: "sensor.gas", compare: "previous_period" }],
   }];
+  delete storedRuntime.comparison;
   storedRuntime.sgcc_configs = [{
     type: "custom:statistics-graph-chart-card",
     entities: [{ entity: "sensor.gas", compare: [

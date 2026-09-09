@@ -164,21 +164,16 @@ export function compactDashboardSgccConfig(config) {
 export function dashboardSgccConfigWithGroupDefaults(
   config,
   group,
-  previousGroup = null,
 ) {
   const next = compactDashboardSgccConfig(config);
   for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
-    const current = String(next[key] ?? "").trim();
-    const inherited = !Object.prototype.hasOwnProperty.call(next, key)
-      || (previousGroup != null && current === previousGroup);
-    if (inherited) next[key] = group;
+    next[key] = group;
   }
   return next;
 }
 
 export function dashboardConfigWithDateNavigation(config, source = {}) {
   const next = clone(config) || {};
-  const previousGroup = String(next.date_picker_group || "").trim();
   const showDatePicker = Object.prototype.hasOwnProperty.call(source, "show_date_picker")
     ? source.show_date_picker !== false
     : dashboardDatePickerVisible(next);
@@ -188,7 +183,7 @@ export function dashboardConfigWithDateNavigation(config, source = {}) {
   next.show_date_picker = showDatePicker;
   next.date_picker_group = datePickerGroup;
   next.sgcc_configs = (next.sgcc_configs || []).map((sgccConfig) => (
-    dashboardSgccConfigWithGroupDefaults(sgccConfig, datePickerGroup, previousGroup)
+    dashboardSgccConfigWithGroupDefaults(sgccConfig, datePickerGroup)
   ));
   next.snapshot = compactDashboardSnapshot(next.snapshot);
   return next;
@@ -204,7 +199,7 @@ export function dashboardSgccRuntimeConfig(config, wrapperConfig) {
   }
   const group = String(wrapperConfig?.date_picker_group || "").trim();
   for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
-    if (!Object.prototype.hasOwnProperty.call(next, key)) next[key] = group;
+    next[key] = group;
   }
   return next;
 }
@@ -481,6 +476,14 @@ export function dashboardRuntimeState(snapshot, comparisonStyles = null) {
     schema: 1,
     period,
     chart,
+    comparison: {
+      compare: snapshot?.period?.compare || "",
+      compare_choice: snapshot?.period?.compare_choice || null,
+      compare_count: Math.max(
+        1,
+        Math.min(10, Math.trunc(Number(snapshot?.period?.compare_count)) || 1),
+      ),
+    },
   };
   if (Array.isArray(comparisonStyles) && comparisonStyles.length) {
     state.comparison_styles = clone(comparisonStyles);
@@ -497,6 +500,17 @@ export function applyDashboardRuntimeState(snapshot, state) {
     delete runtimePeriod.compare_choice;
     delete runtimePeriod.compare_count;
     next.period = { ...clone(next.period || {}), ...runtimePeriod };
+  }
+  if (state.comparison && typeof state.comparison === "object") {
+    next.period = {
+      ...clone(next.period || {}),
+      compare: state.comparison.compare || "",
+      compare_choice: state.comparison.compare_choice || null,
+      compare_count: Math.max(
+        1,
+        Math.min(10, Math.trunc(Number(state.comparison.compare_count)) || 1),
+      ),
+    };
   }
   next.chart = clone(next.chart || {});
   for (const key of DASHBOARD_RUNTIME_CHART_KEYS) {
@@ -712,7 +726,9 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
           snapshot,
           runtimeState,
         );
-        snapshot = applySgccComparisonPeriod(snapshot, baseConfigs);
+        if (!runtimeState?.comparison) {
+          snapshot = applySgccComparisonPeriod(snapshot, baseConfigs);
+        }
       } catch (error) {
         console.warn("Advanced History card editor: unable to restore dashboard state", error);
       }
@@ -1330,10 +1346,10 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       this._dashboardConfig?.snapshot,
       storedConfigs,
     );
-    const resolved = applySgccComparisonPeriod(
-      applyDashboardRuntimeState(snapshot, state),
-      storedConfigs,
-    );
+    const runtimeSnapshot = applyDashboardRuntimeState(snapshot, state);
+    const resolved = state?.comparison
+      ? runtimeSnapshot
+      : applySgccComparisonPeriod(runtimeSnapshot, storedConfigs);
     return resolved;
   }
 
