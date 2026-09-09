@@ -537,6 +537,27 @@ function seriesKey(row) {
   return attribute ? `${entity}::${attribute}` : entity;
 }
 
+export function dashboardEntityIdsInConfigOrder(entityIds, configs) {
+  const configured = [];
+  const seen = new Set();
+  for (const config of configs || []) {
+    for (const raw of config?.entities || []) {
+      const entity = typeof raw === "string" ? raw : raw?.entity || raw?.statistic_id;
+      if (!entity || seen.has(entity)) continue;
+      seen.add(entity);
+      configured.push(entity);
+    }
+  }
+  const rank = new Map(configured.map((entity, index) => [entity, index]));
+  return (entityIds || [])
+    .map((entity, index) => ({ entity, index }))
+    .sort((left, right) => (
+      (rank.get(left.entity) ?? configured.length + left.index)
+      - (rank.get(right.entity) ?? configured.length + right.index)
+    ))
+    .map(({ entity }) => entity);
+}
+
 export function containSgccEditorConfigEvent(event) {
   event.stopPropagation();
   return clone(event.detail?.config);
@@ -1231,6 +1252,13 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       compare_choice: null,
       compare_count: 1,
     };
+  }
+
+  _resolvedEntityIds() {
+    return dashboardEntityIdsInConfigOrder(
+      super._resolvedEntityIds(),
+      this._dashboardConfig?.sgcc_configs,
+    );
   }
 
   _createPeriodStore() {

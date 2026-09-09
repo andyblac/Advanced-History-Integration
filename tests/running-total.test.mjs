@@ -389,6 +389,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
     dashboardConfigWithPendingComparison,
     dashboardConfigWithSnapshot,
     dashboardDatePickerVisible,
+    dashboardEntityIdsInConfigOrder,
     dashboardRuntimeState,
     dashboardSgccRuntimeConfig,
     loadDashboardRuntimeState,
@@ -399,6 +400,22 @@ test("SGCC editor changes retain Advanced History options and native height", as
   } = await import(
     "../custom_components/advanced_history/frontend/advanced-history-sgcc-card.js"
   );
+  assert.deepEqual(dashboardEntityIdsInConfigOrder([
+    "sensor.andys_bedroom",
+    "sensor.kitchen",
+    "sensor.lounge",
+    "sensor.outside",
+  ], [{ entities: [
+    { entity: "sensor.lounge" },
+    { entity: "sensor.kitchen" },
+    { entity: "sensor.andys_bedroom" },
+    { entity: "sensor.outside", y_axis: "secondary" },
+  ] }]), [
+    "sensor.lounge",
+    "sensor.kitchen",
+    "sensor.andys_bedroom",
+    "sensor.outside",
+  ]);
   const pendingStorage = new Map();
   localStorage.getItem = (key) => pendingStorage.get(key) ?? null;
   localStorage.setItem = (key, value) => pendingStorage.set(key, value);
