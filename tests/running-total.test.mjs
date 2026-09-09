@@ -855,8 +855,16 @@ test("SGCC editor changes retain Advanced History options and native height", as
     type: "custom:statistics-graph-chart-card",
     entities: [{ entity: "sensor.gas", compare: { opacity: 0.5 } }],
   }];
+  let comparisonLayoutReleases = 0;
+  let comparisonLayoutSchedules = 0;
+  runtimeContext._graphCards = [{ updateComplete: Promise.resolve() }];
+  runtimeContext._releaseDashboardCardLayout = () => { comparisonLayoutReleases += 1; };
+  runtimeContext._graphLayoutSchedule = () => { comparisonLayoutSchedules += 1; };
   runtimeContext.dispatchEvent = (event) => { emittedConfig = event.detail.config; };
   runtimeContext._recordComparisonChange();
+  await runtimeContext._dashboardComparisonLayoutSettlement;
+  assert.equal(comparisonLayoutReleases, 1);
+  assert.equal(comparisonLayoutSchedules, 1);
   assert.equal(runtimeContext._dashboardConfig.snapshot.id, "runtime-handoff");
   assert.equal(runtimeContext._dashboardConfig.snapshot.chart.compare, undefined);
   assert.equal(runtimeContext._dashboardConfig.snapshot.period.compare_choice, "last_month");

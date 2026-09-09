@@ -1497,6 +1497,21 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
   _saveTargets() {}
   _saveCurrentSnapshot() {}
   _persistPanelTabs() {}
+  _settleDashboardComparisonLayout() {
+    const updates = (this._graphCards || [])
+      .map((card) => card?.updateComplete)
+      .filter((update) => update && typeof update.then === "function");
+    this._dashboardComparisonLayoutSettlement = Promise.allSettled(updates).then(() => {
+      // Date navigation keeps the existing card height locked to prevent a
+      // transient dashboard jump. Comparison changes legitimately add or
+      // remove legend rows, so release that lock once SGCC has rendered the
+      // new rows and let the dynamic layout measure their natural height.
+      this._releaseDashboardCardLayout();
+      this._graphLayoutSchedule?.();
+    });
+    return this._dashboardComparisonLayoutSettlement;
+  }
+
   _recordComparisonChange() {
     const current = this._captureSnapshot();
     if (!current?.period) return;
@@ -1555,6 +1570,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       bubbles: true,
       composed: true,
     }));
+    void this._settleDashboardComparisonLayout();
   }
 
   _recordChange(snapshot = null) { this._saveDashboardState(snapshot); }
