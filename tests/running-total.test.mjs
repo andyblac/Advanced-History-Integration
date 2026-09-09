@@ -389,6 +389,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
     dashboardConfigWithPendingComparison,
     dashboardConfigWithSnapshot,
     dashboardDatePickerVisible,
+    dashboardDownloadVisible,
     dashboardEntityIdsInConfigOrder,
     dashboardRuntimeState,
     dashboardSgccRuntimeConfig,
@@ -500,6 +501,9 @@ test("SGCC editor changes retain Advanced History options and native height", as
     show_date_picker: true,
     sgcc_configs: [{ show_date_picker: false }],
   }), true);
+  assert.equal(dashboardDownloadVisible({}), false);
+  assert.equal(dashboardDownloadVisible({ show_download_button: false }), false);
+  assert.equal(dashboardDownloadVisible({ show_download_button: true }), true);
   assert.deepEqual(compactDashboardSnapshot({
     schema: 1,
     id: "dashboard-card-2",
@@ -527,9 +531,11 @@ test("SGCC editor changes retain Advanced History options and native height", as
   }, {
     show_date_picker: false,
     date_picker_group: "shared-group",
+    show_download_button: true,
   });
   assert.equal(dateNavigationConfig.show_date_picker, false);
   assert.equal(dateNavigationConfig.date_picker_group, "shared-group");
+  assert.equal(dateNavigationConfig.show_download_button, true);
   for (const config of dateNavigationConfig.sgcc_configs) {
     for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
       assert.equal(config[key], "shared-group");

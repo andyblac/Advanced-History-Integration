@@ -99,6 +99,7 @@ export default {
   "advanced_history_card": "Tarjeta de historial avanzado",
   "title_date_navigation": "Título y navegación de fechas",
   "date_picker": "Selector de fecha",
+  "show_download_button": "Mostrar botón de descarga",
   "group": "Grupo",
   "dashboard_yaml_fallback_title": "YAML del panel de control",
   "copy_dashboard_yaml": "Copiar YAML",

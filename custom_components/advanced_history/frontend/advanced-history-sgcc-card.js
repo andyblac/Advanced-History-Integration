@@ -52,11 +52,12 @@ const cardStyles = `
   .dashboard-axis-group.primary { grid-column:1; grid-row:1; }
   .dashboard-axis-group.secondary { grid-column:3; grid-row:1; justify-content:flex-end; }
   .dashboard-date-controls {
-    min-width:0; max-width:100%; display:flex; align-items:center;
-    grid-column:2; grid-row:1; justify-self:center; gap:5px; width:max-content;
+    position:relative; min-width:0; max-width:100%; display:flex; align-items:center;
+    grid-column:2; grid-row:1; justify-self:center; width:max-content;
   }
   .dashboard-date-controls[hidden] { display:none; }
   .dashboard-download-button {
+    position:absolute; left:calc(100% + 5px); top:50%; transform:translateY(-50%);
     width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center;
     color:var(--secondary-text-color); background:var(--secondary-background-color);
     border:1px solid var(--divider-color); border-radius:15px; cursor:pointer;
@@ -154,6 +155,10 @@ export function dashboardDatePickerVisible(config) {
   return config?.show_date_picker !== false;
 }
 
+export function dashboardDownloadVisible(config) {
+  return config?.show_download_button === true;
+}
+
 export function compactDashboardSgccConfig(config) {
   const next = clone(config) || {};
   for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) delete next[key];
@@ -180,8 +185,12 @@ export function dashboardConfigWithDateNavigation(config, source = {}) {
   const datePickerGroup = Object.prototype.hasOwnProperty.call(source, "date_picker_group")
     ? String(source.date_picker_group || "").trim()
     : String(next.date_picker_group || "").trim();
+  const showDownloadButton = Object.prototype.hasOwnProperty.call(source, "show_download_button")
+    ? source.show_download_button === true
+    : dashboardDownloadVisible(next);
   next.show_date_picker = showDatePicker;
   next.date_picker_group = datePickerGroup;
+  next.show_download_button = showDownloadButton;
   next.sgcc_configs = (next.sgcc_configs || []).map((sgccConfig) => (
     dashboardSgccConfigWithGroupDefaults(sgccConfig, datePickerGroup)
   ));
@@ -712,6 +721,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
     const groupedConfig = dashboardConfigWithDateNavigation(this._config, {
       show_date_picker: dashboardDatePickerVisible(this._config),
       date_picker_group: this._config.date_picker_group,
+      show_download_button: dashboardDownloadVisible(this._config),
     });
     if (JSON.stringify(groupedConfig) !== JSON.stringify(this._config)) {
       this._config = groupedConfig;
@@ -832,6 +842,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
         }, {
           show_date_picker: dashboardDatePickerVisible(this._config),
           date_picker_group: this._config.date_picker_group,
+          show_download_button: dashboardDownloadVisible(this._config),
         });
         this._config = next;
         this.dispatchEvent(new CustomEvent("config-changed", {
@@ -885,10 +896,8 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
         ) || "Title";
         const advancedHistoryCard = this._customLocalize("advanced_history_card");
         const titleDateNavigation = this._customLocalize("title_date_navigation");
-        const datePickerLabel = sgccFieldLabel(
-          "show_date_picker",
-          this._customLocalize("date_picker"),
-        );
+        const datePickerLabel = this._customLocalize("date_picker");
+        const downloadButtonLabel = this._customLocalize("show_download_button");
         const groupLabel = sgccFieldLabel(
           "date_picker_group",
           this._customLocalize("group"),
@@ -910,6 +919,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
                 <label class="si advanced-history-date-toggle"><div class="st"><input id="advanced_history_show_date_picker" type="checkbox" ${dashboardDatePickerVisible(this._config) ? "checked" : ""}><span class="ss"></span></div><div class="sl"><span class="sn">${this._escape(datePickerLabel)}</span></div></label>
                 <div class="f advanced-history-group-field"><input id="advanced_history_date_picker_group" class="advanced-history-group-input" type="text" autocomplete="off" placeholder="${this._escape(groupLabel)}" value="${this._escape(String(this._config.date_picker_group || "").trim())}"></div>
               </div>
+              <label class="si advanced-history-download-toggle mt8"><div class="st"><input id="advanced_history_show_download_button" type="checkbox" ${dashboardDownloadVisible(this._config) ? "checked" : ""}><span class="ss"></span></div><div class="sl"><span class="sn">${this._escape(downloadButtonLabel)}</span></div></label>
             </div>
           </div>`;
         editorRoot.prepend(panel);
@@ -920,6 +930,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
         const titleInput = panel.querySelector("#advanced_history_title");
         const showDatePickerInput = panel.querySelector("#advanced_history_show_date_picker");
         const datePickerGroupInput = panel.querySelector("#advanced_history_date_picker_group");
+        const showDownloadButtonInput = panel.querySelector("#advanced_history_show_download_button");
         titleInput?.addEventListener("input", (event) => {
           event.stopPropagation();
           const next = cardConfigWithTitle(this._config, titleInput.value);
@@ -933,6 +944,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
           const next = dashboardConfigWithDateNavigation(this._config, {
             show_date_picker: showDatePickerInput.checked,
             date_picker_group: datePickerGroupInput.value,
+            show_download_button: showDownloadButtonInput.checked,
           });
           this._config = next;
           syncManagedGroupFields();
@@ -942,6 +954,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
         };
         showDatePickerInput?.addEventListener("change", updateDateNavigation);
         datePickerGroupInput?.addEventListener("input", updateDateNavigation);
+        showDownloadButtonInput?.addEventListener("change", updateDateNavigation);
       };
       const mountManagedStyles = () => {
         if (!editor.shadowRoot || editor.shadowRoot.querySelector("[data-advanced-history-comparisons]")) return;
@@ -949,8 +962,8 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
         managedStyles.dataset.advancedHistoryComparisons = "";
         managedStyles.textContent = `
           .advanced-history-navigation-row {
-            width:100%; display:grid !important;
-            grid-template-columns:minmax(280px,max-content) minmax(240px,1fr) !important;
+            width:100%; min-width:0; display:grid !important;
+            grid-template-columns:minmax(180px,240px) minmax(0,1fr) !important;
             align-items:center; gap:8px;
           }
           .advanced-history-date-toggle {
@@ -1454,6 +1467,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     const hasY1Targets = Boolean(this._targetCount(this._targets));
     const hasY2Targets = Boolean(this._targetCount(this._y2Targets));
     const showDatePicker = dashboardDatePickerVisible(this._dashboardConfig);
+    const showDownloadButton = dashboardDownloadVisible(this._dashboardConfig);
     const downloadData = this._localize(
       "ui.panel.lovelace.components.energy_period_selector.download_data",
       "Download data",
@@ -1474,7 +1488,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
             </div>
             <div class="dashboard-date-controls" ${showDatePicker ? "" : "hidden"}>
               <div id="date-controller" class="period-selector-card"></div>
-              <button id="download-chart-data" class="dashboard-download-button" type="button" title="${this._escape(downloadData)}" aria-label="${this._escape(downloadData)}"><ha-icon icon="mdi:download"></ha-icon></button>
+              ${showDownloadButton ? `<button id="download-chart-data" class="dashboard-download-button" type="button" title="${this._escape(downloadData)}" aria-label="${this._escape(downloadData)}"><ha-icon icon="mdi:download"></ha-icon></button>` : ""}
             </div>
             <div class="dashboard-axis-group secondary axis-target-secondary" ${hasY2Targets ? "" : "hidden"}>
               <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>

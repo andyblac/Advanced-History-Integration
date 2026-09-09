@@ -99,6 +99,7 @@ export default {
   "advanced_history_card": "Geavanceerde geschiedeniskaart",
   "title_date_navigation": "Titel en datumnavigatie",
   "date_picker": "Datumkiezer",
+  "show_download_button": "Downloadknop tonen",
   "group": "Groep",
   "dashboard_yaml_fallback_title": "Dashboard-YAML",
   "copy_dashboard_yaml": "YAML kopiëren",
