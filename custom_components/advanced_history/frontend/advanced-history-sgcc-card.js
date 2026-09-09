@@ -887,7 +887,7 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
               <div class="f"><label>${this._escape(titleLabel)}</label><input id="advanced_history_title" type="text" autocomplete="off" value="${this._escape(this._config.title || "")}"></div>
               <div class="advanced-history-navigation-row mt8">
                 <label class="si advanced-history-date-toggle"><div class="st"><input id="advanced_history_show_date_picker" type="checkbox" ${dashboardDatePickerVisible(this._config) ? "checked" : ""}><span class="ss"></span></div><div class="sl"><span class="sn">${this._escape(datePickerLabel)}</span></div></label>
-                <input id="advanced_history_date_picker_group" class="advanced-history-group-input" type="text" autocomplete="off" placeholder="${this._escape(groupLabel)}" value="${this._escape(String(this._config.date_picker_group || "").trim())}">
+                <div class="f advanced-history-group-field"><input id="advanced_history_date_picker_group" class="advanced-history-group-input" type="text" autocomplete="off" placeholder="${this._escape(groupLabel)}" value="${this._escape(String(this._config.date_picker_group || "").trim())}"></div>
               </div>
             </div>
           </div>`;
@@ -929,18 +929,26 @@ export class AdvancedHistorySgccCardEditor extends HTMLElement {
         managedStyles.textContent = `
           .advanced-history-navigation-row {
             width:100%; display:grid !important;
-            grid-template-columns:140px minmax(0,1fr) !important;
+            grid-template-columns:minmax(280px,max-content) minmax(240px,1fr) !important;
             align-items:center; gap:8px;
           }
           .advanced-history-date-toggle {
-            width:140px !important; min-width:0 !important; max-width:140px !important;
+            width:auto !important; min-width:0 !important; max-width:none !important;
             box-sizing:border-box; white-space:nowrap;
           }
           .advanced-history-date-toggle .sl,
           .advanced-history-date-toggle .sn { min-width:0 !important; white-space:nowrap; }
+          .advanced-history-group-field,
           .advanced-history-group-input {
             width:100% !important; min-width:0 !important;
             box-sizing:border-box;
+          }
+          @media (max-width:700px) {
+            .advanced-history-navigation-row {
+              grid-template-columns:minmax(0,1fr) !important;
+              align-items:stretch;
+            }
+            .advanced-history-date-toggle { width:100% !important; }
           }
           .cmp-add,
           .cmp-del,
