@@ -256,6 +256,7 @@ export function dashboardCardConfigs(cards) {
     const source = card?.__advancedHistoryConfig || card?._config;
     if (!source || typeof source !== "object" || Array.isArray(source)) return null;
     const config = clone(source);
+    if (card?.__advancedHistoryAutoHeight) config.height = "auto";
     const exportAggregates = card?.__advancedHistoryRunningTotalExportAggregates || {};
     for (const row of config.entities || []) {
       if (!row || typeof row !== "object" || row.attribute != null) continue;

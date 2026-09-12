@@ -28,6 +28,7 @@ const DASHBOARD_RUNTIME_CHART_KEYS = [
   "rolling_resume_hours",
   "series_transforms",
   "running_total_axes",
+  "state_strips",
   "exclude_y2_comparison",
   "show_comparison_banner",
 ];
@@ -1485,6 +1486,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
                 <ha-dropdown id="y1-comparison-menu" class="axis-comparison-menu" placement="bottom-start" distance="7"></ha-dropdown>
               </div>
               <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" ${hasY1Targets ? "" : "hidden"} role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
+              <button id="toggle-state-strips" class="axis-state-strips-toggle axis-state-strips-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:view-sequential-outline"></ha-icon></button>
             </div>
             <div class="dashboard-date-controls" ${showDatePicker ? "" : "hidden"}>
               <div id="date-controller" class="period-selector-card"></div>
@@ -1534,6 +1536,10 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       "click",
       () => this._toggleAxisRunningTotal("secondary"),
     );
+    this.shadowRoot.getElementById("toggle-state-strips")?.addEventListener(
+      "click",
+      () => this._toggleStateStrips(),
+    );
     this.shadowRoot.getElementById("download-chart-data")?.addEventListener(
       "click",
       () => this._downloadChartData(),
@@ -1541,6 +1547,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     this._syncY2ComparisonToggle();
     this._syncY1ComparisonToggle();
     this._syncRunningTotalAxisButtons();
+    this._syncStateStripsButton();
     this._renderContent();
   }
 

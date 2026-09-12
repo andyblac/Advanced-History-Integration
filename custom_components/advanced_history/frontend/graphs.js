@@ -40,6 +40,30 @@ const EXTENDED_ENTITY_COLORS = Object.freeze([
   "#fff176",
 ]);
 
+export function stateStripPresentationOptions(numericOptions = {}, stateOptions = {}) {
+  const options = { ...numericOptions };
+  if (
+    !Object.prototype.hasOwnProperty.call(options, "state_strip_labels")
+    && Object.prototype.hasOwnProperty.call(stateOptions, "state_timeline_show_labels")
+  ) {
+    options.state_strip_labels = stateOptions.state_timeline_show_labels;
+  }
+  const labelFontSize = Number.parseFloat(
+    options.state_timeline_label_font_size
+    ?? stateOptions.state_timeline_label_font_size,
+  );
+  const resolvedFontSize = Number.isFinite(labelFontSize)
+    ? Math.max(6, Math.min(40, labelFontSize))
+    : null;
+  if (
+    resolvedFontSize != null
+    && !Object.prototype.hasOwnProperty.call(options, "state_strip_height")
+  ) {
+    options.state_strip_height = Math.max(16, Math.ceil(resolvedFontSize + 6));
+  }
+  return { options, labelFontSize: resolvedFontSize };
+}
+
 function extendedEntityPalette(cardPalette, minimumSize = 0) {
   const colors = [];
   const seen = new Set();
@@ -246,6 +270,7 @@ export class GraphMethods {
     }
     const entityIds = this._resolvedEntityIds();
     const series = this._seriesDescriptors(entityIds);
+    this._syncStateStripsButton();
     if (this._notice && !this.shadowRoot.querySelector(".notice")) host.insertAdjacentHTML("beforebegin", `<div class="notice">${this._escape(this._notice)}</div>`);
     if (!entityIds.length) {
       this._renderLargeRangeDetailBanner(null);
@@ -272,29 +297,37 @@ export class GraphMethods {
     const numeric = series.filter((item) => this._isNumeric(item));
     const states = series.filter((item) => !this._isNumeric(item));
     const numericGroups = this._numericSeriesGroups(numeric);
-    const multipleCharts = numericGroups.length + (states.length ? 1 : 0) > 1;
+    const stateStrips = this._stateStripsEnabled(series);
+    const separateStates = states.length && !stateStrips;
+    // A state strip changes where the categorical series is rendered, not the
+    // logical grouping of the chart. Keep the same automatic numeric heading
+    // that is shown when state history uses its own card.
+    const multipleCharts = this._hasMultipleChartGroups(numericGroups, states);
     this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
     // Establish the available chart region before configuring cards with the
     // card's native height:auto + numeric grid-row contract.
     this._configureDynamicGraphLayout(
       host,
       Boolean(numeric.length),
-      Boolean(states.length),
+      Boolean(separateStates),
       numericGroups.length,
+      stateStrips,
     );
     if (numericGroups.length) {
       const numericMode = this._cardOptions("timeline").chart_mode || "timeline";
-      for (const group of numericGroups) {
+      numericGroups.forEach((group, index) => {
+        const embeddedStates = stateStrips && index === 0 ? states : [];
         this._createGraph(
           host,
-          group.series,
+          [...group.series, ...embeddedStates],
           multipleCharts ? this._numericSeriesGroupTitle(group) : "",
           numericMode,
           detail,
+          new Set(embeddedStates.map((item) => this._seriesDescriptor(item).key)),
         );
-      }
+      });
     }
-    if (states.length) {
+    if (separateStates) {
       this._createGraph(
         host,
         states,
@@ -401,7 +434,18 @@ export class GraphMethods {
     card.setConfig(fittedConfig);
   }
 
-  _configureDynamicGraphLayout(host, hasNumeric, hasState, numericChartCount = hasNumeric ? 1 : 0) {
+  _stateStripPlotHeight(layoutHeight, numericRequirement) {
+    const nonPlotHeight = Math.max(0, numericRequirement - 200);
+    return Math.max(200, Math.floor(layoutHeight - nonPlotHeight));
+  }
+
+  _configureDynamicGraphLayout(
+    host,
+    hasNumeric,
+    hasState,
+    numericChartCount = hasNumeric ? 1 : 0,
+    hasStateStrips = false,
+  ) {
     const configuredNumericHeight = this._cardOptions("timeline").height;
     const usesAutomaticNumericHeight = hasNumeric && (
       configuredNumericHeight == null || configuredNumericHeight === "auto"
@@ -419,6 +463,7 @@ export class GraphMethods {
       if (!this.isConnected || this.shadowRoot?.getElementById("charts") !== host) return;
       for (const card of this._graphCards || []) {
         this._applyComparisonSeriesPeriodLabels?.(card);
+        this._applyStateStripLabelStyle(card);
       }
       this._syncAxisVisibilityButtons?.();
       if (hasState) {
@@ -463,6 +508,20 @@ export class GraphMethods {
       const layoutHeight = this._dashboardCardMode
         ? Math.max(MIN_NUMERIC_GRAPH_HEIGHT, numericRequirement)
         : available;
+      if (hasStateStrips && numericCard?.__advancedHistoryConfig) {
+        const plotHeight = this._stateStripPlotHeight(layoutHeight, numericRequirement);
+        if (numericCard.__advancedHistoryStateStripPlotHeight !== plotHeight) {
+          numericCard.__advancedHistoryStateStripPlotHeight = plotHeight;
+          numericCard.__advancedHistoryAutoHeight = true;
+          const fittedConfig = {
+            ...numericCard.__advancedHistoryConfig,
+            height: plotHeight,
+          };
+          numericCard.__advancedHistoryConfig = fittedConfig;
+          numericCard.setConfig(fittedConfig);
+          this._setGraphCardHass(numericCard, this._hass);
+        }
+      }
       if (hasState) {
         host.style.removeProperty("height");
         // Do not give the grid a viewport-sized minimum: an auto state row is
@@ -737,7 +796,7 @@ export class GraphMethods {
     return { ...this._detailCardOptions(detail), ...cardOptions };
   }
 
-  _createGraph(host, series, title, mode, detail = null) {
+  _createGraph(host, series, title, mode, detail = null, stateStripKeys = new Set()) {
     const shell = document.createElement("div");
     shell.className = "graph-shell";
     shell.classList.add(mode === "state_timeline" ? "state-graph" : "numeric-graph");
@@ -760,18 +819,32 @@ export class GraphMethods {
     if (cardOptions.chart_mode && cardOptions.chart_mode !== mode) {
       delete cardOptions.chart_mode;
     }
-    const resolvedCardOptions = this._resolvedDetailCardOptions(detail, cardOptions);
-    const entities = series.map((item) => this._entityCardConfig(
-      item,
-      mode,
-      cardOptionsConfig,
-    ));
+    let resolvedCardOptions = this._resolvedDetailCardOptions(detail, cardOptions);
+    if (stateStripKeys.size) {
+      const stateOptions = this._cardOptions("state_timeline");
+      const presentation = stateStripPresentationOptions(resolvedCardOptions, stateOptions);
+      resolvedCardOptions = presentation.options;
+      card.__advancedHistoryStateStripLabelFontSize = presentation.labelFontSize;
+    }
+    const entities = series.map((item) => {
+      const descriptor = this._seriesDescriptor(item);
+      const stateStrip = stateStripKeys.has(descriptor.key);
+      const configured = this._entityCardConfig(
+        item,
+        stateStrip ? "state_timeline" : mode,
+        stateStrip ? this._effectiveCardOptionsConfig("state_timeline") : cardOptionsConfig,
+      );
+      if (!stateStrip) return configured;
+      delete configured.y_axis;
+      return { ...configured, graph_type: "state_strip" };
+    });
     const runningTotalEntities = new Set();
     const runningTotalExportAggregates = {};
     if (mode !== "state_timeline") {
       const transforms = this._activeSnapshot?.series_transforms || {};
       const axisTransforms = this._activeSnapshot?.running_total_axes || {};
       entities.forEach((configured) => {
+        if (configured.graph_type === "state_strip") return;
         const axis = configured.y_axis === "secondary" ? "secondary" : "primary";
         if (
           configured.attribute == null
@@ -826,6 +899,7 @@ export class GraphMethods {
       // removed, causing the remaining series to change color.
       if (
         mode !== "state_timeline"
+        && configured.graph_type !== "state_strip"
         && configured.color == null
         && Array.isArray(palette)
         && palette.length
@@ -964,6 +1038,7 @@ export class GraphMethods {
         });
       }
       card.setConfig(config);
+      this._applyStateStripLabelStyle(card);
       this._applyDashboardGraphBackground(card, config);
       card.__advancedHistoryConfig = config;
       this._setGraphCardHass(card, this._hass);
@@ -993,6 +1068,7 @@ export class GraphMethods {
       this._syncGraphCardsToPeriod?.();
       this._graphLayoutObserveCard?.(card);
       card.updateComplete?.then(() => {
+        this._applyStateStripLabelStyle(card);
         this._applyDashboardGraphBackground(card, config);
         if (this._graphCards?.includes(card)) {
           this._syncGraphCardsToPeriod?.();
@@ -1020,6 +1096,24 @@ export class GraphMethods {
       card.setConfig(next);
       this._setGraphCardHass(card, this._hass);
     }
+  }
+
+  _applyStateStripLabelStyle(card) {
+    const root = card?.shadowRoot;
+    if (!root) return;
+    const selector = "style[data-advanced-history-state-strip-labels]";
+    const existing = root.querySelector?.(selector);
+    const size = card.__advancedHistoryStateStripLabelFontSize;
+    if (!Number.isFinite(size)) {
+      existing?.remove?.();
+      return;
+    }
+    const style = existing || (card.ownerDocument || root.ownerDocument)?.createElement?.("style");
+    if (!style) return;
+    style.dataset.advancedHistoryStateStripLabels = "";
+    const css = `.sgc-strip-label { font-size:${size}px !important; }`;
+    if (style.textContent !== css) style.textContent = css;
+    if (!existing) root.append(style);
   }
 
   _largeRangePeriod() {
@@ -1601,6 +1695,50 @@ export class GraphMethods {
     const hasNumeric = series.some((item) => this._isNumeric(item));
     const hasState = series.some((item) => !this._isNumeric(item));
     return !(hasNumeric && hasState);
+  }
+
+  _stateStripsAvailable(series = this._seriesDescriptors(this._resolvedEntityIds())) {
+    const hasNumeric = series.some((item) => this._isNumeric(item));
+    const hasState = series.some((item) => !this._isNumeric(item));
+    const numericMode = this._cardOptions("timeline").chart_mode || "timeline";
+    return hasNumeric && hasState && numericMode === "timeline";
+  }
+
+  _hasMultipleChartGroups(numericGroups, states) {
+    return numericGroups.length + (states.length ? 1 : 0) > 1;
+  }
+
+  _stateStripsEnabled(series = this._seriesDescriptors(this._resolvedEntityIds())) {
+    return this._activeSnapshot?.state_strips === true
+      && this._stateStripsAvailable(series);
+  }
+
+  _syncStateStripsButton() {
+    const button = this.shadowRoot?.getElementById("toggle-state-strips");
+    if (!button) return;
+    const available = this._stateStripsAvailable();
+    const active = available && this._activeSnapshot?.state_strips === true;
+    const label = this._customLocalize(
+      active ? "disable_state_strips" : "enable_state_strips",
+    );
+    button.hidden = !available;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-checked", String(active));
+    button.setAttribute("aria-label", label);
+    button.title = label;
+  }
+
+  _toggleStateStrips() {
+    if (!this._stateStripsAvailable()) return;
+    const chart = this._activeSnapshot
+      ? this._clone(this._activeSnapshot)
+      : this._captureSnapshot().chart;
+    if (chart.state_strips === true) delete chart.state_strips;
+    else chart.state_strips = true;
+    this._activeSnapshot = chart;
+    this._recordChange(null, true);
+    this._syncStateStripsButton();
+    this._renderGraphs();
   }
 
   _numericSeriesGroup(value) {
@@ -2320,6 +2458,7 @@ export class GraphMethods {
     const attributeSelection = this._clone(this._activeSnapshot?.attribute_selection);
     const seriesTransforms = this._clone(this._activeSnapshot?.series_transforms);
     const runningTotalAxes = this._clone(this._activeSnapshot?.running_total_axes);
+    const stateStrips = this._activeSnapshot?.state_strips === true;
     const currentCardOptions = this._activeSnapshot?.card_options;
     const currentTypedOptions = currentCardOptions
       && typeof currentCardOptions === "object"
@@ -2374,6 +2513,7 @@ export class GraphMethods {
     if (runningTotalAxes && Object.keys(runningTotalAxes).length) {
       this._activeSnapshot.running_total_axes = runningTotalAxes;
     }
+    if (stateStrips) this._activeSnapshot.state_strips = true;
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
     if (this._hasDetailResolutionOverride()) this._largeRangeFineDetail = false;
     this._recordChange(null, true);

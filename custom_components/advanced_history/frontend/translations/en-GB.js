@@ -86,6 +86,8 @@ export default {
   "disable_running_total": "Stop showing {target} as a running total",
   "enable_axis_running_total": "Show compatible {axis} targets as running totals",
   "disable_axis_running_total": "Stop showing {axis} targets as running totals",
+  "enable_state_strips": "Show state history beneath the numeric chart",
+  "disable_state_strips": "Show state history in a separate chart",
   "attributes_settings": "Graph attributes: {target}",
   "attributes_settings_note": "Choose the entity state and attributes to display. For categorical attributes, enter the recorded values that should appear in the timeline.",
   "categorical_attribute_values": "Recorded values",

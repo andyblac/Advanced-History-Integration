@@ -492,6 +492,7 @@ export class StorageMethods {
       "attribute_selection",
       "series_transforms",
       "running_total_axes",
+      "state_strips",
       "compare",
       "remove_card_options",
     ].forEach(copyChartValue);

@@ -83,6 +83,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
   const attributeSelection = {};
   const seriesRows = {};
   const comparisons = [];
+  let hasStateStrips = false;
   for (const row of cardRows(config)) {
     const entityId = typeof row === "string" ? row : row?.entity;
     if (!validEntityId(entityId)) continue;
@@ -96,6 +97,10 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
       const options = clone(row);
       delete options.entity;
       delete options.statistic_id;
+      if (options.graph_type === "state_strip") {
+        hasStateStrips = true;
+        delete options.graph_type;
+      }
       if (options.y_axis === "secondary") secondaryEntityIds.add(entityId);
       delete options.y_axis;
       if (options.compare !== undefined) comparisons.push(options.compare);
@@ -130,6 +135,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
     attribute_selection: attributeSelection,
   };
   if (singleGraph) chart.single_graph = true;
+  if (hasStateStrips) chart.state_strips = true;
   if (
     comparisons.length
     && comparisons.every((value) => JSON.stringify(value) === JSON.stringify(comparisons[0]))

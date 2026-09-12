@@ -444,6 +444,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
           <ha-dropdown id="y1-comparison-menu" class="axis-comparison-menu" placement="bottom-start" distance="7"></ha-dropdown>
         </div>
         <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
+        <button id="toggle-state-strips" class="axis-state-strips-toggle axis-state-strips-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:view-sequential-outline"></ha-icon></button>
       </div>
       <div id="target-picker-host" class="native-target-picker">
         <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
@@ -548,9 +549,14 @@ export class AdvancedHistoryPanel extends HTMLElement {
       "click",
       () => this._toggleAxisRunningTotal("secondary"),
     );
+    this.shadowRoot.getElementById("toggle-state-strips")?.addEventListener(
+      "click",
+      () => this._toggleStateStrips(),
+    );
     this._syncY2ComparisonToggle();
     this._syncY1ComparisonToggle();
     this._syncRunningTotalAxisButtons();
+    this._syncStateStripsButton();
     this._bindPeriodSelectorAutoHide?.();
     this._bindPanelTabs();
     this._updateUndoRedoButtons();

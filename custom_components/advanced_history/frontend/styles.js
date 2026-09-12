@@ -156,7 +156,7 @@ export const panelStyles = `
     color:var(--secondary-text-color); background:rgba(127,127,127,.28);
   }
   .axis-target-secondary .axis-target-label { justify-content:flex-end; }
-  .axis-compare-toggle, .axis-running-total-toggle {
+  .axis-compare-toggle, .axis-running-total-toggle, .axis-state-strips-toggle {
     width:36px; height:24px; padding:0; display:inline-flex; align-items:center; justify-content:center;
     box-sizing:border-box; appearance:none; line-height:0;
     color:var(--secondary-text-color);
@@ -164,7 +164,7 @@ export const panelStyles = `
     border:1px solid rgba(127,127,127,.46);
     border-radius:12px; cursor:pointer;
   }
-  .axis-compare-toggle:hover, .axis-running-total-toggle:hover { color:var(--primary-text-color); background:rgba(127,127,127,.38); }
+  .axis-compare-toggle:hover, .axis-running-total-toggle:hover, .axis-state-strips-toggle:hover { color:var(--primary-text-color); background:rgba(127,127,127,.38); }
   .axis-compare-toggle.active { color:var(--text-primary-color,var(--primary-text-color)); background:var(--primary-color); border-color:var(--primary-color); }
   .axis-compare-primary.active {
     color:var(--text-primary-color,var(--primary-text-color));
@@ -176,14 +176,20 @@ export const panelStyles = `
     background:var(--ha-color-green-80,var(--success-color));
     border-color:var(--ha-color-green-80,var(--success-color));
   }
+  .axis-state-strips-primary.active {
+    color:var(--text-primary-color,var(--primary-text-color));
+    background:var(--ha-color-green-80,var(--success-color));
+    border-color:var(--ha-color-green-80,var(--success-color));
+  }
   .axis-running-total-secondary.active { color:var(--text-primary-color,var(--primary-text-color)); background:var(--primary-color); border-color:var(--primary-color); }
   .target-sources-pane[data-advanced-history-has-targets] .axis-visibility-toggle:not(.all-hidden),
   .target-sources-pane[data-advanced-history-has-targets] .axis-compare-toggle.active,
-  .target-sources-pane[data-advanced-history-has-targets] .axis-running-total-toggle.active {
+  .target-sources-pane[data-advanced-history-has-targets] .axis-running-total-toggle.active,
+  .target-sources-pane[data-advanced-history-has-targets] .axis-state-strips-toggle.active {
     color:var(--advanced-history-axis-chip-foreground);
   }
-  .axis-compare-toggle ha-icon, .axis-running-total-toggle ha-icon { display:block; flex:0 0 18px; width:18px; height:18px; margin:0; --mdc-icon-size:18px; }
-  .axis-compare-toggle[hidden], .axis-running-total-toggle[hidden] { display:none; }
+  .axis-compare-toggle ha-icon, .axis-running-total-toggle ha-icon, .axis-state-strips-toggle ha-icon { display:block; flex:0 0 18px; width:18px; height:18px; margin:0; --mdc-icon-size:18px; }
+  .axis-compare-toggle[hidden], .axis-running-total-toggle[hidden], .axis-state-strips-toggle[hidden] { display:none; }
   .axis-comparison-menu-shell { position:relative; display:flex; align-items:center; }
   .axis-comparison-menu { --ha-dropdown-font-size:14px; font-weight:400; }
   .axis-comparison-menu::part(menu) { width:268px; box-sizing:border-box; }

@@ -30,6 +30,7 @@ function context(singleGraph = false) {
     _seriesKey: GraphMethods.prototype._seriesKey,
     _seriesDescriptor: GraphMethods.prototype._seriesDescriptor,
     _numericSeriesGroup: GraphMethods.prototype._numericSeriesGroup,
+    _cardOptions() { return {}; },
   };
 }
 
@@ -87,4 +88,47 @@ test("a chart containing only secondary-axis series stays together", () => {
 
   assert.equal(groups.length, 1);
   assert.deepEqual(groups[0].series, series);
+});
+
+test("state strips are available only for a mixed timeline chart", () => {
+  const target = context();
+  target._isNumeric = GraphMethods.prototype._isNumeric;
+  const mixed = ["sensor.room_temperature", "climate.room"];
+
+  assert.equal(
+    GraphMethods.prototype._stateStripsAvailable.call(target, mixed),
+    true,
+  );
+  assert.equal(
+    GraphMethods.prototype._stateStripsAvailable.call(target, ["sensor.room_temperature"]),
+    false,
+  );
+
+  target._cardOptions = () => ({ chart_mode: "bar" });
+  assert.equal(
+    GraphMethods.prototype._stateStripsAvailable.call(target, mixed),
+    false,
+  );
+});
+
+test("state strips remain opt-in even when mixed series are available", () => {
+  const target = context();
+  target._isNumeric = GraphMethods.prototype._isNumeric;
+  target._stateStripsAvailable = GraphMethods.prototype._stateStripsAvailable;
+  const mixed = ["sensor.room_temperature", "climate.room"];
+
+  assert.equal(GraphMethods.prototype._stateStripsEnabled.call(target, mixed), false);
+  target._activeSnapshot.state_strips = true;
+  assert.equal(GraphMethods.prototype._stateStripsEnabled.call(target, mixed), true);
+});
+
+test("embedded state strips retain the mixed-chart automatic heading", () => {
+  assert.equal(
+    GraphMethods.prototype._hasMultipleChartGroups.call(
+      {},
+      [{ series: ["sensor.room_temperature"] }],
+      ["climate.room"],
+    ),
+    true,
+  );
 });
