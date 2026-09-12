@@ -152,6 +152,10 @@ export function cardConfigWithTitle(config, title) {
   return next;
 }
 
+export function dashboardCardTitle(config) {
+  return String(config?.title || "").trim();
+}
+
 export function dashboardDatePickerVisible(config) {
   return config?.show_date_picker !== false;
 }
@@ -1457,13 +1461,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     if (!this._dashboardConfig) return;
     this._disconnectDashboardScaleObservers();
     this._releaseDashboardCardLayout();
-    const title = String(this._dashboardConfig.title || "").trim();
-    const cardOptions = this._activeSnapshot?.card_options || {};
-    const hasGraphHeader = [
-      cardOptions.card_header,
-      cardOptions.numeric?.card_header,
-      cardOptions.state?.card_header,
-    ].some((header) => String(header || "").trim());
+    const title = dashboardCardTitle(this._dashboardConfig);
     const dependencyMissing = Boolean(this._cardLoadError);
     const hasY1Targets = Boolean(this._targetCount(this._targets));
     const hasY2Targets = Boolean(this._targetCount(this._y2Targets));
@@ -1476,7 +1474,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     this.shadowRoot.innerHTML = `
       <style>${cardStyles}</style>
       <ha-card class="dashboard-card">
-        ${title && !hasGraphHeader ? `<div class="dashboard-card-title">${this._escape(title)}</div>` : ""}
+        ${title ? `<div class="dashboard-card-title">${this._escape(title)}</div>` : ""}
         <div class="dashboard-card-content">
           ${dependencyMissing ? "" : `<div class="dashboard-axis-strip">
             <div class="dashboard-axis-group primary axis-target-primary">

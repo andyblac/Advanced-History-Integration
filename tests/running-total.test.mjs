@@ -388,6 +388,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
     dashboardConfigWithDateNavigation,
     dashboardConfigWithPendingComparison,
     dashboardConfigWithSnapshot,
+    dashboardCardTitle,
     dashboardDatePickerVisible,
     dashboardDownloadVisible,
     dashboardEntityIdsInConfigOrder,
@@ -495,6 +496,11 @@ test("SGCC editor changes retain Advanced History options and native height", as
   const titled = cardConfigWithTitle({ type: "custom:advanced-history-sgcc-card" }, "Gas");
   assert.equal(titled.title, "Gas");
   assert.equal(cardConfigWithTitle(titled, "").title, undefined);
+  assert.equal(dashboardCardTitle({
+    title: "  Gas Consumption  ",
+    sgcc_configs: [{ card_header: "Battery (%)" }],
+  }), "Gas Consumption");
+  assert.equal(dashboardCardTitle({ sgcc_configs: [{ card_header: "Battery (%)" }] }), "");
   assert.equal(dashboardDatePickerVisible({}), true);
   assert.equal(dashboardDatePickerVisible({ show_date_picker: false }), false);
   assert.equal(dashboardDatePickerVisible({
