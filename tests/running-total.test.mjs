@@ -637,6 +637,17 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(updated.chart.entity_options["sensor.gas"].line_width, 3);
   assert.deepEqual(updated.period, { compare: "previous" });
 
+  const combined = snapshotFromSgccConfigs({ chart: { card_options: {} } }, [{
+    type: "custom:statistics-graph-chart-card",
+    card_header: "Battery (%)",
+    entities: [
+      { entity: "sensor.battery" },
+      { entity: "cover.window", graph_type: "state_strip" },
+    ],
+  }]);
+  assert.equal(combined.chart.card_options.numeric.card_header, "Battery (%)");
+  assert.deepEqual(combined.chart.card_options.state, {});
+
   const hiddenLegendEntry = {
     dataset: { id: "sensor.gas__0" },
     classList: { contains: (name) => name === "legend-hidden" },

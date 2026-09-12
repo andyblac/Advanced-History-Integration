@@ -641,6 +641,7 @@ export function snapshotFromSgccConfigs(snapshot, configs) {
   delete chart.compare;
   const existingCardOptions = chart.card_options || {};
   const typed = configs.length > 1
+    || converted.some((item) => item.chart?.state_strips === true)
     || Boolean(existingCardOptions.numeric || existingCardOptions.state);
   if (typed) {
     const options = existingCardOptions.numeric || existingCardOptions.state
