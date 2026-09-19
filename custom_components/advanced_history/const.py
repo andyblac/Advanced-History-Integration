@@ -38,7 +38,10 @@ BUILD_NUMBER = BUILD_METADATA.get("number", "")
 
 def _display_version(version: str, channel: str, number: str) -> str:
     """Return the user-facing integration version."""
-    return f"{version}-{channel}.{number}" if channel and number else version
+    if not channel or not number:
+        return version
+    suffix = f"-{channel}.{number}"
+    return version if version.endswith(suffix) else f"{version}{suffix}"
 
 
 DISPLAY_VERSION = _display_version(VERSION, BUILD_CHANNEL, BUILD_NUMBER)

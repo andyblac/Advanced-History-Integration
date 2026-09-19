@@ -82,7 +82,7 @@ New installations create both services automatically. The More Info graph replac
 
 ### Development builds
 
-Run `python3 scripts/build_dev.py` from the repository root before uploading a local development build. Each run increments a local build counter, writes `build.json` into the integration folder, and creates `dist/advanced_history-dev-<build>.zip`. The counter automatically resets to `1` when the version in `manifest.json` changes. You can upload either that ZIP’s contents or the updated `custom_components/advanced_history` folder.
+Run `python3 scripts/build_dev.py` from the repository root before uploading a local development build. Each run increments a local build counter, writes `build.json`, stamps the integration manifest with the full development version, and creates `dist/advanced_history-dev-<build>.zip`. This makes Home Assistant display the build number whether you install the ZIP or copy the updated `custom_components/advanced_history` folder. The builder retains the underlying release version when incrementing subsequent development builds, and resets the counter to `1` when that release version changes.
 
 Local development builds display versions such as `v2.1.0-dev.42` beneath the Advanced History title, making it easy to confirm which build is installed. The version-aware counter in `dev-build.json` is tracked so numbering survives a fresh clone. The generated integration metadata and ZIP files are ignored by Git. Stable installations display the manifest version only.
 
