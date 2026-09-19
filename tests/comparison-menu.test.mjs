@@ -471,6 +471,30 @@ test("dashboard SGCC inherits the wrapper background when transparency is the de
   assert.equal(removed, true);
 });
 
+test("numeric SGCC grid rows follow the expanded panel height", () => {
+  const configs = [];
+  const card = {
+    __advancedHistoryConfig: {
+      height: "auto",
+      grid_options: { columns: "full", rows: 7 },
+    },
+    setConfig: (config) => configs.push(config),
+  };
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _hass: {},
+    _setGraphCardHass() {},
+  });
+
+  context._fitNumericTimelineCard(card, 1175);
+
+  assert.equal(configs.length, 1);
+  assert.equal(card.__advancedHistoryConfig.grid_options.rows, 24);
+  assert.equal(card.__advancedHistoryConfig.grid_options.columns, "full");
+
+  context._fitNumericTimelineCard(card, 1175);
+  assert.equal(configs.length, 1);
+});
+
 test("dashboard period store publishes local state without an Energy request", async () => {
   const context = Object.create(PeriodSelectorMethods.prototype);
   const store = context._createPeriodStore();
@@ -668,6 +692,49 @@ test("dashboard SGCC keeps its local period store out of the HA connection", () 
 
   assert.equal(card.hass.connection._advanced_history_test, undefined);
   assert.equal(connection._advanced_history_test, undefined);
+});
+
+test("numeric SGCC receives recorder responses without AHP rewriting them", async () => {
+  const compact = [[
+    { s: "0", a: { unit_of_measurement: "kW" }, lu: 1789279200 },
+    { s: "21", lu: 1789285500 },
+  ]];
+  const sources = [];
+  const hass = { callWS: async () => compact };
+  const card = {
+    __advancedHistoryChartMode: "timeline",
+    __advancedHistorySourceTracker: {
+      record: (source) => sources.push(source),
+    },
+  };
+  const context = Object.create(GraphMethods.prototype);
+
+  context._setGraphCardHass(card, hass);
+  const response = await card.hass.callWS({ type: "history/history_during_period" });
+
+  assert.equal(response, compact);
+  assert.deepEqual(sources, ["history"]);
+});
+
+test("separate state timeline retains compact-history compatibility conversion", async () => {
+  const compact = [[
+    { s: "off", a: { friendly_name: "Heating" }, lu: 1789279200 },
+    { s: "on", lu: 1789285500 },
+  ]];
+  const hass = { callWS: async () => compact };
+  const card = {
+    __advancedHistoryChartMode: "state_timeline",
+    __advancedHistorySourceTracker: { record() {} },
+  };
+  const context = Object.create(GraphMethods.prototype);
+
+  context._setGraphCardHass(card, hass);
+  const response = await card.hass.callWS({ type: "history/history_during_period" });
+
+  assert.notEqual(response, compact);
+  assert.equal(response[0][0].state, "off");
+  assert.equal(response[0][1].state, "on");
+  assert.deepEqual(response[0][1].attributes, { friendly_name: "Heating" });
 });
 
 test("rendered SGCC data supplies a source when its request came from cache", () => {

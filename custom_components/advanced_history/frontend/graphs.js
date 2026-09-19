@@ -439,6 +439,23 @@ export class GraphMethods {
     return Math.max(200, Math.floor(layoutHeight - nonPlotHeight));
   }
 
+  _fitNumericTimelineCard(card, height) {
+    const config = card?.__advancedHistoryConfig;
+    if (!config || config.height !== "auto" || !Number.isFinite(height)) return;
+    const rows = Math.max(1, Math.ceil(height / 50));
+    if (config.grid_options?.rows === rows) return;
+    const fittedConfig = {
+      ...config,
+      grid_options: {
+        ...(config.grid_options || {}),
+        rows,
+      },
+    };
+    card.__advancedHistoryConfig = fittedConfig;
+    card.setConfig(fittedConfig);
+    this._setGraphCardHass(card, this._hass);
+  }
+
   _configureDynamicGraphLayout(
     host,
     hasNumeric,
@@ -530,19 +547,23 @@ export class GraphMethods {
         host.style.removeProperty("min-height");
         const stateShell = host.querySelector(".graph-shell.state-graph");
         const stateHeight = Math.ceil(stateShell?.getBoundingClientRect().height || 0);
-        const numericHeight = `${Math.max(
+        const numericHeightValue = Math.max(
           MIN_NUMERIC_GRAPH_HEIGHT,
           layoutHeight - stateHeight - 16,
           numericRequirement,
-        )}px`;
+        );
+        const numericHeight = `${numericHeightValue}px`;
         if (host.style.getPropertyValue("--numeric-graph-height") !== numericHeight) {
           host.style.setProperty("--numeric-graph-height", numericHeight);
         }
+        this._fitNumericTimelineCard(numericCard, numericHeightValue);
       } else {
         host.style.removeProperty("min-height");
         host.style.removeProperty("--numeric-graph-height");
-        const next = `${Math.max(layoutHeight, numericRequirement)}px`;
+        const numericHeightValue = Math.max(layoutHeight, numericRequirement);
+        const next = `${numericHeightValue}px`;
         if (host.style.height !== next) host.style.height = next;
+        this._fitNumericTimelineCard(numericCard, numericHeightValue);
       }
     };
     const schedule = () => {
@@ -1589,7 +1610,13 @@ export class GraphMethods {
 
     const recordResponse = (message, response) => {
       const source = this._requestDataSource(message);
+      // Modern SGCC handles Home Assistant's compact recorder payload itself.
+      // Rewriting numeric history here changes the payload compared with a
+      // standalone SGCC card and can make it discard recorder data in favour
+      // of long-term statistics. Keep the compatibility conversion confined
+      // to the separate state-timeline card that originally required it.
       const normalized = source === "history"
+        && card.__advancedHistoryChartMode === "state_timeline"
         ? normalizeCompactHistoryResponse(response)
         : response;
       if (source && this._dataSourceResponseHasPoints(normalized)) {
