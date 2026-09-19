@@ -50,14 +50,30 @@ test("the state-strip axis control toggles a bookmarkable chart option", () => {
 });
 
 test("an auto-height state-strip chart gives remaining card space to its plot", () => {
-  assert.equal(
-    GraphMethods.prototype._stateStripPlotHeight.call({}, 900, 320),
-    780,
-  );
-  assert.equal(
-    GraphMethods.prototype._stateStripPlotHeight.call({}, 260, 360),
-    200,
-  );
+  const configs = [];
+  const card = {
+    __advancedHistoryConfig: { height: "auto" },
+    shadowRoot: {
+      querySelector(selector) {
+        return {
+          getBoundingClientRect: () => ({
+            height: selector === "ha-card.sgc-card" ? 320 : 200,
+          }),
+        };
+      },
+    },
+    setConfig: (config) => configs.push(config),
+  };
+  const context = {
+    _hass: {},
+    _setGraphCardHass() {},
+  };
+
+  GraphMethods.prototype._fitAutomaticNumericCard.call(context, card, 900);
+  assert.equal(configs.at(-1).height, 780);
+
+  GraphMethods.prototype._fitAutomaticNumericCard.call(context, card, 260);
+  assert.equal(configs.at(-1).height, 200);
 });
 
 test("state strips inherit state-timeline label defaults", () => {

@@ -311,7 +311,6 @@ export class GraphMethods {
       Boolean(numeric.length),
       Boolean(separateStates),
       numericGroups.length,
-      stateStrips,
     );
     if (numericGroups.length) {
       const numericMode = this._cardOptions("timeline").chart_mode || "timeline";
@@ -434,23 +433,32 @@ export class GraphMethods {
     card.setConfig(fittedConfig);
   }
 
-  _stateStripPlotHeight(layoutHeight, numericRequirement) {
-    const nonPlotHeight = Math.max(0, numericRequirement - 200);
-    return Math.max(200, Math.floor(layoutHeight - nonPlotHeight));
-  }
-
-  _fitNumericTimelineCard(card, height) {
+  _fitAutomaticNumericCard(card, cardHeight) {
     const config = card?.__advancedHistoryConfig;
-    if (!config || config.height !== "auto" || !Number.isFinite(height)) return;
-    const rows = Math.max(1, Math.ceil(height / 50));
-    if (config.grid_options?.rows === rows) return;
-    const fittedConfig = {
-      ...config,
-      grid_options: {
-        ...(config.grid_options || {}),
-        rows,
-      },
-    };
+    if (
+      !config
+      || (!card.__advancedHistoryAutoHeight && config.height !== "auto")
+      || !Number.isFinite(cardHeight)
+    ) return;
+    const root = card.shadowRoot;
+    const cardElement = root?.querySelector("ha-card.sgc-card");
+    const plotWrap = root?.querySelector(".sgc-plot-wrap");
+    if (!cardElement || !plotWrap) return;
+    const outerHeight = cardElement.getBoundingClientRect().height;
+    const plotHeight = plotWrap.getBoundingClientRect().height;
+    if (!outerHeight || !plotHeight) return;
+
+    // SGCC 4.03 correctly fills height:auto on its first render, but a
+    // width-only host resize can rebuild the inner SVG at its generic 200px
+    // fallback while the card and plot wrapper remain full height. Resolve
+    // the automatic height to the measured plot allocation so subsequent
+    // sidebar/entity layout changes keep using the real panel height.
+    const nonPlotHeight = Math.max(0, outerHeight - plotHeight);
+    const fittedHeight = Math.max(200, Math.floor(cardHeight - nonPlotHeight));
+    if (card.__advancedHistoryAutoPlotHeight === fittedHeight) return;
+    card.__advancedHistoryAutoHeight = true;
+    card.__advancedHistoryAutoPlotHeight = fittedHeight;
+    const fittedConfig = { ...config, height: fittedHeight };
     card.__advancedHistoryConfig = fittedConfig;
     card.setConfig(fittedConfig);
     this._setGraphCardHass(card, this._hass);
@@ -461,7 +469,6 @@ export class GraphMethods {
     hasNumeric,
     hasState,
     numericChartCount = hasNumeric ? 1 : 0,
-    hasStateStrips = false,
   ) {
     const configuredNumericHeight = this._cardOptions("timeline").height;
     const usesAutomaticNumericHeight = hasNumeric && (
@@ -525,20 +532,6 @@ export class GraphMethods {
       const layoutHeight = this._dashboardCardMode
         ? Math.max(MIN_NUMERIC_GRAPH_HEIGHT, numericRequirement)
         : available;
-      if (hasStateStrips && numericCard?.__advancedHistoryConfig) {
-        const plotHeight = this._stateStripPlotHeight(layoutHeight, numericRequirement);
-        if (numericCard.__advancedHistoryStateStripPlotHeight !== plotHeight) {
-          numericCard.__advancedHistoryStateStripPlotHeight = plotHeight;
-          numericCard.__advancedHistoryAutoHeight = true;
-          const fittedConfig = {
-            ...numericCard.__advancedHistoryConfig,
-            height: plotHeight,
-          };
-          numericCard.__advancedHistoryConfig = fittedConfig;
-          numericCard.setConfig(fittedConfig);
-          this._setGraphCardHass(numericCard, this._hass);
-        }
-      }
       if (hasState) {
         host.style.removeProperty("height");
         // Do not give the grid a viewport-sized minimum: an auto state row is
@@ -556,14 +549,14 @@ export class GraphMethods {
         if (host.style.getPropertyValue("--numeric-graph-height") !== numericHeight) {
           host.style.setProperty("--numeric-graph-height", numericHeight);
         }
-        this._fitNumericTimelineCard(numericCard, numericHeightValue);
+        this._fitAutomaticNumericCard(numericCard, numericHeightValue);
       } else {
         host.style.removeProperty("min-height");
         host.style.removeProperty("--numeric-graph-height");
         const numericHeightValue = Math.max(layoutHeight, numericRequirement);
         const next = `${numericHeightValue}px`;
         if (host.style.height !== next) host.style.height = next;
-        this._fitNumericTimelineCard(numericCard, numericHeightValue);
+        this._fitAutomaticNumericCard(numericCard, numericHeightValue);
       }
     };
     const schedule = () => {
@@ -817,6 +810,17 @@ export class GraphMethods {
     return { ...this._detailCardOptions(detail), ...cardOptions };
   }
 
+  _mountConfiguredGraphCard(host, shell, card) {
+    host.append(shell);
+    this._cards.push(card);
+    this._graphCards.push(card);
+    // Match Home Assistant's card lifecycle: mount the configured element
+    // before assigning hass. Cached recorder responses can otherwise finish
+    // while SGCC is disconnected, making its first SVG measure the generic
+    // 200px fallback instead of the available panel height.
+    this._setGraphCardHass(card, this._hass);
+  }
+
   _createGraph(host, series, title, mode, detail = null, stateStripKeys = new Set()) {
     const shell = document.createElement("div");
     shell.className = "graph-shell";
@@ -1022,10 +1026,7 @@ export class GraphMethods {
       config = this._applyDashboardChildScaleOptions?.(config) || config;
     }
     if (mode !== "state_timeline") {
-      const climateEntities = entities.map((entity) => (
-        typeof entity === "string" ? entity : entity?.entity
-      )).filter((entityId) => String(entityId || "").startsWith("climate."));
-      config = withClimateModeAnnotations(config, climateEntities);
+      config = withClimateModeAnnotations(config, entities);
     }
     if (mode !== "state_timeline" && config.height === "auto") {
       // The card's native height:auto implementation only enables its
@@ -1062,7 +1063,6 @@ export class GraphMethods {
       this._applyStateStripLabelStyle(card);
       this._applyDashboardGraphBackground(card, config);
       card.__advancedHistoryConfig = config;
-      this._setGraphCardHass(card, this._hass);
       shell.append(card, sourceIndicator);
       this._trackDashboardScaleCard?.(card, this._graphCards?.length || 0);
       // Panel chart overrides belong to the current user's chart state. A
@@ -1082,9 +1082,7 @@ export class GraphMethods {
         );
         shell.append(editorButton);
       }
-      host.append(shell);
-      this._cards.push(card);
-      this._graphCards.push(card);
+      this._mountConfiguredGraphCard(host, shell, card);
       this._observeRenderedGraphDataSource(card);
       this._syncGraphCardsToPeriod?.();
       this._graphLayoutObserveCard?.(card);

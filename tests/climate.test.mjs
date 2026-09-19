@@ -153,6 +153,17 @@ test("creates uniquely identified spans for each climate entity", () => {
   );
 });
 
+test("does not annotate hidden climate entities", () => {
+  const annotations = climateModeAnnotations([
+    { entity: "climate.lounge", enabled: false },
+    { entity: "climate.bedroom", enabled: true },
+    { entity: "sensor.temperature", enabled: true },
+  ]);
+
+  assert.equal(annotations.length, 6);
+  assert.ok(annotations.every(({ entity }) => entity === "climate.bedroom"));
+});
+
 test("preserves user annotations while replacing generated climate spans", () => {
   const user = { type: "line", time: "2026-09-05T12:00:00Z", label: "User" };
   const oldGenerated = climateModeAnnotations("climate.old")[0];

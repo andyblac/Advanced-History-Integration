@@ -471,27 +471,62 @@ test("dashboard SGCC inherits the wrapper background when transparency is the de
   assert.equal(removed, true);
 });
 
-test("numeric SGCC grid rows follow the expanded panel height", () => {
+test("SGCC receives hass only after its configured card is mounted", () => {
+  const card = { isConnected: false };
+  const shell = { card };
+  const hass = {};
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _cards: [],
+    _graphCards: [],
+    _hass: hass,
+    _setGraphCardHass(mountedCard, mountedHass) {
+      assert.equal(mountedCard.isConnected, true);
+      assert.equal(mountedHass, hass);
+    },
+  });
+  const host = {
+    append(mountedShell) {
+      assert.equal(mountedShell, shell);
+      mountedShell.card.isConnected = true;
+    },
+  };
+
+  context._mountConfiguredGraphCard(host, shell, card);
+
+  assert.deepEqual(context._cards, [card]);
+  assert.deepEqual(context._graphCards, [card]);
+});
+
+test("automatic numeric cards retain their measured plot height after width changes", () => {
   const configs = [];
+  const hass = {};
+  const cardElement = { getBoundingClientRect: () => ({ height: 989 }) };
+  const plotWrap = { getBoundingClientRect: () => ({ height: 874 }) };
   const card = {
-    __advancedHistoryConfig: {
-      height: "auto",
-      grid_options: { columns: "full", rows: 7 },
+    __advancedHistoryConfig: { height: "auto", grid_options: { rows: 20 } },
+    shadowRoot: {
+      querySelector(selector) {
+        return selector === "ha-card.sgc-card" ? cardElement : plotWrap;
+      },
     },
     setConfig: (config) => configs.push(config),
   };
   const context = Object.assign(Object.create(GraphMethods.prototype), {
-    _hass: {},
-    _setGraphCardHass() {},
+    _hass: hass,
+    _setGraphCardHass(fittedCard, fittedHass) {
+      assert.equal(fittedCard, card);
+      assert.equal(fittedHass, hass);
+    },
   });
 
-  context._fitNumericTimelineCard(card, 1175);
+  context._fitAutomaticNumericCard(card, 989);
 
   assert.equal(configs.length, 1);
-  assert.equal(card.__advancedHistoryConfig.grid_options.rows, 24);
-  assert.equal(card.__advancedHistoryConfig.grid_options.columns, "full");
+  assert.equal(configs[0].height, 874);
+  assert.equal(card.__advancedHistoryConfig.height, 874);
+  assert.equal(card.__advancedHistoryAutoHeight, true);
 
-  context._fitNumericTimelineCard(card, 1175);
+  context._fitAutomaticNumericCard(card, 989);
   assert.equal(configs.length, 1);
 });
 

@@ -45,6 +45,12 @@ export function withoutClimateModeAnnotations(annotations) {
 export function climateModeAnnotations(entityIds) {
   const climateEntities = [...new Set(
     (Array.isArray(entityIds) ? entityIds : [entityIds])
+      .map((entity) => {
+        if (entity && typeof entity === "object") {
+          return entity.enabled === false ? null : entity.entity;
+        }
+        return entity;
+      })
       .filter((entityId) => String(entityId || "").startsWith("climate.")),
   )];
   return climateEntities.flatMap((entityId) => (
