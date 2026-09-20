@@ -1106,6 +1106,13 @@ export class PeriodSelectorMethods {
     this._setPeriodSelectorRange(start, end);
   }
 
+  _navigatePeriodSelector(direction, button = null) {
+    this._shiftPeriodSelectorRange(direction);
+    // Pointer-leave owns auto-hide. Releasing the clicked arrow's focus keeps
+    // :focus-within from holding the selector open after the pointer departs.
+    button?.blur?.();
+  }
+
   _selectCurrentPeriod() {
     const collection = this._periodStore;
     if (!collection) return;
@@ -1194,8 +1201,8 @@ export class PeriodSelectorMethods {
       controller.querySelector(".period-selector-now")?.addEventListener("click", () => {
         this._selectCurrentOrRollingPeriod();
       });
-      controller.querySelector(".period-selector-nav.previous")?.addEventListener("click", () => this._shiftPeriodSelectorRange(-1));
-      controller.querySelector(".period-selector-nav.next")?.addEventListener("click", () => this._shiftPeriodSelectorRange(1));
+      controller.querySelector(".period-selector-nav.previous")?.addEventListener("click", (event) => this._navigatePeriodSelector(-1, event.currentTarget));
+      controller.querySelector(".period-selector-nav.next")?.addEventListener("click", (event) => this._navigatePeriodSelector(1, event.currentTarget));
       picker.addEventListener("value-changed", (event) => {
         if (picker.__advancedHistorySyncing) return;
         const value = event.detail?.value;
@@ -1233,23 +1240,63 @@ export class PeriodSelectorMethods {
     dropdown.querySelector("[data-advanced-history-compare]")?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      dropdown.open = false;
+      this._closePeriodSelectorMenu(dropdown, button);
       this._setY1ComparisonEnabled(!this._periodStore?.compare);
     });
     dropdown.querySelector("[data-advanced-history-download]")?.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
-      dropdown.open = false;
+      this._closePeriodSelectorMenu(dropdown, button);
       this._downloadChartData();
     });
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
+      if (dropdown.open) {
+        this._closePeriodSelectorMenu(dropdown, button);
+        return;
+      }
       dropdown.anchorElement = button;
-      dropdown.open = !dropdown.open;
-      button.setAttribute("aria-expanded", String(dropdown.open));
+      dropdown.open = true;
+      button.setAttribute("aria-expanded", "true");
+      this._installPeriodSelectorMenuDismissHandlers(dropdown, button);
     });
-    dropdown.addEventListener("wa-hide", () => button.setAttribute("aria-expanded", "false"));
+    dropdown.addEventListener("wa-hide", () => {
+      button.setAttribute("aria-expanded", "false");
+      this._removePeriodSelectorMenuDismissHandlers?.();
+      this._schedulePeriodSelectorHide();
+    });
+  }
+
+  _periodSelectorMenuEventInside(event, dropdown, button) {
+    const path = event?.composedPath?.() || [];
+    return path.includes(dropdown) || path.includes(button);
+  }
+
+  _closePeriodSelectorMenu(dropdown, button) {
+    if (dropdown) dropdown.open = false;
+    button?.setAttribute?.("aria-expanded", "false");
+    this._removePeriodSelectorMenuDismissHandlers?.();
+  }
+
+  _installPeriodSelectorMenuDismissHandlers(dropdown, button) {
+    this._removePeriodSelectorMenuDismissHandlers?.();
+    const pointerdown = (event) => {
+      if (this._periodSelectorMenuEventInside(event, dropdown, button)) return;
+      this._closePeriodSelectorMenu(dropdown, button);
+    };
+    const keydown = (event) => {
+      if (event.key !== "Escape") return;
+      this._closePeriodSelectorMenu(dropdown, button);
+      button?.focus?.();
+    };
+    document.addEventListener("pointerdown", pointerdown, true);
+    document.addEventListener("keydown", keydown, true);
+    this._removePeriodSelectorMenuDismissHandlers = () => {
+      document.removeEventListener("pointerdown", pointerdown, true);
+      document.removeEventListener("keydown", keydown, true);
+      this._removePeriodSelectorMenuDismissHandlers = null;
+    };
   }
 
   _syncPeriodSelectorMenu(controller = this.shadowRoot?.querySelector(".panel-period-selector")) {
@@ -1832,8 +1879,10 @@ export class PeriodSelectorMethods {
       if (this._panelTimeRangeDialogOpen) return;
       const host = this.shadowRoot?.getElementById("date-controller");
       const zone = this.shadowRoot?.getElementById("date-controller-reveal");
+      const menu = host?.querySelector?.(".period-selector-menu");
       if (
-        host?.matches(":hover")
+        menu?.open
+        || host?.matches(":hover")
         || host?.matches(":focus-within")
         || zone?.matches(":hover")
         || zone?.matches(":focus")

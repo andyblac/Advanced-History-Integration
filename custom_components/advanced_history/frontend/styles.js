@@ -210,7 +210,7 @@ export const panelStyles = `
     position:fixed; z-index:20; left:16px; right:16px; bottom:max(12px,env(safe-area-inset-bottom));
     width:max-content; max-width:calc(100vw - 32px); margin-inline:auto;
     filter:drop-shadow(0 3px 8px rgba(0,0,0,.28));
-    transition:transform .24s ease,opacity .18s ease; will-change:transform;
+    transition:transform .32s ease,opacity .26s ease; will-change:transform;
   }
   .period-selector-floating.auto-hide:not(.revealed) {
     transform:translateY(calc(100% + max(12px,env(safe-area-inset-bottom)) + 8px));

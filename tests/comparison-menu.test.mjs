@@ -819,6 +819,85 @@ test("dashboard date control shifts the complete selected period", () => {
   assert.equal(shifted.end.getDate(), 17);
 });
 
+test("panel date arrows release focus so pointer-leave can auto-hide the selector", () => {
+  const calls = [];
+  const button = { blur: () => calls.push(["blur"]) };
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _shiftPeriodSelectorRange: (direction) => calls.push(["shift", direction]),
+  });
+
+  context._navigatePeriodSelector(-1, button);
+
+  assert.deepEqual(calls, [["shift", -1], ["blur"]]);
+});
+
+test("period selector menu dismisses only for outside interactions", () => {
+  const context = Object.create(PeriodSelectorMethods.prototype);
+  const dropdown = { open: true };
+  const attributes = new Map();
+  const button = {
+    setAttribute: (name, value) => attributes.set(name, value),
+  };
+  let cleaned = 0;
+  context._removePeriodSelectorMenuDismissHandlers = () => { cleaned += 1; };
+
+  assert.equal(context._periodSelectorMenuEventInside({
+    composedPath: () => [{}, dropdown, {}],
+  }, dropdown, button), true);
+  assert.equal(dropdown.open, true);
+
+  assert.equal(context._periodSelectorMenuEventInside({
+    composedPath: () => [{}],
+  }, dropdown, button), false);
+  context._closePeriodSelectorMenu(dropdown, button);
+
+  assert.equal(dropdown.open, false);
+  assert.equal(attributes.get("aria-expanded"), "false");
+  assert.equal(cleaned, 1);
+});
+
+test("auto-hide keeps the date selector visible while its menu is open", () => {
+  const previousWindow = globalThis.window;
+  let scheduled;
+  globalThis.window = {
+    setTimeout: (callback) => {
+      scheduled = callback;
+      return 1;
+    },
+    clearTimeout: () => {},
+  };
+  try {
+    let hidden = false;
+    const menu = { open: true };
+    const host = {
+      querySelector: () => menu,
+      matches: () => false,
+      classList: { remove: () => { hidden = true; } },
+    };
+    const zone = { matches: () => false };
+    const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+      _datePickerAutoHide: true,
+      _datePickerAutoHideTimer: null,
+      _panelTimeRangeDialogOpen: false,
+      shadowRoot: {
+        getElementById: (id) => id === "date-controller" ? host : zone,
+      },
+    });
+
+    context._schedulePeriodSelectorHide();
+    scheduled();
+    assert.equal(hidden, false);
+
+    menu.open = false;
+    context._schedulePeriodSelectorHide();
+    scheduled();
+    assert.equal(hidden, true);
+  } finally {
+    if (previousWindow === undefined) delete globalThis.window;
+    else globalThis.window = previousWindow;
+  }
+});
+
 test("AHP and AHC Now controls both preserve an active rolling range", () => {
   for (const dashboardCardMode of [false, true]) {
     const calls = [];

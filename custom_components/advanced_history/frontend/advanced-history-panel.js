@@ -313,6 +313,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._periodRestoreTimer = null;
     if (this._datePickerAutoHideTimer) window.clearTimeout(this._datePickerAutoHideTimer);
     this._datePickerAutoHideTimer = null;
+    this._removePeriodSelectorMenuDismissHandlers?.();
   }
 
   async _initialize() {
@@ -469,6 +470,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
       <section id="detail-banner" class="detail-banner" hidden></section>
       ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
       <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>`;
+    this._removePeriodSelectorMenuDismissHandlers?.();
     this._nativeTargetPicker = null;
     this._nativeY2TargetPicker = null;
     this.shadowRoot.innerHTML = `
