@@ -793,12 +793,16 @@ export class GraphMethods {
         show_group_by_picker: false,
       };
     }
-    return {
+    const options = {
       auto_scale_points: false,
       group_by: detail.groupBy,
       show_pph_picker: false,
       show_group_by_picker: true,
     };
+    if (Number.isFinite(detail.pointsPerHour)) {
+      options.points_per_hour = detail.pointsPerHour;
+    }
+    return options;
   }
 
   _hasDetailResolutionOverride() {
@@ -1175,34 +1179,34 @@ export class GraphMethods {
   }
 
   _largeRangeDetailProfile() {
-    if (this._detailModeValue() === "manual") return null;
-    if (this.config.large_range_automatic_detail === false) return null;
+    const mode = this._detailModeValue();
+    if (mode === "manual") return null;
+    const fine = mode === "fine";
+    if (!fine && this.config.large_range_automatic_detail === false) return null;
     const period = this._largeRangePeriod();
     const thresholdDays = Math.max(7, Number(this.config.large_range_detail_threshold_days) || 31);
     if (!period) return null;
-    const nextMonth = new Date(period.start);
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    const calendarMonth = period.start.getDate() === 1
-      && period.start.getHours() === 0
-      && period.start.getMinutes() === 0
-      && Math.abs(period.end.getTime() - (nextMonth.getTime() - 1)) < 7_200_000;
-    // The default 31-day threshold represents a calendar month, including
-    // February and 30-day months. The normal duration rule remains exact for
-    // user-configured thresholds and non-calendar ranges.
-    if (
-      period.hours < thresholdDays * 24 - 2
-      && !(thresholdDays === 31 && calendarMonth)
-    ) return null;
-    const groupBy = period.hours > 730 * 24
-      ? "week"
-      : period.hours > 92 * 24
-        ? "date"
-        : "6h";
+    const groupBy = fine
+      ? period.hours <= 28
+        ? "interval"
+        : period.hours <= 192
+          ? "hour"
+          : period.hours <= 768
+            ? "6h"
+            : period.hours <= 730 * 24
+              ? "date"
+              : "week"
+      : period.hours > 730 * 24
+        ? "week"
+        : period.hours > 92 * 24
+          ? "date"
+          : "6h";
     return {
       ...period,
       thresholdDays,
       groupBy,
-      automatic: !this._largeRangeFineDetail,
+      ...(fine && groupBy === "interval" ? { pointsPerHour: 60 } : {}),
+      automatic: !fine,
     };
   }
 

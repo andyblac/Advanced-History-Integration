@@ -201,6 +201,78 @@ test("auto detail clears configured manual resolution overrides", () => {
   });
 });
 
+test("fine detail applies useful grouping below the automatic large-range threshold", () => {
+  const profileForDays = (days) => {
+    const start = new Date(2026, 8, 1, 0, 0, 0, 0);
+    const end = new Date(start.getTime() + days * 24 * 60 * 60 * 1000);
+    const context = Object.assign(Object.create(GraphMethods.prototype), {
+      _detailMode: "fine",
+      _periodStore: { start, end },
+      _effectiveCompare: () => "",
+      config: {},
+    });
+    return context._largeRangeDetailProfile();
+  };
+
+  assert.deepEqual(
+    {
+      groupBy: profileForDays(1).groupBy,
+      pointsPerHour: profileForDays(1).pointsPerHour,
+    },
+    { groupBy: "interval", pointsPerHour: 60 },
+  );
+  assert.equal(profileForDays(7).groupBy, "hour");
+  assert.equal(profileForDays(31).groupBy, "6h");
+});
+
+test("day-range fine detail applies one-minute point density", () => {
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _detailMode: "fine",
+  });
+
+  assert.deepEqual(context._resolvedDetailCardOptions({
+    automatic: false,
+    groupBy: "interval",
+    pointsPerHour: 60,
+  }, {
+    points_per_hour: 2,
+  }), {
+    auto_scale_points: false,
+    group_by: "interval",
+    points_per_hour: 60,
+    show_pph_picker: false,
+    show_group_by_picker: true,
+  });
+});
+
+test("auto detail exposes its mode banner for week ranges", () => {
+  const start = new Date(2026, 8, 14, 0, 0, 0, 0);
+  const end = new Date(2026, 8, 21, 0, 0, 0, 0);
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _detailMode: "auto",
+    _periodStore: { start, end },
+    _effectiveCompare: () => "",
+    config: {},
+  });
+
+  const profile = context._largeRangeDetailProfile();
+  assert.equal(profile.automatic, true);
+  assert.equal(profile.groupBy, "6h");
+});
+
+test("auto detail exposes its mode banner for day ranges", () => {
+  const start = new Date(2026, 8, 20, 0, 0, 0, 0);
+  const end = new Date(2026, 8, 20, 23, 59, 59, 999);
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _detailMode: "auto",
+    _periodStore: { start, end },
+    _effectiveCompare: () => "",
+    config: {},
+  });
+
+  assert.equal(context._largeRangeDetailProfile()?.automatic, true);
+});
+
 test("detail mode changes restore Auto and Fine behavior", () => {
   const calls = [];
   const context = Object.assign(Object.create(GraphMethods.prototype), {
