@@ -343,14 +343,14 @@ export class PanelTabsMethods {
     const next = this._localize("ui.common.next", "Next");
     const tabHelp = this._customLocalize("panel_tab_help");
     return `<div class="panel-tabs-shell">
-      <button class="panel-tabs-scroll" data-scroll-panels="-1" title="${this._escape(previous)}" aria-label="${this._escape(previous)}" hidden><ha-icon icon="mdi:chevron-left"></ha-icon></button>
+      <button type="button" class="panel-tabs-scroll" data-scroll-panels="-1" title="${this._escape(previous)}" aria-label="${this._escape(previous)}" hidden><ha-icon icon="mdi:chevron-left"></ha-icon></button>
       <nav class="panel-tabs" aria-label="${this._escape(this._customLocalize("panels"))}">
         ${this._panelTabs.map((tab, index) => `<span class="panel-tab${tab.id === this._activePanelTabId ? " active" : ""}" draggable="true" data-panel-tab-item="${this._escape(tab.id)}">
           <button class="panel-tab-select" data-panel-tab="${this._escape(tab.id)}" title="${this._escape(tabHelp)}" ${tab.id === this._activePanelTabId ? 'aria-current="page"' : ""}>${this._escape(this._panelTabDisplayLabel(tab, index))}</button>
           <button class="panel-tab-close" data-close-panel="${this._escape(tab.id)}" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button>
         </span>`).join("")}
       </nav>
-      <button class="panel-tabs-scroll" data-scroll-panels="1" title="${this._escape(next)}" aria-label="${this._escape(next)}" hidden><ha-icon icon="mdi:chevron-right"></ha-icon></button>
+      <button type="button" class="panel-tabs-scroll" data-scroll-panels="1" title="${this._escape(next)}" aria-label="${this._escape(next)}" hidden><ha-icon icon="mdi:chevron-right"></ha-icon></button>
     </div>`;
   }
 
@@ -380,12 +380,19 @@ export class PanelTabsMethods {
     if (direction > 0) {
       const visibleRight = tabs.scrollLeft + tabs.clientWidth;
       const target = bounds.find((item) => item.right > visibleRight + 1);
-      destination = target ? target.right - tabs.clientWidth : tabs.scrollWidth;
+      // Scroll to the tab's snap point. Revealing only its trailing edge can
+      // leave the destination between snap points, allowing the browser to
+      // snap straight back to the current tab.
+      destination = target ? target.left : tabs.scrollWidth;
     } else {
       const target = [...bounds].reverse().find((item) => item.left < tabs.scrollLeft - 1);
       destination = target ? target.left : 0;
     }
-    tabs.scrollTo({ left: Math.max(0, destination), behavior: "smooth" });
+    const maxScroll = Math.max(0, tabs.scrollWidth - tabs.clientWidth);
+    tabs.scrollTo({
+      left: Math.min(maxScroll, Math.max(0, destination)),
+      behavior: "smooth",
+    });
   }
 
   _renamePanelTab(id, button) {
