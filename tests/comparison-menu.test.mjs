@@ -219,13 +219,13 @@ test("fine detail applies useful grouping below the automatic large-range thresh
       groupBy: profileForDays(1).groupBy,
       pointsPerHour: profileForDays(1).pointsPerHour,
     },
-    { groupBy: "interval", pointsPerHour: 60 },
+    { groupBy: "interval", pointsPerHour: 12 },
   );
   assert.equal(profileForDays(7).groupBy, "hour");
   assert.equal(profileForDays(31).groupBy, "6h");
 });
 
-test("day-range fine detail applies one-minute point density", () => {
+test("day-range fine detail applies five-minute point density", () => {
   const context = Object.assign(Object.create(GraphMethods.prototype), {
     _detailMode: "fine",
   });
@@ -233,13 +233,13 @@ test("day-range fine detail applies one-minute point density", () => {
   assert.deepEqual(context._resolvedDetailCardOptions({
     automatic: false,
     groupBy: "interval",
-    pointsPerHour: 60,
+    pointsPerHour: 12,
   }, {
     points_per_hour: 2,
   }), {
     auto_scale_points: false,
     group_by: "interval",
-    points_per_hour: 60,
+    points_per_hour: 12,
     show_pph_picker: false,
     show_group_by_picker: true,
   });

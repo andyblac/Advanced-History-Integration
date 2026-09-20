@@ -1205,7 +1205,7 @@ export class GraphMethods {
       ...period,
       thresholdDays,
       groupBy,
-      ...(fine && groupBy === "interval" ? { pointsPerHour: 60 } : {}),
+      ...(fine && groupBy === "interval" ? { pointsPerHour: 12 } : {}),
       automatic: !fine,
     };
   }
