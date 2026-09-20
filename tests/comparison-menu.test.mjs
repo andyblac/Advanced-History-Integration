@@ -164,6 +164,66 @@ import {
   withoutDashboardWrapperNavigation,
 } from "../custom_components/advanced_history/frontend/graphs.js";
 
+test("manual detail forces both SGCC resolution pickers on", () => {
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _detailMode: "manual",
+  });
+
+  assert.deepEqual(context._resolvedDetailCardOptions(null, {
+    show_pph_picker: false,
+    show_group_by_picker: false,
+    line_width: 2,
+  }), {
+    show_pph_picker: true,
+    show_group_by_picker: true,
+    line_width: 2,
+    auto_scale_points: false,
+  });
+});
+
+test("auto detail clears configured manual resolution overrides", () => {
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _detailMode: "auto",
+  });
+
+  assert.deepEqual(context._resolvedDetailCardOptions(null, {
+    auto_scale_points: false,
+    points_per_hour: 4,
+    group_by: "6h",
+    show_pph_picker: true,
+    show_group_by_picker: true,
+    line_width: 2,
+  }), {
+    auto_scale_points: true,
+    show_pph_picker: false,
+    show_group_by_picker: false,
+    line_width: 2,
+  });
+});
+
+test("detail mode changes restore Auto and Fine behavior", () => {
+  const calls = [];
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _detailMode: "manual",
+    _largeRangeFineDetail: false,
+    _closeDetailModeMenu: () => calls.push("close"),
+    _persistPanelTabs: () => calls.push("persist"),
+    _syncDetailModeButton: () => calls.push("sync"),
+    _renderGraphs: () => calls.push("render"),
+  });
+
+  assert.equal(context._setDetailMode("fine"), true);
+  assert.equal(context._detailMode, "fine");
+  assert.equal(context._largeRangeFineDetail, true);
+  assert.deepEqual(calls, ["close", "persist", "sync", "render"]);
+
+  calls.length = 0;
+  assert.equal(context._setDetailMode("auto"), true);
+  assert.equal(context._detailMode, "auto");
+  assert.equal(context._largeRangeFineDetail, false);
+  assert.deepEqual(calls, ["close", "persist", "sync", "render"]);
+});
+
 test("comparison menu enables the selected comparison type", () => {
   const calls = [];
   const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {

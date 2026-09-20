@@ -771,25 +771,32 @@ export class GraphMethods {
   }
 
   _detailCardOptions(detail = null) {
-    if (!detail) {
-      const configured = this._effectiveCardOptionsConfig("timeline");
-      const hasManualResolution = (
-        ["points_per_hour", "group_by"].some(
-          (key) => Object.prototype.hasOwnProperty.call(configured || {}, key),
-        )
-        || configured?.show_pph_picker === true
-        || configured?.show_group_by_picker === true
-      );
+    const mode = this._detailModeValue();
+    if (mode === "manual") {
       return {
-        auto_scale_points: hasManualResolution
-          ? false
-          : this.config.large_range_automatic_detail !== false,
+        auto_scale_points: false,
+        show_pph_picker: true,
+        show_group_by_picker: true,
       };
     }
-    if (detail.automatic) return { auto_scale_points: true };
+    if (!detail) {
+      return {
+        auto_scale_points: true,
+        show_pph_picker: false,
+        show_group_by_picker: false,
+      };
+    }
+    if (detail.automatic) {
+      return {
+        auto_scale_points: true,
+        show_pph_picker: false,
+        show_group_by_picker: false,
+      };
+    }
     return {
       auto_scale_points: false,
       group_by: detail.groupBy,
+      show_pph_picker: false,
       show_group_by_picker: true,
     };
   }
@@ -805,9 +812,23 @@ export class GraphMethods {
   }
 
   _resolvedDetailCardOptions(detail = null, cardOptions = {}) {
-    // Automatic detail supplies inherited defaults. Explicit integration or
-    // chart options are always applied afterwards and therefore win.
-    return { ...this._detailCardOptions(detail), ...cardOptions };
+    const detailOptions = this._detailCardOptions(detail);
+    if (this._detailModeValue() === "manual") {
+      return { ...cardOptions, ...detailOptions };
+    }
+    const resolved = { ...cardOptions };
+    for (const key of [
+      "auto_scale_points",
+      "points_per_hour",
+      "group_by",
+      "show_pph_picker",
+      "pph_picker_position",
+      "pph_picker_group",
+      "show_group_by_picker",
+      "group_by_picker_position",
+      "group_by_picker_group",
+    ]) delete resolved[key];
+    return { ...resolved, ...detailOptions };
   }
 
   _mountConfiguredGraphCard(host, shell, card) {
@@ -844,7 +865,9 @@ export class GraphMethods {
     if (cardOptions.chart_mode && cardOptions.chart_mode !== mode) {
       delete cardOptions.chart_mode;
     }
-    let resolvedCardOptions = this._resolvedDetailCardOptions(detail, cardOptions);
+    let resolvedCardOptions = mode === "state_timeline"
+      ? cardOptions
+      : this._resolvedDetailCardOptions(detail, cardOptions);
     if (stateStripKeys.size) {
       const stateOptions = this._cardOptions("state_timeline");
       const presentation = stateStripPresentationOptions(resolvedCardOptions, stateOptions);
@@ -1046,11 +1069,10 @@ export class GraphMethods {
     }
     try {
       this._applyDashboardGraphBackground(card, config);
-      if (detail?.automatic) {
+      if (mode !== "state_timeline" && this._detailModeValue() !== "manual") {
         // Statistics Graph Chart Card persists its on-card Group By and PPH
-        // overrides. Apply one picker-free configuration first so the card's
-        // public setConfig path clears those overrides before Auto Scale is
-        // restored. Picker visibility then follows the Card Defaults YAML.
+        // overrides. Apply one picker-free configuration first so switching
+        // away from Manual clears them before Auto/Fine settings are restored.
         card.setConfig({
           ...config,
           show_group_by_picker: false,
@@ -1153,8 +1175,8 @@ export class GraphMethods {
   }
 
   _largeRangeDetailProfile() {
+    if (this._detailModeValue() === "manual") return null;
     if (this.config.large_range_automatic_detail === false) return null;
-    if (this._hasDetailResolutionOverride()) return null;
     const period = this._largeRangePeriod();
     const thresholdDays = Math.max(7, Number(this.config.large_range_detail_threshold_days) || 31);
     if (!period) return null;
@@ -1182,6 +1204,97 @@ export class GraphMethods {
       groupBy,
       automatic: !this._largeRangeFineDetail,
     };
+  }
+
+  _detailModeValue() {
+    if (["auto", "fine", "manual"].includes(this._detailMode)) return this._detailMode;
+    return this._largeRangeFineDetail ? "fine" : "auto";
+  }
+
+  _detailControlAvailable(series = this._seriesDescriptors(this._resolvedEntityIds())) {
+    return series.some((item) => this._isNumeric(item));
+  }
+
+  _detailModePresentation(mode = this._detailModeValue()) {
+    if (mode === "manual") {
+      return { icon: "mdi:tune-vertical", label: this._customLocalize("detail_mode_manual") };
+    }
+    if (mode === "fine") {
+      return { icon: "mdi:chart-bell-curve", label: this._customLocalize("detail_mode_fine") };
+    }
+    return { icon: "mdi:speedometer", label: this._customLocalize("detail_mode_auto") };
+  }
+
+  _syncDetailModeButton() {
+    const button = this.shadowRoot?.getElementById("toggle-detail-mode");
+    if (!button) return;
+    const available = this._detailControlAvailable();
+    const mode = this._detailModeValue();
+    const presentation = this._detailModePresentation(mode);
+    const title = `${this._customLocalize("detail_control")}: ${presentation.label}`;
+    button.hidden = !available;
+    button.dataset.mode = mode;
+    button.classList.toggle("active", mode !== "auto");
+    button.setAttribute("aria-label", title);
+    button.title = title;
+    button.querySelector("ha-icon")?.setAttribute("icon", presentation.icon);
+  }
+
+  _renderDetailModeMenu() {
+    const menu = this.shadowRoot?.getElementById("detail-mode-menu");
+    if (!menu) return;
+    const selected = this._detailModeValue();
+    menu.innerHTML = ["auto", "fine", "manual"].map((mode) => {
+      const presentation = this._detailModePresentation(mode);
+      const checked = mode === selected;
+      return `<ha-dropdown-item data-detail-mode="${mode}" role="menuitemradio" aria-checked="${checked}"><ha-icon slot="icon" icon="${checked ? "mdi:radiobox-marked" : "mdi:radiobox-blank"}"></ha-icon>${this._escape(presentation.label)}</ha-dropdown-item>`;
+    }).join("");
+    for (const item of menu.querySelectorAll("[data-detail-mode]")) {
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this._setDetailMode(item.dataset.detailMode);
+      });
+    }
+  }
+
+  _toggleDetailModeMenu(event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const menu = this.shadowRoot?.getElementById("detail-mode-menu");
+    const button = this.shadowRoot?.getElementById("toggle-detail-mode");
+    if (!menu || !button) return;
+    const opening = !menu.open;
+    this._closeDetailModeMenu();
+    if (!opening) return;
+    this._renderDetailModeMenu();
+    menu.anchorElement = button;
+    menu.open = true;
+    button.setAttribute("aria-expanded", "true");
+    menu.addEventListener("wa-hide", () => {
+      button.setAttribute("aria-expanded", "false");
+    }, { once: true });
+  }
+
+  _closeDetailModeMenu() {
+    const menu = this.shadowRoot?.getElementById("detail-mode-menu");
+    const button = this.shadowRoot?.getElementById("toggle-detail-mode");
+    if (menu) menu.open = false;
+    button?.setAttribute("aria-expanded", "false");
+  }
+
+  _setDetailMode(mode) {
+    if (!["auto", "fine", "manual"].includes(mode)) return false;
+    this._closeDetailModeMenu();
+    if (mode === this._detailModeValue()) return false;
+    this._detailMode = mode;
+    this._largeRangeFineDetail = mode === "fine";
+    this._largeRangeDetailStateKey = null;
+    this._largeRangeDetailDismissedKey = null;
+    this._persistPanelTabs?.();
+    this._syncDetailModeButton();
+    this._renderGraphs();
+    return true;
   }
 
   _largeRangeDetailRenderKey() {
@@ -1286,9 +1399,7 @@ export class GraphMethods {
       </button>`;
     banner.hidden = false;
     banner.querySelector("ha-button")?.addEventListener("click", () => {
-      this._largeRangeFineDetail = profile.automatic;
-      this._largeRangeDetailStateKey = this._largeRangeDetailRenderKey();
-      this._renderGraphs();
+      this._setDetailMode(profile.automatic ? "fine" : "auto");
     });
     banner.querySelector(".detail-dismiss")?.addEventListener("click", () => {
       this._largeRangeDetailDismissedKey = dismissalKey;

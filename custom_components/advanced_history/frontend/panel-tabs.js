@@ -75,6 +75,7 @@ export class PanelTabsMethods {
       loaded_bookmark_dirty: Boolean(this._loadedBookmarkDirty),
       fresh_snapshot_fingerprint: this._freshSnapshotSessionFingerprint || null,
       notice: this._notice || "",
+      detail_mode: this._detailModeValue?.() || "auto",
       large_range_fine_detail: Boolean(this._largeRangeFineDetail),
       large_range_detail_dismissed_key: this._largeRangeDetailDismissedKey || null,
       target_sidebar_state: this._captureTargetSidebarPanelState(),
@@ -210,6 +211,7 @@ export class PanelTabsMethods {
       loaded_bookmark_dirty: false,
       fresh_snapshot_fingerprint: null,
       notice: "",
+      detail_mode: "auto",
       large_range_fine_detail: false,
       large_range_detail_dismissed_key: null,
       target_sidebar_state: this._captureTargetSidebarPanelState(),
@@ -234,7 +236,10 @@ export class PanelTabsMethods {
     this._loadedBookmarkDirty = Boolean(state.loaded_bookmark_dirty);
     this._freshSnapshotSessionFingerprint = state.fresh_snapshot_fingerprint || null;
     this._notice = state.notice || "";
-    this._largeRangeFineDetail = Boolean(state.large_range_fine_detail);
+    this._detailMode = ["auto", "fine", "manual"].includes(state.detail_mode)
+      ? state.detail_mode
+      : state.large_range_fine_detail ? "fine" : "auto";
+    this._largeRangeFineDetail = this._detailMode === "fine";
     this._largeRangeDetailDismissedKey = state.large_range_detail_dismissed_key || null;
     this._restoreTargetSidebarPanelState(state.target_sidebar_state);
     this._largeRangeDetailStateKey = null;

@@ -93,6 +93,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     }
     this._datePickerAutoHideTimer = null;
     this._panelTimeRangeDialogOpen = false;
+    this._detailMode = "auto";
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
     this._largeRangeDetailDismissedKey = null;
@@ -446,6 +447,10 @@ export class AdvancedHistoryPanel extends HTMLElement {
         </div>
         <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
         <button id="toggle-state-strips" class="axis-state-strips-toggle axis-state-strips-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:view-sequential-outline"></ha-icon></button>
+        <div class="axis-detail-menu-shell">
+          <button id="toggle-detail-mode" class="axis-detail-toggle axis-detail-primary" type="button" hidden aria-haspopup="menu" aria-expanded="false"><ha-icon icon="mdi:speedometer"></ha-icon></button>
+          <ha-dropdown id="detail-mode-menu" class="axis-detail-menu" placement="bottom-start" distance="7"></ha-dropdown>
+        </div>
       </div>
       <div id="target-picker-host" class="native-target-picker">
         <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
@@ -555,10 +560,19 @@ export class AdvancedHistoryPanel extends HTMLElement {
       "click",
       () => this._toggleStateStrips(),
     );
+    this.shadowRoot.getElementById("toggle-detail-mode")?.addEventListener(
+      "click",
+      (event) => this._toggleDetailModeMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-detail-mode")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
+    );
     this._syncY2ComparisonToggle();
     this._syncY1ComparisonToggle();
     this._syncRunningTotalAxisButtons();
     this._syncStateStripsButton();
+    this._syncDetailModeButton();
     this._bindPeriodSelectorAutoHide?.();
     this._bindPanelTabs();
     this._updateUndoRedoButtons();
