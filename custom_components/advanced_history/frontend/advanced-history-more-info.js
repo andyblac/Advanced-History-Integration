@@ -5,7 +5,7 @@ import {
 } from "./config-flow-defaults.js";
 import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { installCardHandoffApi } from "./card-handoff.js";
-import { withClimateModeAnnotations } from "./climate.js";
+import { withClimateActionAnnotations } from "./climate.js";
 import { CARD_TAG } from "./constants.js";
 import { automaticEntityOptions } from "./entity-defaults.js";
 import {
@@ -396,7 +396,7 @@ function moreInfoCardConfig(
     entities: entityRows,
   };
   return entityId.startsWith("climate.")
-    ? withClimateModeAnnotations(config, entityId)
+    ? withClimateActionAnnotations(config, entityId)
     : config;
 }
 

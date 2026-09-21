@@ -3,9 +3,9 @@ import test from "node:test";
 
 import {
   climateHistoryAttributes,
-  climateModeAnnotations,
-  withClimateModeAnnotations,
-  withoutClimateModeAnnotations,
+  climateActionAnnotations,
+  withClimateActionAnnotations,
+  withoutClimateActionAnnotations,
 } from "../custom_components/advanced_history/frontend/climate.js";
 import { nativeHistoryAttributeColor } from "../custom_components/advanced_history/frontend/history-series.js";
 import { GraphMethods } from "../custom_components/advanced_history/frontend/graphs.js";
@@ -113,32 +113,32 @@ test("uses Home Assistant's native graph palette for climate attributes", () => 
   }
 });
 
-test("creates native SGCC spans for Home Assistant climate modes", () => {
-  const annotations = climateModeAnnotations("climate.lounge");
+test("creates native SGCC spans for active Home Assistant climate actions", () => {
+  const annotations = climateActionAnnotations("climate.lounge");
 
   assert.deepEqual(
-    annotations.map(({ entity, state, type }) => ({ entity, state, type })),
+    annotations.map(({ entity, attribute, state, type }) => ({ entity, attribute, state, type })),
     [
-      { entity: "climate.lounge", state: "auto", type: "span" },
-      { entity: "climate.lounge", state: "cool", type: "span" },
-      { entity: "climate.lounge", state: "dry", type: "span" },
-      { entity: "climate.lounge", state: "fan_only", type: "span" },
-      { entity: "climate.lounge", state: "heat", type: "span" },
-      { entity: "climate.lounge", state: "heat_cool", type: "span" },
+      { entity: "climate.lounge", attribute: "hvac_action", state: "cooling", type: "span" },
+      { entity: "climate.lounge", attribute: "hvac_action", state: "defrosting", type: "span" },
+      { entity: "climate.lounge", attribute: "hvac_action", state: "drying", type: "span" },
+      { entity: "climate.lounge", attribute: "hvac_action", state: "fan", type: "span" },
+      { entity: "climate.lounge", attribute: "hvac_action", state: "heating", type: "span" },
+      { entity: "climate.lounge", attribute: "hvac_action", state: "preheating", type: "span" },
     ],
   );
   assert.match(
-    annotations.find(({ state }) => state === "heat").color,
+    annotations.find(({ state }) => state === "heating").color,
     /--state-climate-heat-color/,
   );
 });
 
 test("does not add climate annotations to another domain", () => {
-  assert.deepEqual(climateModeAnnotations("sensor.temperature"), []);
+  assert.deepEqual(climateActionAnnotations("sensor.temperature"), []);
 });
 
 test("creates uniquely identified spans for each climate entity", () => {
-  const annotations = climateModeAnnotations([
+  const annotations = climateActionAnnotations([
     "climate.lounge",
     "sensor.temperature",
     "climate.bedroom",
@@ -154,7 +154,7 @@ test("creates uniquely identified spans for each climate entity", () => {
 });
 
 test("does not annotate hidden climate entities", () => {
-  const annotations = climateModeAnnotations([
+  const annotations = climateActionAnnotations([
     { entity: "climate.lounge", enabled: false },
     { entity: "climate.bedroom", enabled: true },
     { entity: "sensor.temperature", enabled: true },
@@ -166,13 +166,19 @@ test("does not annotate hidden climate entities", () => {
 
 test("preserves user annotations while replacing generated climate spans", () => {
   const user = { type: "line", time: "2026-09-05T12:00:00Z", label: "User" };
-  const oldGenerated = climateModeAnnotations("climate.old")[0];
-  const merged = withClimateModeAnnotations(
+  const oldGenerated = {
+    id: "advanced-history-climate-mode:climate.old:heat",
+    advanced_history_climate_mode: true,
+    type: "span",
+    entity: "climate.old",
+    state: "heat",
+  };
+  const merged = withClimateActionAnnotations(
     { annotations: [user, oldGenerated] },
     "climate.new",
   );
 
-  assert.deepEqual(withoutClimateModeAnnotations(merged.annotations), [user]);
+  assert.deepEqual(withoutClimateActionAnnotations(merged.annotations), [user]);
   assert.equal(merged.annotations.length, 7);
   assert.ok(merged.annotations.slice(1).every(({ entity }) => entity === "climate.new"));
 });

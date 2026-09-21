@@ -5,16 +5,17 @@ const CLIMATE_HISTORY_ATTRIBUTES = [
   "target_temp_high",
 ];
 
-const CLIMATE_MODE_COLORS = {
-  auto: "var(--state-climate-auto-color, var(--green-color, #4caf50))",
-  cool: "var(--state-climate-cool-color, var(--blue-color, #2196f3))",
-  dry: "var(--state-climate-dry-color, var(--orange-color, #ff9800))",
-  fan_only: "var(--state-climate-fan_only-color, var(--cyan-color, #00bcd4))",
-  heat: "var(--state-climate-heat-color, var(--deep-orange-color, #ff6f22))",
-  heat_cool: "var(--state-climate-heat-cool-color, var(--amber-color, #ffc107))",
+const CLIMATE_ACTION_COLORS = {
+  cooling: "var(--state-climate-cool-color, var(--blue-color, #2196f3))",
+  defrosting: "var(--state-climate-heat-color, var(--deep-orange-color, #ff6f22))",
+  drying: "var(--state-climate-dry-color, var(--orange-color, #ff9800))",
+  fan: "var(--state-climate-fan_only-color, var(--cyan-color, #00bcd4))",
+  heating: "var(--state-climate-heat-color, var(--deep-orange-color, #ff6f22))",
+  preheating: "var(--state-climate-heat-color, var(--deep-orange-color, #ff6f22))",
 };
 
-export const CLIMATE_MODE_ANNOTATION_PREFIX = "advanced-history-climate-mode:";
+export const CLIMATE_ACTION_ANNOTATION_PREFIX = "advanced-history-climate-action:";
+const LEGACY_CLIMATE_MODE_ANNOTATION_PREFIX = "advanced-history-climate-mode:";
 
 export function climateHistoryAttributes(stateObj) {
   if (!stateObj) return [];
@@ -31,18 +32,21 @@ export function climateHistoryAttributes(stateObj) {
     ));
 }
 
-export function isClimateModeAnnotation(annotation) {
-  return annotation?.advanced_history_climate_mode === true
-    || String(annotation?.id || "").startsWith(CLIMATE_MODE_ANNOTATION_PREFIX);
+export function isClimateActionAnnotation(annotation) {
+  const id = String(annotation?.id || "");
+  return annotation?.advanced_history_climate_action === true
+    || annotation?.advanced_history_climate_mode === true
+    || id.startsWith(CLIMATE_ACTION_ANNOTATION_PREFIX)
+    || id.startsWith(LEGACY_CLIMATE_MODE_ANNOTATION_PREFIX);
 }
 
-export function withoutClimateModeAnnotations(annotations) {
+export function withoutClimateActionAnnotations(annotations) {
   return Array.isArray(annotations)
-    ? annotations.filter((annotation) => !isClimateModeAnnotation(annotation))
+    ? annotations.filter((annotation) => !isClimateActionAnnotation(annotation))
     : [];
 }
 
-export function climateModeAnnotations(entityIds) {
+export function climateActionAnnotations(entityIds) {
   const climateEntities = [...new Set(
     (Array.isArray(entityIds) ? entityIds : [entityIds])
       .map((entity) => {
@@ -54,11 +58,12 @@ export function climateModeAnnotations(entityIds) {
       .filter((entityId) => String(entityId || "").startsWith("climate.")),
   )];
   return climateEntities.flatMap((entityId) => (
-    Object.entries(CLIMATE_MODE_COLORS).map(([state, color]) => ({
-      id: `${CLIMATE_MODE_ANNOTATION_PREFIX}${entityId}:${state}`,
-      advanced_history_climate_mode: true,
+    Object.entries(CLIMATE_ACTION_COLORS).map(([state, color]) => ({
+      id: `${CLIMATE_ACTION_ANNOTATION_PREFIX}${entityId}:${state}`,
+      advanced_history_climate_action: true,
       type: "span",
       entity: entityId,
+      attribute: "hvac_action",
       state,
       color,
       opacity: 0.15,
@@ -66,9 +71,9 @@ export function climateModeAnnotations(entityIds) {
   ));
 }
 
-export function withClimateModeAnnotations(config, entityIds) {
-  const configured = withoutClimateModeAnnotations(config?.annotations);
-  const annotations = [...configured, ...climateModeAnnotations(entityIds)];
+export function withClimateActionAnnotations(config, entityIds) {
+  const configured = withoutClimateActionAnnotations(config?.annotations);
+  const annotations = [...configured, ...climateActionAnnotations(entityIds)];
   const result = { ...config };
   if (annotations.length) result.annotations = annotations;
   else delete result.annotations;

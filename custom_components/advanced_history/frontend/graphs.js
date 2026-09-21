@@ -12,7 +12,7 @@ import {
   nativeHistoryAttributeColor,
   nativeHistoryAttributes,
 } from "./history-series.js";
-import { withClimateModeAnnotations } from "./climate.js";
+import { withClimateActionAnnotations } from "./climate.js";
 import {
   mergeStateMaps,
   nativeStateMap,
@@ -1053,7 +1053,7 @@ export class GraphMethods {
       config = this._applyDashboardChildScaleOptions?.(config) || config;
     }
     if (mode !== "state_timeline") {
-      config = withClimateModeAnnotations(config, entities);
+      config = withClimateActionAnnotations(config, entities);
     }
     if (mode !== "state_timeline" && config.height === "auto") {
       // The card's native height:auto implementation only enables its
