@@ -296,6 +296,48 @@ test("detail mode changes restore Auto and Fine behavior", () => {
   assert.deepEqual(calls, ["close", ["record", null, true], "sync", "render"]);
 });
 
+test("detail banner visibility changes are recorded for bookmarks", () => {
+  const calls = [];
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _showDetailBanner: true,
+    _closeDetailModeMenu: () => calls.push("close"),
+    _recordChange: (...args) => calls.push(["record", ...args]),
+    _renderLargeRangeDetailBanner: () => calls.push("banner"),
+  });
+
+  assert.equal(context._setDetailBannerVisible(false), true);
+  assert.equal(context._showDetailBanner, false);
+  assert.deepEqual(calls, ["close", ["record", null, true], "banner"]);
+
+  calls.length = 0;
+  assert.equal(context._setDetailBannerVisible(true), true);
+  assert.equal(context._showDetailBanner, true);
+  assert.deepEqual(calls, ["close", ["record", null, true], "banner"]);
+});
+
+test("hidden detail banners remain hidden when their profile updates", () => {
+  let cleared = 0;
+  const banner = {
+    hidden: false,
+    replaceChildren: () => { cleared += 1; },
+  };
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _showDetailBanner: false,
+    _periodRestoreLoading: false,
+    _largeRangeDetailDismissedKey: null,
+    shadowRoot: { getElementById: () => banner },
+  });
+
+  context._renderLargeRangeDetailBanner({
+    automatic: true,
+    groupBy: "6h",
+    key: "range",
+  });
+
+  assert.equal(banner.hidden, true);
+  assert.equal(cleared, 1);
+});
+
 test("comparison menu enables the selected comparison type", () => {
   const calls = [];
   const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {

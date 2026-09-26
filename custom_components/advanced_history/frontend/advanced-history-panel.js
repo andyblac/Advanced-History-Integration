@@ -94,6 +94,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._datePickerAutoHideTimer = null;
     this._panelTimeRangeDialogOpen = false;
     this._detailMode = "auto";
+    this._showDetailBanner = true;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
     this._largeRangeDetailDismissedKey = null;

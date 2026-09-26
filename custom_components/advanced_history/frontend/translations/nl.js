@@ -54,6 +54,7 @@ export default {
   "detail_mode_auto": "Automatisch",
   "detail_mode_fine": "Fijn",
   "detail_mode_manual": "Handmatig",
+  "show_detail_banner": "Detailbanner tonen",
   "fine_detail_warning": "Fijn detail gebruikt {resolution} groepering en kan langer duren om te laden.",
   "show_fine_detail": "Fijne details tonen",
   "use_automatic_detail": "Automatisch detail gebruiken",

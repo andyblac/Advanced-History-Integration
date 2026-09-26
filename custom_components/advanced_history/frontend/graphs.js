@@ -1248,11 +1248,13 @@ export class GraphMethods {
     const menu = this.shadowRoot?.getElementById("detail-mode-menu");
     if (!menu) return;
     const selected = this._detailModeValue();
-    menu.innerHTML = ["auto", "fine", "manual"].map((mode) => {
+    const modes = ["auto", "fine", "manual"].map((mode) => {
       const presentation = this._detailModePresentation(mode);
       const checked = mode === selected;
       return `<ha-dropdown-item data-detail-mode="${mode}" role="menuitemradio" aria-checked="${checked}"><ha-icon slot="icon" icon="${checked ? "mdi:radiobox-marked" : "mdi:radiobox-blank"}"></ha-icon>${this._escape(presentation.label)}</ha-dropdown-item>`;
     }).join("");
+    const showBanner = this._showDetailBanner !== false;
+    menu.innerHTML = `${modes}<ha-dropdown-item data-detail-banner role="menuitemcheckbox" aria-checked="${showBanner}"><ha-icon slot="icon" icon="${showBanner ? "mdi:checkbox-marked-outline" : "mdi:checkbox-blank-outline"}"></ha-icon>${this._escape(this._customLocalize("show_detail_banner"))}</ha-dropdown-item>`;
     for (const item of menu.querySelectorAll("[data-detail-mode]")) {
       item.addEventListener("click", (event) => {
         event.preventDefault();
@@ -1260,6 +1262,11 @@ export class GraphMethods {
         this._setDetailMode(item.dataset.detailMode);
       });
     }
+    menu.querySelector("[data-detail-banner]")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this._setDetailBannerVisible(!showBanner);
+    });
   }
 
   _toggleDetailModeMenu(event) {
@@ -1298,6 +1305,17 @@ export class GraphMethods {
     this._recordChange(null, true);
     this._syncDetailModeButton();
     this._renderGraphs();
+    return true;
+  }
+
+  _setDetailBannerVisible(visible) {
+    this._closeDetailModeMenu();
+    const next = visible !== false;
+    if (next === (this._showDetailBanner !== false)) return false;
+    this._showDetailBanner = next;
+    this._largeRangeDetailDismissedKey = null;
+    this._recordChange(null, true);
+    this._renderLargeRangeDetailBanner();
     return true;
   }
 
@@ -1373,6 +1391,7 @@ export class GraphMethods {
     if (
       this._periodRestoreLoading
       || !profile
+      || this._showDetailBanner === false
       || dismissalKey === this._largeRangeDetailDismissedKey
     ) {
       banner.hidden = true;

@@ -91,7 +91,7 @@ test("bookmark rename rejects blank, unknown, and unchanged names", () => {
   assert.equal(context._renameBookmark("one", "One"), false);
 });
 
-test("bookmark snapshots capture the selected detail mode", () => {
+test("bookmark snapshots capture detail mode and banner visibility", () => {
   const context = Object.assign(Object.create(StorageMethods.prototype), {
     _activeSnapshot: {
       defaults_mode: "overrides",
@@ -99,6 +99,7 @@ test("bookmark snapshots capture the selected detail mode", () => {
       entity_options: {},
     },
     _detailMode: "manual",
+    _showDetailBanner: false,
     _detailModeValue: () => "manual",
     _capturePeriodSnapshot: () => null,
     _newSnapshotId: () => "snapshot",
@@ -110,7 +111,9 @@ test("bookmark snapshots capture the selected detail mode", () => {
     _targetSecondarySourceFilters: {},
   });
 
-  assert.equal(context._captureSnapshot().chart.detail_mode, "manual");
+  const chart = context._captureSnapshot().chart;
+  assert.equal(chart.detail_mode, "manual");
+  assert.equal(chart.show_detail_banner, false);
 });
 
 test("legacy bookmark detail mode is treated as Auto", () => {
@@ -125,10 +128,12 @@ test("legacy bookmark detail mode is treated as Auto", () => {
   const normalized = context._normalizeSnapshotChart(legacyChart);
 
   assert.equal(normalized.detail_mode, "auto");
+  assert.equal(normalized.show_detail_banner, true);
   assert.equal(legacyChart.detail_mode, undefined);
+  assert.equal(legacyChart.show_detail_banner, undefined);
 });
 
-test("legacy and explicit Auto bookmark fingerprints match", () => {
+test("legacy and explicit default detail settings have matching fingerprints", () => {
   const context = Object.create(StorageMethods.prototype);
   const snapshot = {
     targets: {},
@@ -145,7 +150,11 @@ test("legacy and explicit Auto bookmark fingerprints match", () => {
     context._snapshotFingerprint(snapshot),
     context._snapshotFingerprint({
       ...snapshot,
-      chart: { ...snapshot.chart, detail_mode: "auto" },
+      chart: {
+        ...snapshot.chart,
+        detail_mode: "auto",
+        show_detail_banner: true,
+      },
     }),
   );
 });

@@ -62,7 +62,7 @@ export class StorageMethods {
       this._hiddenY2Targets = this._normalizeTargets(incomingSnapshot.hidden_y2_targets || {});
       this._restoreTargetSourceFilters(incomingSnapshot);
       incomingSnapshot.chart = this._normalizeSnapshotChart(incomingSnapshot.chart);
-      this._restoreSnapshotDetailMode(incomingSnapshot.chart);
+      this._restoreSnapshotDetailSettings(incomingSnapshot.chart);
       this._excludeY2Comparison = Boolean(incomingSnapshot.chart.exclude_y2_comparison);
       this._comparisonBannerVisible = incomingSnapshot.chart.show_comparison_banner !== false;
       this._activeSnapshot = this._clone(incomingSnapshot.chart);
@@ -127,7 +127,7 @@ export class StorageMethods {
         this._snapshotFingerprint(previous) !== this._loadedBookmarkBaselineFingerprint
       );
       previous.chart = this._normalizeSnapshotChart(previous.chart);
-      this._restoreSnapshotDetailMode(previous.chart);
+      this._restoreSnapshotDetailSettings(previous.chart);
       this._excludeY2Comparison = Boolean(previous.chart.exclude_y2_comparison);
       this._comparisonBannerVisible = previous.chart.show_comparison_banner !== false;
       this._activeSnapshot = this._clone(previous.chart);
@@ -481,6 +481,7 @@ export class StorageMethods {
     const chart = {
       defaults_mode: "overrides",
       detail_mode: this._detailModeValue?.() || "auto",
+      show_detail_banner: this._showDetailBanner !== false,
       card_options: this._clone(activeChart.card_options || {}),
       entity_options: this._clone(activeChart.entity_options || {}),
     };
@@ -534,6 +535,7 @@ export class StorageMethods {
     if (!["auto", "fine", "manual"].includes(chart.detail_mode)) {
       chart.detail_mode = "auto";
     }
+    if (chart.show_detail_banner !== false) chart.show_detail_banner = true;
     return JSON.stringify({
       targets: snapshot.targets,
       hidden_targets: snapshot.hidden_targets,
@@ -981,7 +983,7 @@ export class StorageMethods {
     }
     snapshot = this._clone(snapshot);
     snapshot.chart = this._normalizeSnapshotChart(snapshot.chart);
-    this._restoreSnapshotDetailMode(snapshot.chart);
+    this._restoreSnapshotDetailSettings(snapshot.chart);
     this._excludeY2Comparison = Boolean(snapshot.chart.exclude_y2_comparison);
     this._comparisonBannerVisible = snapshot.chart.show_comparison_banner !== false;
     this._activeSnapshot = this._clone(snapshot.chart);
@@ -1068,6 +1070,7 @@ export class StorageMethods {
     if (!["auto", "fine", "manual"].includes(source.detail_mode)) {
       source.detail_mode = "auto";
     }
+    if (source.show_detail_banner !== false) source.show_detail_banner = true;
     if (source.defaults_mode === "overrides") return source;
 
     // Legacy snapshots contain the fully merged configuration. Values that
@@ -1099,10 +1102,11 @@ export class StorageMethods {
     return source;
   }
 
-  _restoreSnapshotDetailMode(chart) {
+  _restoreSnapshotDetailSettings(chart) {
     this._detailMode = ["auto", "fine", "manual"].includes(chart?.detail_mode)
       ? chart.detail_mode
       : "auto";
+    this._showDetailBanner = chart?.show_detail_banner !== false;
     this._largeRangeFineDetail = this._detailMode === "fine";
   }
 

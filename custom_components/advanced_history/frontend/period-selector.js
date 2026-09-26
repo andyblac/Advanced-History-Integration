@@ -2121,6 +2121,7 @@ export class PeriodSelectorMethods {
     this._comparisonChoice = null;
     this._comparisonCount = 1;
     this._detailMode = "auto";
+    this._showDetailBanner = true;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
     this._largeRangeDetailDismissedKey = null;

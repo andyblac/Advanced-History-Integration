@@ -54,6 +54,7 @@ export default {
   "detail_mode_auto": "Automático",
   "detail_mode_fine": "Fino",
   "detail_mode_manual": "Manual",
+  "show_detail_banner": "Mostrar banner de detalle",
   "fine_detail_warning": "El detalle fino usa una agrupación {resolution} y puede tardar más en cargar.",
   "show_fine_detail": "Mostrar detalle fino",
   "use_automatic_detail": "Usar detalle automático",

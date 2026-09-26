@@ -175,6 +175,7 @@ export class PanelTabsMethods {
     const chart = {
       defaults_mode: "overrides",
       detail_mode: "auto",
+      show_detail_banner: true,
       card_options: { numeric: {}, state: {} },
       entity_options: {},
     };
