@@ -18,6 +18,7 @@ import {
   nativeStateMap,
 } from "./state-colors.js";
 import { cumulativeRunningTotalSeries } from "./running-total.js";
+import { configsWithToggledLegendHideOnLoad } from "./legend-visibility.js";
 
 const DATA_SOURCE_CACHE = new Map();
 const ENTITY_OPTION_REMOVALS = "__advanced_history_remove_options";
@@ -681,53 +682,79 @@ export class GraphMethods {
       if (this._suppressPanelLegendVisibilitySync) return;
       const entry = eventEntry(event);
       if (!entry) return;
-      const hiddenBefore = new Set(card._hiddenEntities || []);
-      this._suppressPanelLegendVisibilitySync = true;
-      setTimeout(() => {
-        const hiddenAfter = new Set(card._hiddenEntities || []);
-        const changed = hiddenAfter.size !== hiddenBefore.size
-          || [...hiddenAfter].some((legendId) => !hiddenBefore.has(legendId));
-        this._suppressPanelLegendVisibilitySync = false;
-        if (!changed) return;
-        this._commitPanelLegendVisibility(card);
-      }, 0);
+      card.__advancedHistoryLegendVisibilityOverridden = true;
+      if (event.metaKey || event.ctrlKey) {
+        setTimeout(() => {
+          this._togglePanelLegendHideOnLoad(card, entry.dataset.id);
+        }, 0);
+      }
     }, true);
     card.__advancedHistoryPanelLegendVisibilityGuard = true;
-  }
-
-  _commitPanelLegendVisibility(card) {
-    this._capturePanelLegendVisibility(card);
-    this._recordChange(null, true);
-    this._syncAxisVisibilityButtons();
   }
 
   _panelLegendStateKey(card) {
     return card?.__advancedHistoryLegendStateKey || "";
   }
 
-  _capturePanelLegendVisibility(card) {
-    if (this._dashboardCardMode) return;
+  _togglePanelLegendHideOnLoad(card, legendId) {
+    const current = card?.__advancedHistoryConfig;
+    if (!current || !Array.isArray(card?._entities)) return false;
+    const [config] = configsWithToggledLegendHideOnLoad(
+      [current],
+      0,
+      card._entities,
+      legendId,
+    );
+    if (!config || JSON.stringify(config) === JSON.stringify(current)) return false;
+    this._applyGraphEditorConfig(config, card.__advancedHistorySeries, current);
+    this._renderGraphs();
+    return true;
+  }
+
+  // TODO(v2.5): Remove the legacy `legend_hidden_series` compatibility path:
+  // this migration, `_restorePanelLegendVisibility`, its snapshot preservation
+  // in `_commitGraphEditorConfig`, the storage/constant allow-list entries, and
+  // their legacy-only tests. SGCC's `auto_hide`/`hide_on_load` is authoritative.
+  _migrateLegacyLegendVisibility(card, config) {
+    if (this._dashboardCardMode || this._loadedExternalBookmark) return config;
     const key = this._panelLegendStateKey(card);
-    if (!key) return;
-    // Legend visibility is a chart-only SGCC state. It must remain separate
-    // from hidden_targets, which controls source selection in the sidebars.
-    const hidden = [...(card._hiddenEntities || [])].filter((legendId) => {
-      const index = card._entities?.findIndex((entity, entityIndex) => {
-        const entityId = entity?.entity || entity?.statistic_id;
-        return entityId && `${entityId}__${entityIndex}` === legendId;
-      });
-      return index >= 0;
-    });
-    const state = { ...(this._activeSnapshot?.legend_hidden_series || {}) };
-    if (hidden.length) state[key] = hidden;
-    else delete state[key];
+    const hidden = this._activeSnapshot?.legend_hidden_series?.[key];
+    if (!key || !Array.isArray(hidden) || !hidden.length || !Array.isArray(card?._entities)) {
+      return config;
+    }
+    let migrated = config;
+    for (const legendId of hidden) {
+      [migrated] = configsWithToggledLegendHideOnLoad(
+        [migrated],
+        0,
+        card._entities,
+        legendId,
+        true,
+      );
+    }
+    const remaining = { ...(this._activeSnapshot.legend_hidden_series || {}) };
+    delete remaining[key];
     this._activeSnapshot = { ...(this._activeSnapshot || {}) };
-    if (Object.keys(state).length) this._activeSnapshot.legend_hidden_series = state;
+    if (Object.keys(remaining).length) this._activeSnapshot.legend_hidden_series = remaining;
     else delete this._activeSnapshot.legend_hidden_series;
+    if (JSON.stringify(migrated) === JSON.stringify(config)) {
+      this._recordChange(null, true);
+      return config;
+    }
+    this._applyGraphEditorConfig(
+      migrated,
+      card.__advancedHistorySeries,
+      config,
+    );
+    return migrated;
   }
 
   _restorePanelLegendVisibility(card) {
-    if (this._dashboardCardMode || this._suppressPanelLegendVisibilitySync) return;
+    if (
+      this._dashboardCardMode
+      || this._suppressPanelLegendVisibilitySync
+      || card?.__advancedHistoryLegendVisibilityOverridden
+    ) return;
     const key = this._panelLegendStateKey(card);
     const saved = new Set(this._activeSnapshot?.legend_hidden_series?.[key] || []);
     if (!key || !saved.size) return;
@@ -852,21 +879,6 @@ export class GraphMethods {
     } finally {
       this._suppressPanelLegendVisibilitySync = false;
     }
-    if (this._dashboardCardMode) {
-      this._syncAxisVisibilityButtons();
-      return;
-    }
-    const secondary = axis === "secondary";
-    const targets = secondary ? this._y2Targets : this._targets;
-    const hiddenTargets = secondary ? this._hiddenY2Targets : this._hiddenTargets;
-    const entityIds = this._resolvedEntityIdsForAxis(axis);
-    for (const kind of ["area_id", "device_id", "entity_id"]) {
-      hiddenTargets[kind] = hide
-        ? [...(kind === "entity_id" ? entityIds : targets[kind])]
-        : [];
-    }
-    this._recordChange(null, true);
-    this._syncNativeTargetVisibility?.(axis);
     this._syncAxisVisibilityButtons();
   }
 
@@ -963,6 +975,7 @@ export class GraphMethods {
     );
     card.__advancedHistoryChartMode = mode;
     card.__advancedHistorySourceKey = sourceKey;
+    card.__advancedHistorySeries = series;
     card.__advancedHistoryLegendStateKey = [
       mode,
       series.map((item) => this._seriesDescriptor(item).key).join("\u001f"),
@@ -1190,6 +1203,11 @@ export class GraphMethods {
         });
       }
       card.setConfig(config);
+      const migratedConfig = this._migrateLegacyLegendVisibility(card, config);
+      if (migratedConfig !== config) {
+        config = migratedConfig;
+        card.setConfig(config);
+      }
       this._applyStateStripLabelStyle(card);
       this._applyDashboardGraphBackground(card, config);
       card.__advancedHistoryConfig = config;
@@ -2712,6 +2730,7 @@ export class GraphMethods {
     const seriesTransforms = this._clone(this._activeSnapshot?.series_transforms);
     const runningTotalAxes = this._clone(this._activeSnapshot?.running_total_axes);
     const stateStrips = this._activeSnapshot?.state_strips === true;
+    const legendHiddenSeries = this._clone(this._activeSnapshot?.legend_hidden_series);
     const currentCardOptions = this._activeSnapshot?.card_options;
     const currentTypedOptions = currentCardOptions
       && typeof currentCardOptions === "object"
@@ -2767,6 +2786,9 @@ export class GraphMethods {
       this._activeSnapshot.running_total_axes = runningTotalAxes;
     }
     if (stateStrips) this._activeSnapshot.state_strips = true;
+    if (legendHiddenSeries && Object.keys(legendHiddenSeries).length) {
+      this._activeSnapshot.legend_hidden_series = legendHiddenSeries;
+    }
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
     if (this._hasDetailResolutionOverride()) this._largeRangeFineDetail = false;
     this._recordChange(null, true);

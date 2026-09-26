@@ -669,124 +669,39 @@ test("dashboard Command/Ctrl-click toggles persistent hide-on-load separately", 
   assert.equal(card.__advancedHistoryLegendLayoutGuard, true);
 });
 
-test("panel legend clicks persist SGCC visibility without hiding source entities", async () => {
+test("panel legend clicks stay temporary while Command/Ctrl-click toggles hide-on-load", async () => {
   const listeners = new Map();
-  const entry = (id) => ({
-    dataset: { id },
-    classList: { contains: () => false },
-  });
-  const mainEntry = entry("sensor.power__0");
-  const comparisonEntry = entry("sensor.power__1");
+  const mainEntry = { dataset: { id: "sensor.power__0" } };
+  const comparisonEntry = { dataset: { id: "sensor.power__1" } };
   const card = {
     __advancedHistoryLegendStateKey: "timeline\u001esensor.power",
-    _entities: [
-      { entity: "sensor.power", y_axis: "primary" },
-      { entity: "sensor.power", y_axis: "primary", _compareOf: 0 },
-    ],
-    _hiddenEntities: new Set(),
     shadowRoot: {
       addEventListener: (type, listener, capture) => listeners.set(type, { listener, capture }),
-      querySelectorAll: () => [mainEntry, comparisonEntry],
     },
   };
-  const changes = [];
-  let buttonSyncs = 0;
+  const hideOnLoadToggles = [];
   const context = Object.assign(Object.create(GraphMethods.prototype), {
     _dashboardCardMode: false,
     _activeSnapshot: {},
-    _hiddenTargets: { area_id: [], device_id: [], entity_id: [] },
-    _hiddenY2Targets: { area_id: [], device_id: [], entity_id: [] },
-    _recordChange: (...args) => changes.push(args),
-    _syncAxisVisibilityButtons: () => { buttonSyncs += 1; },
+    _togglePanelLegendHideOnLoad: (...args) => hideOnLoadToggles.push(args),
   });
 
   context._guardPanelLegendVisibility(card);
   assert.equal(listeners.get("click").capture, true);
-  listeners.get("click").listener({ target: { closest: () => mainEntry } });
-  assert.equal(context._suppressPanelLegendVisibilitySync, true);
-  // SGCC replaces the clicked legend node while toggling its internal state.
-  // The detached original remains visible, so persistence must not read it.
-  card._hiddenEntities.add(mainEntry.dataset.id);
-  await new Promise((resolve) => setTimeout(resolve, 0));
-
-  assert.equal(context._suppressPanelLegendVisibilitySync, false);
-  assert.deepEqual(context._hiddenTargets.entity_id, []);
-  assert.deepEqual(
-    context._activeSnapshot.legend_hidden_series[card.__advancedHistoryLegendStateKey],
-    ["sensor.power__0"],
-  );
-  assert.deepEqual(changes, [[null, true]]);
-  assert.equal(buttonSyncs, 1);
+  listeners.get("click").listener({ metaKey: false, target: { closest: () => mainEntry } });
+  assert.deepEqual(context._activeSnapshot, {});
+  assert.equal(hideOnLoadToggles.length, 0);
+  assert.equal(card.__advancedHistoryLegendVisibilityOverridden, true);
   assert.equal(card.__advancedHistoryPanelLegendVisibilityGuard, true);
 
-  listeners.get("click").listener({ target: { closest: () => mainEntry } });
-  card._hiddenEntities.delete(mainEntry.dataset.id);
-  // A redraw during SGCC's deferred update must not restore the stale hidden
-  // state and cancel the user's attempt to reveal the series.
-  context._restorePanelLegendVisibility(card);
+  listeners.get("click").listener({ metaKey: true, target: { closest: () => mainEntry } });
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.deepEqual(context._hiddenTargets.entity_id, []);
-  assert.equal(context._activeSnapshot.legend_hidden_series, undefined);
-  assert.deepEqual(changes, [[null, true], [null, true]]);
-
-  listeners.get("click").listener({ target: { closest: () => comparisonEntry } });
-  card._hiddenEntities.add(comparisonEntry.dataset.id);
+  listeners.get("click").listener({ ctrlKey: true, target: { closest: () => comparisonEntry } });
   await new Promise((resolve) => setTimeout(resolve, 0));
-  assert.deepEqual(context._hiddenTargets.entity_id, []);
-  assert.deepEqual(
-    context._activeSnapshot.legend_hidden_series[card.__advancedHistoryLegendStateKey],
-    ["sensor.power__1"],
-  );
-  assert.deepEqual(changes, [[null, true], [null, true], [null, true]]);
-});
-
-test("panel legend clicks persist delayed grouped Y2 SGCC visibility only", async () => {
-  const listeners = new Map();
-  const mainEntry = {
-    dataset: { id: "sensor.outside__0" },
-    matches: () => true,
-  };
-  const comparisonEntry = {
-    dataset: { id: "sensor.outside__1" },
-    matches: () => true,
-  };
-  const card = {
-    __advancedHistoryLegendStateKey: "timeline\u001esensor.outside",
-    _entities: [
-      { entity: "sensor.outside", y_axis: "secondary" },
-      { entity: "sensor.outside", y_axis: "secondary", _compareOf: 0 },
-    ],
-    _hiddenEntities: new Set(),
-    shadowRoot: {
-      addEventListener: (type, listener, capture) => listeners.set(type, { listener, capture }),
-      querySelectorAll: () => [mainEntry, comparisonEntry],
-    },
-  };
-  const changes = [];
-  const context = Object.assign(Object.create(GraphMethods.prototype), {
-    _dashboardCardMode: false,
-    _activeSnapshot: {},
-    _hiddenTargets: { area_id: [], device_id: [], entity_id: [] },
-    _hiddenY2Targets: { area_id: [], device_id: [], entity_id: [] },
-    _recordChange: (...args) => changes.push(args),
-    _syncAxisVisibilityButtons: () => {},
-  });
-
-  context._guardPanelLegendVisibility(card);
-  listeners.get("click").listener({
-    composedPath: () => [mainEntry],
-    target: {},
-  });
-  card._hiddenEntities.add(mainEntry.dataset.id);
-  card._hiddenEntities.add(comparisonEntry.dataset.id);
-  await new Promise((resolve) => setTimeout(resolve, 0));
-
-  assert.deepEqual(context._hiddenY2Targets.entity_id, []);
-  assert.deepEqual(
-    context._activeSnapshot.legend_hidden_series[card.__advancedHistoryLegendStateKey],
-    ["sensor.outside__0", "sensor.outside__1"],
-  );
-  assert.deepEqual(changes, [[null, true]]);
+  assert.deepEqual(hideOnLoadToggles, [
+    [card, "sensor.power__0"],
+    [card, "sensor.power__1"],
+  ]);
 });
 
 test("panel legend visibility restores comparison lines after a graph remount", () => {
@@ -810,6 +725,66 @@ test("panel legend visibility restores comparison lines after a graph remount", 
 
   assert.deepEqual([...hidden], ["sensor.power__1"]);
   assert.equal(context._suppressPanelLegendVisibilitySync, false);
+});
+
+test("legacy panel legend visibility migrates to native hide-on-load options", () => {
+  const key = "timeline\u001esensor.power";
+  const config = {
+    entities: [{
+      entity: "sensor.power",
+      auto_hide: true,
+      compare: [{ period: "1 day" }],
+    }],
+  };
+  const card = {
+    __advancedHistoryLegendStateKey: key,
+    __advancedHistorySeries: [{ entity: "sensor.power" }],
+    _entities: [
+      { entity: "sensor.power" },
+      { entity: "sensor.power", _compareOf: 0 },
+    ],
+  };
+  let applied;
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _dashboardCardMode: false,
+    _loadedExternalBookmark: false,
+    _activeSnapshot: {
+      legend_hidden_series: {
+        [key]: ["sensor.power__0", "sensor.power__1"],
+        "timeline\u001esensor.gas": ["sensor.gas__0"],
+      },
+    },
+    _applyGraphEditorConfig: (...args) => { applied = args; },
+  });
+
+  const migrated = context._migrateLegacyLegendVisibility(card, config);
+
+  assert.deepEqual(migrated.entities, [{
+    entity: "sensor.power",
+    auto_hide: true,
+    compare: [{ period: "1 day", hide_on_load: true }],
+  }]);
+  assert.deepEqual(applied, [migrated, card.__advancedHistorySeries, config]);
+  assert.deepEqual(context._activeSnapshot.legend_hidden_series, {
+    "timeline\u001esensor.gas": ["sensor.gas__0"],
+  });
+});
+
+test("legacy legend visibility in a shared bookmark remains read-only", () => {
+  const key = "timeline\u001esensor.power";
+  const config = { entities: ["sensor.power"] };
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _dashboardCardMode: false,
+    _loadedExternalBookmark: true,
+    _activeSnapshot: { legend_hidden_series: { [key]: ["sensor.power__0"] } },
+  });
+  const card = {
+    __advancedHistoryLegendStateKey: key,
+    _entities: [{ entity: "sensor.power" }],
+  };
+
+  assert.equal(context._migrateLegacyLegendVisibility(card, config), config);
+  assert.deepEqual(context._activeSnapshot.legend_hidden_series[key], ["sensor.power__0"]);
 });
 
 test("axis badges hide and restore every main legend series on their axis", () => {
@@ -883,12 +858,12 @@ test("axis badges hide and restore every main legend series on their axis", () =
   assert.equal(buttonState.get("y1:all-hidden"), true);
   assert.equal(buttonState.get("y1:aria-pressed"), "false");
   assert.deepEqual(context._hiddenTargets, {
-    area_id: ["living_room"],
+    area_id: [],
     device_id: [],
-    entity_id: ["sensor.gas", "sensor.power"],
+    entity_id: ["sensor.gas"],
   });
-  assert.deepEqual(buttonState.get("record-change"), [null, true]);
-  assert.equal(buttonState.get("sync-axis"), "primary");
+  assert.equal(buttonState.has("record-change"), false);
+  assert.equal(buttonState.has("sync-axis"), false);
 
   context._toggleAxisLegendVisibility("primary");
   assert.equal(context._legendEntryHidden(gas), false);
@@ -899,7 +874,7 @@ test("axis badges hide and restore every main legend series on their axis", () =
   assert.deepEqual(context._hiddenTargets, {
     area_id: [],
     device_id: [],
-    entity_id: [],
+    entity_id: ["sensor.gas"],
   });
 });
 
