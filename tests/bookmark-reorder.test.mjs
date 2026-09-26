@@ -90,3 +90,103 @@ test("bookmark rename rejects blank, unknown, and unchanged names", () => {
   assert.equal(context._renameBookmark("missing", "New name"), false);
   assert.equal(context._renameBookmark("one", "One"), false);
 });
+
+test("bookmark snapshots capture the selected detail mode", () => {
+  const context = Object.assign(Object.create(StorageMethods.prototype), {
+    _activeSnapshot: {
+      defaults_mode: "overrides",
+      card_options: {},
+      entity_options: {},
+    },
+    _detailMode: "manual",
+    _detailModeValue: () => "manual",
+    _capturePeriodSnapshot: () => null,
+    _newSnapshotId: () => "snapshot",
+    _targets: {},
+    _hiddenTargets: {},
+    _y2Targets: {},
+    _hiddenY2Targets: {},
+    _targetPrimarySourceFilters: {},
+    _targetSecondarySourceFilters: {},
+  });
+
+  assert.equal(context._captureSnapshot().chart.detail_mode, "manual");
+});
+
+test("legacy bookmark detail mode is treated as Auto", () => {
+  const context = Object.assign(Object.create(StorageMethods.prototype), {
+    config: {},
+  });
+  const legacyChart = {
+    defaults_mode: "overrides",
+    card_options: {},
+    entity_options: {},
+  };
+  const normalized = context._normalizeSnapshotChart(legacyChart);
+
+  assert.equal(normalized.detail_mode, "auto");
+  assert.equal(legacyChart.detail_mode, undefined);
+});
+
+test("legacy and explicit Auto bookmark fingerprints match", () => {
+  const context = Object.create(StorageMethods.prototype);
+  const snapshot = {
+    targets: {},
+    hidden_targets: {},
+    y2_targets: {},
+    hidden_y2_targets: {},
+    target_filters: {},
+    y2_target_filters: {},
+    chart: { defaults_mode: "overrides" },
+    period: null,
+  };
+
+  assert.equal(
+    context._snapshotFingerprint(snapshot),
+    context._snapshotFingerprint({
+      ...snapshot,
+      chart: { ...snapshot.chart, detail_mode: "auto" },
+    }),
+  );
+});
+
+test("changing detail mode marks a loaded legacy bookmark as changed", () => {
+  const base = {
+    targets: { entity_id: ["sensor.power"] },
+    hidden_targets: {},
+    y2_targets: {},
+    hidden_y2_targets: {},
+    target_filters: {},
+    y2_target_filters: {},
+    chart: { defaults_mode: "overrides" },
+    period: null,
+  };
+  const context = Object.assign(Object.create(StorageMethods.prototype), {
+    _loadedBookmarkId: "bookmark",
+    _loadedExternalBookmark: false,
+    _loadedExternalBookmarkOwnerId: null,
+    _loadedExternalBookmarkId: null,
+    _loadedBookmarkDirty: false,
+    _freshSnapshotSessionFingerprint: null,
+    _currentSnapshot: structuredClone(base),
+    _incomingTargetOverride: false,
+    _periodRestoreLoading: false,
+    _captureSnapshot: () => ({
+      ...structuredClone(base),
+      chart: { ...base.chart, detail_mode: "manual" },
+    }),
+    _snapshotTargetCount: () => 1,
+    _newSnapshotId: () => "current",
+    _snapshotLabel: () => "Current",
+    _pushUndoSnapshot: () => {},
+    _saveLibrary: () => true,
+    _saveCurrentSnapshot: () => {},
+    _updateUndoRedoButtons: () => {},
+    _persistPanelTabs: () => {},
+  });
+  context._loadedBookmarkBaselineFingerprint = context._snapshotFingerprint(base);
+
+  context._recordChange(null, true);
+
+  assert.equal(context._loadedBookmarkDirty, true);
+});

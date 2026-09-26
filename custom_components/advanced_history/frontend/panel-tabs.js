@@ -174,6 +174,7 @@ export class PanelTabsMethods {
     end.setHours(23, 59, 59, 999);
     const chart = {
       defaults_mode: "overrides",
+      detail_mode: "auto",
       card_options: { numeric: {}, state: {} },
       entity_options: {},
     };
@@ -221,6 +222,17 @@ export class PanelTabsMethods {
   _restorePanelTab(tab) {
     const state = tab?.state || this._blankPanelTabState();
     tab.state = state;
+    const stateDetailMode = ["auto", "fine", "manual"].includes(state.detail_mode)
+      ? state.detail_mode
+      : state.large_range_fine_detail ? "fine" : "auto";
+    for (const snapshot of [state.snapshot, state.current_snapshot]) {
+      if (
+        snapshot?.chart
+        && !["auto", "fine", "manual"].includes(snapshot.chart.detail_mode)
+      ) {
+        snapshot.chart.detail_mode = stateDetailMode;
+      }
+    }
     this._loadedBookmarkId = state.loaded_bookmark_id || null;
     this._loadedExternalBookmark = Boolean(
       state.loaded_external_bookmark
@@ -236,9 +248,7 @@ export class PanelTabsMethods {
     this._loadedBookmarkDirty = Boolean(state.loaded_bookmark_dirty);
     this._freshSnapshotSessionFingerprint = state.fresh_snapshot_fingerprint || null;
     this._notice = state.notice || "";
-    this._detailMode = ["auto", "fine", "manual"].includes(state.detail_mode)
-      ? state.detail_mode
-      : state.large_range_fine_detail ? "fine" : "auto";
+    this._detailMode = stateDetailMode;
     this._largeRangeFineDetail = this._detailMode === "fine";
     this._largeRangeDetailDismissedKey = state.large_range_detail_dismissed_key || null;
     this._restoreTargetSidebarPanelState(state.target_sidebar_state);

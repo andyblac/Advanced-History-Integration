@@ -1295,7 +1295,7 @@ export class GraphMethods {
     this._largeRangeFineDetail = mode === "fine";
     this._largeRangeDetailStateKey = null;
     this._largeRangeDetailDismissedKey = null;
-    this._persistPanelTabs?.();
+    this._recordChange(null, true);
     this._syncDetailModeButton();
     this._renderGraphs();
     return true;

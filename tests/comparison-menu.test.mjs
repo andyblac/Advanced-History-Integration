@@ -279,7 +279,7 @@ test("detail mode changes restore Auto and Fine behavior", () => {
     _detailMode: "manual",
     _largeRangeFineDetail: false,
     _closeDetailModeMenu: () => calls.push("close"),
-    _persistPanelTabs: () => calls.push("persist"),
+    _recordChange: (...args) => calls.push(["record", ...args]),
     _syncDetailModeButton: () => calls.push("sync"),
     _renderGraphs: () => calls.push("render"),
   });
@@ -287,13 +287,13 @@ test("detail mode changes restore Auto and Fine behavior", () => {
   assert.equal(context._setDetailMode("fine"), true);
   assert.equal(context._detailMode, "fine");
   assert.equal(context._largeRangeFineDetail, true);
-  assert.deepEqual(calls, ["close", "persist", "sync", "render"]);
+  assert.deepEqual(calls, ["close", ["record", null, true], "sync", "render"]);
 
   calls.length = 0;
   assert.equal(context._setDetailMode("auto"), true);
   assert.equal(context._detailMode, "auto");
   assert.equal(context._largeRangeFineDetail, false);
-  assert.deepEqual(calls, ["close", "persist", "sync", "render"]);
+  assert.deepEqual(calls, ["close", ["record", null, true], "sync", "render"]);
 });
 
 test("comparison menu enables the selected comparison type", () => {
