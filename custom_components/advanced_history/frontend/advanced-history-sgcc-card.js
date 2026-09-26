@@ -32,6 +32,8 @@ const DASHBOARD_RUNTIME_CHART_KEYS = [
   "exclude_y2_comparison",
   "y2_compare_count",
   "show_comparison_banner",
+  "detail_mode",
+  "show_detail_banner",
 ];
 
 const cardStyles = `
@@ -53,6 +55,17 @@ const cardStyles = `
   .dashboard-axis-group { min-width:0; display:flex; align-items:center; gap:7px; }
   .dashboard-axis-group.primary { grid-column:1; grid-row:1; }
   .dashboard-axis-group.secondary { grid-column:3; grid-row:1; justify-content:flex-end; }
+  .dashboard-axis-group:not([data-advanced-history-has-targets]) .axis-visibility-toggle {
+    color:var(--secondary-text-color);
+    background:rgba(127,127,127,.28);
+  }
+  .dashboard-axis-group[data-advanced-history-has-targets] .axis-visibility-toggle:not(.all-hidden),
+  .dashboard-axis-group[data-advanced-history-has-targets] .axis-compare-toggle.active,
+  .dashboard-axis-group[data-advanced-history-has-targets] .axis-running-total-toggle.active,
+  .dashboard-axis-group[data-advanced-history-has-targets] .axis-state-strips-toggle.active,
+  .dashboard-axis-group[data-advanced-history-has-targets] .axis-detail-toggle.active {
+    color:var(--advanced-history-axis-chip-foreground);
+  }
   .dashboard-date-controls {
     position:relative; min-width:0; max-width:100%; display:flex; align-items:center;
     grid-column:2; grid-row:1; justify-self:center; width:max-content;
@@ -1497,6 +1510,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     const dependencyMissing = Boolean(this._cardLoadError);
     const hasY1Targets = Boolean(this._targetCount(this._targets));
     const hasY2Targets = Boolean(this._targetCount(this._y2Targets));
+    const themeMode = this._hass?.themes?.darkMode ? "dark" : "light";
     const showDatePicker = dashboardDatePickerVisible(this._dashboardConfig);
     const showDownloadButton = dashboardDownloadVisible(this._dashboardConfig);
     const downloadData = this._localize(
@@ -1509,20 +1523,24 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
         ${title ? `<div class="dashboard-card-title">${this._escape(title)}</div>` : ""}
         <div class="dashboard-card-content">
           ${dependencyMissing ? "" : `<div class="dashboard-axis-strip">
-            <div class="dashboard-axis-group primary axis-target-primary">
-              <button id="toggle-y1-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("primary_axis"))}" aria-label="${this._escape(this._customLocalize("primary_axis"))}" aria-pressed="true">Y1</button><span>${this._escape(this._customLocalize("primary_axis"))}</span>
+            <div class="dashboard-axis-group primary axis-target-primary" ${hasY1Targets ? `data-advanced-history-has-targets data-advanced-history-theme-mode="${themeMode}"` : ""}>
+              <span>${this._escape(this._customLocalize("primary_axis"))}</span><button id="toggle-y1-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("primary_axis"))}" aria-label="${this._escape(this._customLocalize("primary_axis"))}" aria-pressed="true">Y1</button>
               <div class="axis-comparison-menu-shell">
                 <button id="toggle-y1-comparison" class="axis-compare-toggle axis-compare-primary" type="button" ${hasY1Targets ? "" : "hidden"} aria-haspopup="menu" aria-expanded="false" aria-pressed="false"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
                 <ha-dropdown id="y1-comparison-menu" class="axis-comparison-menu" placement="bottom-start" distance="7"></ha-dropdown>
               </div>
               <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" ${hasY1Targets ? "" : "hidden"} role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
               <button id="toggle-state-strips" class="axis-state-strips-toggle axis-state-strips-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:view-sequential-outline"></ha-icon></button>
+              <div class="axis-detail-menu-shell">
+                <button id="toggle-detail-mode" class="axis-detail-toggle axis-detail-primary" type="button" hidden aria-haspopup="menu" aria-expanded="false"><ha-icon icon="mdi:speedometer"></ha-icon></button>
+                <ha-dropdown id="detail-mode-menu" class="axis-detail-menu" placement="bottom-start" distance="7"></ha-dropdown>
+              </div>
             </div>
             <div class="dashboard-date-controls" ${showDatePicker ? "" : "hidden"}>
               <div id="date-controller" class="period-selector-card"></div>
               ${showDownloadButton ? `<button id="download-chart-data" class="dashboard-download-button" type="button" title="${this._escape(downloadData)}" aria-label="${this._escape(downloadData)}"><ha-icon icon="mdi:download"></ha-icon></button>` : ""}
             </div>
-            <div class="dashboard-axis-group secondary axis-target-secondary" ${hasY2Targets ? "" : "hidden"}>
+            <div class="dashboard-axis-group secondary axis-target-secondary" ${hasY2Targets ? `data-advanced-history-has-targets data-advanced-history-theme-mode="${themeMode}"` : "hidden"}>
               <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
               <div class="axis-comparison-menu-shell">
                 <button id="toggle-y2-comparison" class="axis-compare-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-pressed="true"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
@@ -1577,6 +1595,14 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       "click",
       () => this._toggleStateStrips(),
     );
+    this.shadowRoot.getElementById("toggle-detail-mode")?.addEventListener(
+      "click",
+      (event) => this._toggleDetailModeMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-detail-mode")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
+    );
     this.shadowRoot.getElementById("download-chart-data")?.addEventListener(
       "click",
       () => this._downloadChartData(),
@@ -1585,6 +1611,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     this._syncY1ComparisonToggle();
     this._syncRunningTotalAxisButtons();
     this._syncStateStripsButton();
+    this._syncDetailModeButton();
     this._renderContent();
   }
 

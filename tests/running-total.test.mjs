@@ -684,6 +684,8 @@ test("SGCC editor changes retain Advanced History options and native height", as
       card_options: { height: 520 },
       running_total_axes: { primary: true },
       show_comparison_banner: false,
+      detail_mode: "manual",
+      show_detail_banner: false,
     },
     period: {
       start: "2026-08-01T00:00:00.000Z",
@@ -711,6 +713,10 @@ test("SGCC editor changes retain Advanced History options and native height", as
   });
   assert.deepEqual(restored.chart.running_total_axes, { primary: true });
   assert.equal(restored.chart.show_comparison_banner, false);
+  assert.equal(runtime.chart.detail_mode, "manual");
+  assert.equal(runtime.chart.show_detail_banner, false);
+  assert.equal(restored.chart.detail_mode, "manual");
+  assert.equal(restored.chart.show_detail_banner, false);
   assert.deepEqual(restored.chart.card_options, original.chart.card_options);
 
   const controller = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
