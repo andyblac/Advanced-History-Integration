@@ -45,6 +45,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._comparisonState = null;
     this._comparisonChoice = null;
     this._comparisonCount = 1;
+    this._y2ComparisonCount = 1;
     this._comparisonPeriodKind = null;
     this._periodUnsubscribe = null;
     this._nativeTargetPicker = null;
@@ -164,14 +165,25 @@ export class AdvancedHistoryPanel extends HTMLElement {
     if (!button) return;
     const excluded = Boolean(this._excludeY2Comparison);
     button.hidden = !compareActive || !this._targetCount(this._y2Targets);
+    if (!compareActive) this._closeY2ComparisonMenu?.();
     button.classList.toggle("active", !excluded);
     button.setAttribute("aria-pressed", String(!excluded));
-    const label = this._customLocalize(
-      excluded ? "include_y2_comparison" : "exclude_y2_comparison",
-    );
+    const label = this._customLocalize("comparison_settings");
     button.title = label;
     button.setAttribute("aria-label", label);
     button.querySelector("ha-icon")?.setAttribute("icon", "mdi:compare-horizontal");
+    const enabled = this.shadowRoot?.getElementById("y2-comparison-enabled");
+    this._setComparisonMenuCheckboxState?.(enabled, compareActive && !excluded);
+    const showBanner = this.shadowRoot?.getElementById("y2-comparison-show-banner");
+    this._setComparisonMenuCheckboxState?.(showBanner, this._comparisonBannerVisible);
+    const period = this.shadowRoot?.getElementById("y2-comparison-period");
+    if (period) {
+      period.value = this._comparisonChoice
+        || this._comparisonChoiceFromMode?.(this._periodStore?.compare)
+        || "previous_period";
+    }
+    const count = this.shadowRoot?.getElementById("y2-comparison-count");
+    if (count) count.value = String(this._y2ComparisonCount || 1);
   }
 
   _syncY1ComparisonToggle(compareActive = this._comparisonIsActive()) {
@@ -187,13 +199,6 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._setComparisonMenuCheckboxState?.(enabled, Boolean(compareActive));
     const showBanner = this.shadowRoot?.getElementById("comparison-show-banner");
     this._setComparisonMenuCheckboxState?.(showBanner, this._comparisonBannerVisible);
-  }
-
-  _toggleY2Comparison() {
-    this._excludeY2Comparison = !this._excludeY2Comparison;
-    this._syncY2ComparisonToggle(true);
-    this._recordChange(null, true);
-    this._renderGraphs();
   }
 
   async _addCurrentPanelToDashboard(button) {
@@ -460,7 +465,10 @@ export class AdvancedHistoryPanel extends HTMLElement {
     const secondaryTargetControls = secondaryAxisEditable ? `<div class="axis-target-group axis-target-secondary${y2TargetClass}">
       <div class="axis-target-label">
         <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
-        <button id="toggle-y2-comparison" class="axis-compare-toggle${this._excludeY2Comparison ? "" : " active"}" type="button" hidden aria-pressed="${this._excludeY2Comparison ? "false" : "true"}"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+        <div class="axis-comparison-menu-shell">
+          <button id="toggle-y2-comparison" class="axis-compare-toggle${this._excludeY2Comparison ? "" : " active"}" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-pressed="${this._excludeY2Comparison ? "false" : "true"}"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+          <ha-dropdown id="y2-comparison-menu" class="axis-comparison-menu" placement="bottom-end" distance="7"></ha-dropdown>
+        </div>
         <button id="toggle-y2-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("secondary_axis"))}" aria-label="${this._escape(this._customLocalize("secondary_axis"))}" aria-pressed="true">Y2</button>${useTargetSidebar ? "" : `<span>${this._escape(this._customLocalize("secondary_axis"))}</span>`}
       </div>
       <div id="y2-target-picker-host" class="native-target-picker">
@@ -531,7 +539,11 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this.shadowRoot.getElementById("redo")?.addEventListener("click", () => this._redo());
     this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
       "click",
-      () => this._toggleY2Comparison(),
+      (event) => this._toggleY2ComparisonMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
     );
     this.shadowRoot.getElementById("toggle-y1-visibility")?.addEventListener(
       "click",

@@ -63,6 +63,7 @@ export class StorageMethods {
       this._restoreTargetSourceFilters(incomingSnapshot);
       incomingSnapshot.chart = this._normalizeSnapshotChart(incomingSnapshot.chart);
       this._restoreSnapshotDetailSettings(incomingSnapshot.chart);
+      this._restoreSnapshotY2ComparisonCount(incomingSnapshot);
       this._excludeY2Comparison = Boolean(incomingSnapshot.chart.exclude_y2_comparison);
       this._comparisonBannerVisible = incomingSnapshot.chart.show_comparison_banner !== false;
       this._activeSnapshot = this._clone(incomingSnapshot.chart);
@@ -128,6 +129,7 @@ export class StorageMethods {
       );
       previous.chart = this._normalizeSnapshotChart(previous.chart);
       this._restoreSnapshotDetailSettings(previous.chart);
+      this._restoreSnapshotY2ComparisonCount(previous);
       this._excludeY2Comparison = Boolean(previous.chart.exclude_y2_comparison);
       this._comparisonBannerVisible = previous.chart.show_comparison_banner !== false;
       this._activeSnapshot = this._clone(previous.chart);
@@ -506,6 +508,10 @@ export class StorageMethods {
       chart.rolling_resume_hours = this._panelRollingResumeHours;
     }
     if (this._excludeY2Comparison) chart.exclude_y2_comparison = true;
+    chart.y2_compare_count = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._y2ComparisonCount)) || 1),
+    );
     if (!this._comparisonBannerVisible) chart.show_comparison_banner = false;
     return {
       schema: 1,
@@ -536,6 +542,12 @@ export class StorageMethods {
       chart.detail_mode = "auto";
     }
     if (chart.show_detail_banner !== false) chart.show_detail_banner = true;
+    if (!Object.prototype.hasOwnProperty.call(chart, "y2_compare_count")) {
+      chart.y2_compare_count = Math.max(
+        1,
+        Math.min(10, Math.trunc(Number(snapshot.period?.compare_count)) || 1),
+      );
+    }
     return JSON.stringify({
       targets: snapshot.targets,
       hidden_targets: snapshot.hidden_targets,
@@ -984,6 +996,7 @@ export class StorageMethods {
     snapshot = this._clone(snapshot);
     snapshot.chart = this._normalizeSnapshotChart(snapshot.chart);
     this._restoreSnapshotDetailSettings(snapshot.chart);
+    this._restoreSnapshotY2ComparisonCount(snapshot);
     this._excludeY2Comparison = Boolean(snapshot.chart.exclude_y2_comparison);
     this._comparisonBannerVisible = snapshot.chart.show_comparison_banner !== false;
     this._activeSnapshot = this._clone(snapshot.chart);
@@ -1108,6 +1121,15 @@ export class StorageMethods {
       : "auto";
     this._showDetailBanner = chart?.show_detail_banner !== false;
     this._largeRangeFineDetail = this._detailMode === "fine";
+  }
+
+  _restoreSnapshotY2ComparisonCount(snapshot) {
+    this._y2ComparisonCount = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(
+        snapshot?.chart?.y2_compare_count ?? snapshot?.period?.compare_count,
+      )) || 1),
+    );
   }
 
   _configuredCardOptions(mode = "timeline") {

@@ -418,6 +418,106 @@ test("comparison menu saves an active period choice immediately", () => {
   ]);
 });
 
+test("Y2 comparison controls change enablement and count without changing Y1 period", () => {
+  const calls = [];
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _comparisonChoice: "last_year",
+    _y2ComparisonCount: 1,
+    _excludeY2Comparison: false,
+    _comparisonIsActive: () => true,
+    _beginGraphDataSourceCycle: () => calls.push("cycle"),
+    _syncY2ComparisonToggle: (active) => calls.push(["sync", active]),
+    _syncComparisonBannerVisibility: () => calls.push("banner"),
+    _recordChange: (...args) => calls.push(["record", ...args]),
+    _renderGraphs: () => calls.push("render"),
+  });
+
+  context._setY2ComparisonEnabled(false);
+  assert.equal(context._excludeY2Comparison, true);
+  assert.equal(context._comparisonChoice, "last_year");
+  assert.deepEqual(calls, [
+    "cycle",
+    ["sync", true],
+    "banner",
+    ["record", null, true],
+    "render",
+  ]);
+
+  calls.length = 0;
+  context._excludeY2Comparison = false;
+  context._setY2ComparisonCount(99);
+  assert.equal(context._y2ComparisonCount, 10);
+  assert.equal(context._comparisonChoice, "last_year");
+  assert.deepEqual(calls, [
+    "cycle",
+    "render",
+    "banner",
+    ["record", null, true],
+  ]);
+});
+
+test("Y2 comparison count inherits the period selected by Y1", () => {
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _comparisonChoice: "last_month",
+    _y2ComparisonCount: 3,
+    _periodStore: { compare: "previous" },
+    _comparisonIsActive: (value) => Boolean(value),
+    _comparisonChoiceFromMode: () => "previous_period",
+  });
+
+  assert.deepEqual(context._y2ComparisonValue("previous_period"), [
+    { period: "last_month", periods_back: 1 },
+    { period: "last_month", periods_back: 2 },
+    { period: "last_month", periods_back: 3 },
+  ]);
+});
+
+test("Y2 uses the Y1 comparison menu layout with a locked period selector", () => {
+  const node = () => ({
+    listeners: {},
+    querySelector: () => ({ setAttribute() {} }),
+    setAttribute() {},
+    addEventListener(type, listener) { this.listeners[type] = listener; },
+  });
+  const elements = {
+    "#y2-comparison-enabled": node(),
+    "#y2-comparison-show-banner": node(),
+    "#y2-comparison-period": node(),
+    "#y2-comparison-count": node(),
+  };
+  const menu = {
+    innerHTML: "",
+    querySelector: (selector) => elements[selector],
+    addEventListener() {},
+    removeEventListener() {},
+  };
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    shadowRoot: { getElementById: () => menu },
+    _periodStore: { compare: "yoy" },
+    _comparisonChoice: "last_year",
+    _y2ComparisonCount: 3,
+    _excludeY2Comparison: false,
+    _comparisonBannerVisible: true,
+    _comparisonOptions: () => [
+      ["previous_period", "previous"],
+      ["last_year", "year"],
+    ],
+    _comparisonLabel: (value) => value,
+    _escape: (value) => String(value),
+    _localize: (_key, fallback) => fallback,
+    _customLocalize: (key) => key,
+  });
+
+  context._renderY2ComparisonMenu();
+
+  assert.match(menu.innerHTML, /id="y2-comparison-show-banner"/);
+  assert.match(menu.innerHTML, /id="y2-comparison-period"[^>]* disabled/);
+  assert.equal(elements["#y2-comparison-period"].value, "last_year");
+  assert.equal(elements["#y2-comparison-period"].listeners.change, undefined);
+  assert.equal(elements["#y2-comparison-count"].value, "3");
+  assert.equal(typeof elements["#y2-comparison-count"].listeners.change, "function");
+});
+
 test("dashboard comparison refresh keeps the chart mounted", () => {
   const elements = {
     "period-loading-banner": { hidden: false },

@@ -206,6 +206,72 @@ export class PeriodSelectorMethods {
     });
   }
 
+  _renderY2ComparisonMenu() {
+    const menu = this.shadowRoot?.getElementById("y2-comparison-menu");
+    if (!menu) return;
+    const collection = this._periodStore;
+    const compareActive = collection
+      ? Boolean(collection.compare)
+      : this._comparisonIsActive();
+    const active = compareActive && !this._excludeY2Comparison;
+    const choice = this._comparisonChoice
+      || this._comparisonChoiceFromMode(collection?.compare)
+      || "previous_period";
+    const options = this._comparisonOptions(collection).map(([value, label]) => (
+      `<option value="${this._escape(value)}">${this._escape(this._comparisonLabel(value, label))}</option>`
+    )).join("");
+    const countOptions = Array.from({ length: 10 }, (_, index) => {
+      const value = String(index + 1);
+      return `<option value="${value}">${value}</option>`;
+    }).join("");
+    const count = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._y2ComparisonCount)) || 1),
+    );
+    const compareDataLabel = this._localize(
+      "ui.panel.lovelace.components.energy_period_selector.compare",
+      "Compare data",
+    );
+    const comparisonBannerLabel = this._customLocalize("show_comparison_banner");
+    menu.innerHTML = `
+      <ha-dropdown-item id="y2-comparison-enabled" class="comparison-menu-check" value="y2-comparison-enabled"><ha-icon slot="icon"></ha-icon>${this._escape(compareDataLabel)}</ha-dropdown-item>
+      <ha-dropdown-item id="y2-comparison-show-banner" class="comparison-menu-check" value="y2-comparison-show-banner"><ha-icon slot="icon"></ha-icon>${this._escape(comparisonBannerLabel)}</ha-dropdown-item>
+      <div class="comparison-menu-heading">${this._escape(this._customLocalize("comparison_options"))}</div>
+      <div class="comparison-menu-options">
+        <select id="y2-comparison-period" class="comparison-menu-select comparison-menu-period" aria-label="${this._escape(this._customLocalize("comparison_period"))}" title="${this._escape(this._customLocalize("comparison_period"))}" disabled>${options}</select>
+        <select id="y2-comparison-count" class="comparison-menu-select comparison-menu-count" aria-label="${this._escape(this._customLocalize("comparison_count"))}" title="${this._escape(this._customLocalize("comparison_count"))}">${countOptions}</select>
+      </div>`;
+    const comparisonEnabled = menu.querySelector("#y2-comparison-enabled");
+    const comparisonBanner = menu.querySelector("#y2-comparison-show-banner");
+    const comparisonPeriod = menu.querySelector("#y2-comparison-period");
+    const comparisonCount = menu.querySelector("#y2-comparison-count");
+    this._setComparisonMenuCheckboxState(comparisonEnabled, active);
+    this._setComparisonMenuCheckboxState(comparisonBanner, this._comparisonBannerVisible);
+    comparisonPeriod.value = choice;
+    comparisonCount.value = String(count);
+    if (menu._advancedHistoryComparisonSelect) {
+      menu.removeEventListener("wa-select", menu._advancedHistoryComparisonSelect);
+    }
+    menu._advancedHistoryComparisonSelect = (event) => {
+      const item = event.detail?.item;
+      if (item !== comparisonEnabled && item !== comparisonBanner) return;
+      event.preventDefault();
+      const checked = !item._advancedHistoryChecked;
+      this._setComparisonMenuCheckboxState(item, checked);
+      if (item === comparisonEnabled) {
+        this._setY2ComparisonEnabled(checked);
+        return;
+      }
+      this._comparisonBannerVisible = checked;
+      this._syncComparisonBannerVisibility();
+      this._commitComparisonChange();
+    };
+    menu.addEventListener("wa-select", menu._advancedHistoryComparisonSelect);
+    comparisonCount.addEventListener("change", (event) => {
+      this._setY2ComparisonCount(event.currentTarget.value);
+    });
+  }
+
   _toggleY1ComparisonMenu(event) {
     event?.preventDefault();
     event?.stopPropagation();
@@ -227,6 +293,31 @@ export class PeriodSelectorMethods {
   _closeY1ComparisonMenu() {
     const menu = this.shadowRoot?.getElementById("y1-comparison-menu");
     const button = this.shadowRoot?.getElementById("toggle-y1-comparison");
+    if (menu) menu.open = false;
+    button?.setAttribute("aria-expanded", "false");
+  }
+
+  _toggleY2ComparisonMenu(event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const menu = this.shadowRoot?.getElementById("y2-comparison-menu");
+    const button = this.shadowRoot?.getElementById("toggle-y2-comparison");
+    if (!menu || !button) return;
+    const opening = !menu.open;
+    this._closeY2ComparisonMenu();
+    if (!opening) return;
+    this._renderY2ComparisonMenu();
+    menu.anchorElement = button;
+    menu.open = true;
+    button.setAttribute("aria-expanded", "true");
+    menu.addEventListener("wa-hide", () => {
+      button.setAttribute("aria-expanded", "false");
+    }, { once: true });
+  }
+
+  _closeY2ComparisonMenu() {
+    const menu = this.shadowRoot?.getElementById("y2-comparison-menu");
+    const button = this.shadowRoot?.getElementById("toggle-y2-comparison");
     if (menu) menu.open = false;
     button?.setAttribute("aria-expanded", "false");
   }
@@ -283,6 +374,46 @@ export class PeriodSelectorMethods {
       this._syncComparisonRange?.();
     }
     this._commitComparisonChange();
+  }
+
+  _setY2ComparisonEnabled(enabled) {
+    this._excludeY2Comparison = !enabled;
+    this._beginGraphDataSourceCycle?.();
+    this._syncComparisonRange?.();
+    this._syncY2ComparisonToggle(this._comparisonIsActive());
+    this._syncComparisonBannerVisibility();
+    this._commitComparisonChange();
+    this._renderGraphs();
+  }
+
+  _setY2ComparisonCount(value) {
+    this._y2ComparisonCount = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(value)) || 1),
+    );
+    if (this._comparisonIsActive() && !this._excludeY2Comparison) {
+      this._beginGraphDataSourceCycle?.();
+      this._syncComparisonRange?.();
+      this._renderGraphs();
+    }
+    this._syncComparisonBannerVisibility();
+    this._commitComparisonChange();
+  }
+
+  _activeComparisonCount() {
+    const primary = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._comparisonCount)) || 1),
+    );
+    const hasSecondaryTargets = typeof this._targetCount === "function"
+      ? Boolean(this._targetCount(this._y2Targets))
+      : true;
+    if (this._excludeY2Comparison || !hasSecondaryTargets) return primary;
+    const secondary = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._y2ComparisonCount)) || 1),
+    );
+    return Math.max(primary, secondary);
   }
 
   _comparisonRange(start, end, choice, count = 1) {
@@ -448,10 +579,7 @@ export class PeriodSelectorMethods {
     const choice = this._comparisonChoice
       || this._comparisonChoiceFromMode(collection.compare)
       || "previous_period";
-    const count = Math.max(
-      1,
-      Math.min(10, Math.trunc(Number(this._comparisonCount)) || 1),
-    );
+    const count = this._activeComparisonCount();
     const ranges = this._comparisonRanges(start, end, choice, count);
     if (ranges.length !== count) return [];
     const translationKeys = {
@@ -909,7 +1037,7 @@ export class PeriodSelectorMethods {
       displayStart,
       displayEnd,
       choice,
-      this._comparisonCount,
+      this._activeComparisonCount(),
     );
     if (!ranges.length) {
       host.hidden = true;
@@ -2120,6 +2248,7 @@ export class PeriodSelectorMethods {
     this._comparisonState = null;
     this._comparisonChoice = null;
     this._comparisonCount = 1;
+    this._y2ComparisonCount = 1;
     this._detailMode = "auto";
     this._showDetailBanner = true;
     this._largeRangeFineDetail = false;
@@ -2129,6 +2258,7 @@ export class PeriodSelectorMethods {
     if (compareHost) compareHost.hidden = true;
     this._syncY1ComparisonToggle(false);
     this._closeY1ComparisonMenu();
+    this._closeY2ComparisonMenu();
     if (!collection) {
       this._periodResetPending = true;
       return false;

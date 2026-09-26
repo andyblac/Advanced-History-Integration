@@ -100,6 +100,7 @@ test("bookmark snapshots capture detail mode and banner visibility", () => {
     },
     _detailMode: "manual",
     _showDetailBanner: false,
+    _y2ComparisonCount: 4,
     _detailModeValue: () => "manual",
     _capturePeriodSnapshot: () => null,
     _newSnapshotId: () => "snapshot",
@@ -114,6 +115,7 @@ test("bookmark snapshots capture detail mode and banner visibility", () => {
   const chart = context._captureSnapshot().chart;
   assert.equal(chart.detail_mode, "manual");
   assert.equal(chart.show_detail_banner, false);
+  assert.equal(chart.y2_compare_count, 4);
 });
 
 test("legacy bookmark detail mode is treated as Auto", () => {
@@ -154,9 +156,21 @@ test("legacy and explicit default detail settings have matching fingerprints", (
         ...snapshot.chart,
         detail_mode: "auto",
         show_detail_banner: true,
+        y2_compare_count: 1,
       },
     }),
   );
+});
+
+test("legacy bookmarks initially use the Y1 comparison count for Y2", () => {
+  const context = Object.create(StorageMethods.prototype);
+
+  context._restoreSnapshotY2ComparisonCount({
+    chart: {},
+    period: { compare_count: 3 },
+  });
+
+  assert.equal(context._y2ComparisonCount, 3);
 });
 
 test("changing detail mode marks a loaded legacy bookmark as changed", () => {

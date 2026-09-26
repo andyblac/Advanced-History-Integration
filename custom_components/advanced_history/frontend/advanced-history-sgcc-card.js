@@ -30,6 +30,7 @@ const DASHBOARD_RUNTIME_CHART_KEYS = [
   "running_total_axes",
   "state_strips",
   "exclude_y2_comparison",
+  "y2_compare_count",
   "show_comparison_banner",
 ];
 
@@ -304,22 +305,45 @@ export function loadDashboardRuntimeState(config) {
   return JSON.parse(saved || "null");
 }
 
-function snapshotComparison(snapshot) {
-  if (Object.prototype.hasOwnProperty.call(snapshot?.chart || {}, "compare")) {
-    return clone(snapshot.chart.compare);
-  }
-  if (!snapshot?.period?.compare) return null;
-  const choice = snapshot.period.compare_choice
-    || (snapshot.period.compare === "yoy" ? "last_year" : "previous_period");
+function snapshotComparison(snapshot, countOverride = null) {
+  const configured = Object.prototype.hasOwnProperty.call(snapshot?.chart || {}, "compare")
+    ? clone(snapshot.chart.compare)
+    : null;
+  const active = configured ?? (snapshot?.period?.compare ? true : null);
+  if (
+    active === false
+    || active == null
+    || active === ""
+    || (Array.isArray(active) && !active.length)
+  ) return active;
+  if (countOverride == null && configured != null) return configured;
+  const first = Array.isArray(configured) ? configured[0] : configured;
+  const configuredPeriod = first && typeof first === "object" ? first.period : first;
+  const choice = configuredPeriod && configuredPeriod !== true
+    ? configuredPeriod
+    : snapshot.period?.compare_choice
+      || (snapshot.period?.compare === "yoy" ? "last_year" : "previous_period");
   const count = Math.max(
     1,
-    Math.min(10, Math.trunc(Number(snapshot.period.compare_count)) || 1),
+    Math.min(10, Math.trunc(Number(
+      countOverride ?? snapshot.period.compare_count,
+    )) || 1),
   );
-  if (count === 1) return choice;
-  return Array.from({ length: count }, (_, index) => ({
-    period: choice,
-    periods_back: index + 1,
-  }));
+  const configuredRows = Array.isArray(configured) ? configured : [configured];
+  const comparison = (index) => {
+    const template = configuredRows[index] || configuredRows[0];
+    if (!template || typeof template !== "object") {
+      return { period: choice, periods_back: index + 1 };
+    }
+    return { ...clone(template), period: choice, periods_back: index + 1 };
+  };
+  if (count === 1) {
+    if (!first || typeof first !== "object") return choice;
+    const result = comparison(0);
+    delete result.periods_back;
+    return result;
+  }
+  return Array.from({ length: count }, (_, index) => comparison(index));
 }
 
 function mergeComparisonStyle(active, configured, preserved = null) {
@@ -454,6 +478,12 @@ function comparisonDefaults(row, snapshot, settings) {
 export function sgccConfigsWithSnapshotComparisons(configs, snapshot, settings = {}) {
   const active = snapshotComparison(snapshot);
   const excludeSecondary = Boolean(snapshot?.chart?.exclude_y2_comparison);
+  const secondaryActive = excludeSecondary
+    ? false
+    : snapshotComparison(
+        snapshot,
+        snapshot?.chart?.y2_compare_count ?? snapshot?.period?.compare_count,
+      );
   return clone(configs || []).map((config) => {
     if (!config || config.chart_mode === "state_timeline" || !Array.isArray(config.entities)) {
       return config;
@@ -461,11 +491,12 @@ export function sgccConfigsWithSnapshotComparisons(configs, snapshot, settings =
     config.entities = config.entities.map((raw) => {
       const row = typeof raw === "string" ? { entity: raw } : clone(raw);
       if (!row || typeof row !== "object") return raw;
-      if (active === false || (excludeSecondary && row.y_axis === "secondary")) {
+      const rowActive = row.y_axis === "secondary" ? secondaryActive : active;
+      if (rowActive === false) {
         delete row.compare;
-      } else if (active != null) {
+      } else if (rowActive != null) {
         row.compare = mergeComparisonStyle(
-          active,
+          rowActive,
           comparisonDefaults(row, snapshot, settings),
         );
       }
@@ -1493,7 +1524,10 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
             </div>
             <div class="dashboard-axis-group secondary axis-target-secondary" ${hasY2Targets ? "" : "hidden"}>
               <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
-              <button id="toggle-y2-comparison" class="axis-compare-toggle" type="button" aria-pressed="true"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+              <div class="axis-comparison-menu-shell">
+                <button id="toggle-y2-comparison" class="axis-compare-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-pressed="true"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+                <ha-dropdown id="y2-comparison-menu" class="axis-comparison-menu" placement="bottom-end" distance="7"></ha-dropdown>
+              </div>
               <button id="toggle-y2-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("secondary_axis"))}" aria-label="${this._escape(this._customLocalize("secondary_axis"))}" aria-pressed="true">Y2</button><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
             </div>
           </div>`}
@@ -1509,7 +1543,11 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       </ha-card>`;
     this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
       "click",
-      () => this._toggleY2Comparison(),
+      (event) => this._toggleY2ComparisonMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
     );
     this.shadowRoot.getElementById("toggle-y1-visibility")?.addEventListener(
       "click",
@@ -1586,6 +1624,13 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       compare_count: count,
     };
     const active = compare ? this._comparisonValue(choice || "previous_period", count) : false;
+    const secondaryCount = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._y2ComparisonCount)) || 1),
+    );
+    const secondaryActive = compare && !this._excludeY2Comparison
+      ? this._comparisonValue(choice || "previous_period", secondaryCount)
+      : false;
     current.chart = clone(current.chart || {});
     delete current.chart.compare;
     const previousConfigs = clone(this._dashboardConfig?.sgcc_configs || []);
@@ -1599,10 +1644,10 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       }
       config.entities = config.entities.map((raw, entityIndex) => {
         if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
-        if (raw.y_axis === "secondary") return raw;
-        if (active === false) delete raw.compare;
+        const rowActive = raw.y_axis === "secondary" ? secondaryActive : active;
+        if (rowActive === false) delete raw.compare;
         else raw.compare = mergeComparisonStyle(
-          active,
+          rowActive,
           raw.compare,
           this._dashboardComparisonStyles?.[configIndex]?.[entityIndex],
         );

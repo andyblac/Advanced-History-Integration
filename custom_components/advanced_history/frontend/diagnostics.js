@@ -154,6 +154,7 @@ export class DiagnosticsMethods {
           start: snapshot.period.start || null,
           end: snapshot.period.end || null,
           compare: snapshot.period.compare || null,
+          compare_count: snapshot.period.compare_count || 1,
         } : null,
       },
       chart: {
@@ -161,6 +162,7 @@ export class DiagnosticsMethods {
         graph_height: snapshot.chart?.graph_height ?? this._effectiveGraphHeight(),
         compare: this._sanitizeDiagnosticValue(snapshot.chart?.compare ?? this._effectiveCompare(), aliases),
         exclude_y2_comparison: Boolean(snapshot.chart?.exclude_y2_comparison),
+        y2_compare_count: snapshot.chart?.y2_compare_count || 1,
         show_comparison_banner: snapshot.chart?.show_comparison_banner !== false,
         large_range_detail: (() => {
           const profile = this._largeRangeDetailProfile();

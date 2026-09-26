@@ -2066,12 +2066,16 @@ export class GraphMethods {
     const enabled = this._enabledResolvedEntityIds?.has(entity) !== false;
     const { compare: compareDefaults, ...options } = entityOptions;
     const activeCompare = this._effectiveCompare();
+    const secondaryAxis = mode !== "state_timeline"
+      && this._y2ResolvedEntityIds?.has(entity);
+    const axisCompare = secondaryAxis && !this._excludeY2Comparison
+      ? this._y2ComparisonValue(activeCompare)
+      : activeCompare;
     let compare = this._withTimeRangeComparisonLayout(
-      this._mergeCompareOptions(activeCompare, compareDefaults),
+      this._mergeCompareOptions(axisCompare, compareDefaults),
     );
     if (mode !== "state_timeline") {
       delete options.state_map;
-      const secondaryAxis = this._y2ResolvedEntityIds?.has(entity);
       options.y_axis = secondaryAxis ? "secondary" : "primary";
       if (secondaryAxis && this._excludeY2Comparison) compare = null;
       return compare == null
@@ -2090,6 +2094,45 @@ export class GraphMethods {
     return compare == null
       ? { ...options, ...generated, entity, enabled }
       : { ...options, ...generated, entity, enabled, compare };
+  }
+
+  _y2ComparisonValue(activeCompare = this._effectiveCompare()) {
+    if (!this._comparisonIsActive(activeCompare)) return activeCompare;
+    const configuredPeriod = Array.isArray(activeCompare)
+      ? activeCompare[0]?.period
+      : activeCompare && typeof activeCompare === "object"
+        ? activeCompare.period
+        : activeCompare;
+    const nativeChoice = this._comparisonChoiceFromMode?.(this._periodStore?.compare);
+    const choice = this._comparisonChoice
+      || nativeChoice
+      || ([
+        "previous_period",
+        "yesterday",
+        "last_week",
+        "last_month",
+        "last_year",
+      ].includes(configuredPeriod) ? configuredPeriod : "previous_period");
+    const count = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._y2ComparisonCount)) || 1),
+    );
+    const configuredRows = Array.isArray(activeCompare) ? activeCompare : [activeCompare];
+    const comparison = (index) => {
+      const template = configuredRows[index] || configuredRows[0];
+      if (!template || typeof template !== "object") {
+        return { period: choice, periods_back: index + 1 };
+      }
+      return { ...this._clone(template), period: choice, periods_back: index + 1 };
+    };
+    if (count === 1) {
+      const first = configuredRows[0];
+      if (!first || typeof first !== "object") return choice;
+      const result = comparison(0);
+      delete result.periods_back;
+      return result;
+    }
+    return Array.from({ length: count }, (_, index) => comparison(index));
   }
 
   _mergeCompareOptions(activeCompare, defaults) {

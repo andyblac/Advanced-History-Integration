@@ -798,6 +798,25 @@ test("SGCC editor changes retain Advanced History options and native height", as
   ]);
   assert.equal(comparisonConfigs[0].entities[1].compare, undefined);
 
+  const independentAxisCounts = sgccConfigsWithSnapshotComparisons([{
+    type: "custom:statistics-graph-chart-card",
+    entities: [
+      { entity: "sensor.gas" },
+      { entity: "sensor.temperature", y_axis: "secondary" },
+    ],
+  }], {
+    chart: { y2_compare_count: 3 },
+    period: { compare: "previous", compare_choice: "last_month", compare_count: 1 },
+  });
+  assert.deepEqual(independentAxisCounts[0].entities[0].compare, {
+    period: "last_month",
+  });
+  assert.deepEqual(independentAxisCounts[0].entities[1].compare, [
+    { period: "last_month", periods_back: 1 },
+    { period: "last_month", periods_back: 2 },
+    { period: "last_month", periods_back: 3 },
+  ]);
+
   const canonicalComparison = [
     { period: "last_year", opacity: 1 },
     { period: "last_year", periods_back: 2, opacity: 0.8 },

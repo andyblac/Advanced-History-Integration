@@ -213,6 +213,7 @@ export const panelStyles = `
   }
   .comparison-menu-period { flex:1 1 auto; min-width:0; padding:2px 7px; }
   .comparison-menu-count { width:48px; padding:2px 5px; }
+  .comparison-menu-select:disabled { opacity:.6; cursor:not-allowed; }
   .axis-target-divider { flex:0 0 1px; align-self:stretch; margin-top:28px; background:var(--divider-color); }
   .period-selector-floating {
     position:fixed; z-index:20; left:16px; right:16px; bottom:max(12px,env(safe-area-inset-bottom));

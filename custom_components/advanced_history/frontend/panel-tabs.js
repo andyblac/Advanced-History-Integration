@@ -176,6 +176,7 @@ export class PanelTabsMethods {
       defaults_mode: "overrides",
       detail_mode: "auto",
       show_detail_banner: true,
+      y2_compare_count: 1,
       card_options: { numeric: {}, state: {} },
       entity_options: {},
     };
