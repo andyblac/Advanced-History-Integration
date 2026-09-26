@@ -501,6 +501,7 @@ export class StorageMethods {
       "state_strips",
       "compare",
       "remove_card_options",
+      "legend_hidden_series",
     ].forEach(copyChartValue);
     if (this._panelTimeRange) chart.time_range = this._clone(this._panelTimeRange);
     if (this._panelRollingHours) chart.rolling_hours = this._panelRollingHours;

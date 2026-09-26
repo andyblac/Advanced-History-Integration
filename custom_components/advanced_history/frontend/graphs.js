@@ -602,6 +602,7 @@ export class GraphMethods {
         if (!root || this._graphLayoutObservedRoots?.has(root)) return Boolean(root);
         this._guardDashboardLegendLayout(card);
         this._guardPanelLegendVisibility(card);
+        this._restorePanelLegendVisibility(card);
         root.addEventListener("change", (event) => {
           if (!event.target?.closest?.('[data-qp="gby"], .sgc-group-by-picker')) return;
           this._syncLargeRangeDetailBannerFromCard(card);
@@ -634,7 +635,10 @@ export class GraphMethods {
       const card = mutation?.target?.getRootNode?.()?.host;
       if (card) cards.add(card);
     }
-    for (const card of cards) this._applyComparisonSeriesPeriodLabels?.(card);
+    for (const card of cards) {
+      this._applyComparisonSeriesPeriodLabels?.(card);
+      this._restorePanelLegendVisibility(card);
+    }
   }
 
   _guardDashboardLegendLayout(card) {
@@ -662,38 +666,80 @@ export class GraphMethods {
     if (this._dashboardCardMode || card?.__advancedHistoryPanelLegendVisibilityGuard) return;
     const root = card?.shadowRoot;
     if (!root) return;
+    const selector = ".sgc-detail-legend-entity[data-id], .sgc-legend-item[data-id]";
+    const eventEntry = (event) => event.composedPath?.().find(
+      (node) => node?.matches?.(selector),
+    ) || event.target?.closest?.(selector);
     root.addEventListener("click", (event) => {
       if (this._suppressPanelLegendVisibilitySync) return;
-      const entry = event.target?.closest?.(
-        ".sgc-detail-legend-entity[data-id], .sgc-legend-item[data-id]",
-      );
+      const entry = eventEntry(event);
       if (!entry) return;
-      const entities = card._entities;
-      if (!Array.isArray(entities)) return;
-      const index = entities.findIndex((entity, entityIndex) => {
-        const entityId = entity?.entity || entity?.statistic_id;
-        return entity?._compareOf == null
-          && entityId
-          && `${entityId}__${entityIndex}` === entry.dataset.id;
-      });
-      if (index < 0) return;
-      const entity = entities[index];
-      const entityId = entity.entity || entity.statistic_id;
-      const axis = entity.y_axis === "secondary" ? "secondary" : "primary";
-      queueMicrotask(() => {
-        const hiddenTargets = axis === "secondary"
-          ? this._hiddenY2Targets
-          : this._hiddenTargets;
-        const hidden = new Set(hiddenTargets.entity_id || []);
-        if (this._legendEntryHidden(entry)) hidden.add(entityId);
-        else hidden.delete(entityId);
-        hiddenTargets.entity_id = [...hidden];
-        this._recordChange(null, true);
-        this._syncNativeTargetVisibility?.(axis);
-        this._syncAxisVisibilityButtons();
-      });
+      const hiddenBefore = new Set(card._hiddenEntities || []);
+      this._suppressPanelLegendVisibilitySync = true;
+      setTimeout(() => {
+        const hiddenAfter = new Set(card._hiddenEntities || []);
+        const changed = hiddenAfter.size !== hiddenBefore.size
+          || [...hiddenAfter].some((legendId) => !hiddenBefore.has(legendId));
+        this._suppressPanelLegendVisibilitySync = false;
+        if (!changed) return;
+        this._commitPanelLegendVisibility(card);
+      }, 0);
     }, true);
     card.__advancedHistoryPanelLegendVisibilityGuard = true;
+  }
+
+  _commitPanelLegendVisibility(card) {
+    this._capturePanelLegendVisibility(card);
+    this._recordChange(null, true);
+    this._syncAxisVisibilityButtons();
+  }
+
+  _panelLegendStateKey(card) {
+    return card?.__advancedHistoryLegendStateKey || "";
+  }
+
+  _capturePanelLegendVisibility(card) {
+    if (this._dashboardCardMode) return;
+    const key = this._panelLegendStateKey(card);
+    if (!key) return;
+    // Legend visibility is a chart-only SGCC state. It must remain separate
+    // from hidden_targets, which controls source selection in the sidebars.
+    const hidden = [...(card._hiddenEntities || [])].filter((legendId) => {
+      const index = card._entities?.findIndex((entity, entityIndex) => {
+        const entityId = entity?.entity || entity?.statistic_id;
+        return entityId && `${entityId}__${entityIndex}` === legendId;
+      });
+      return index >= 0;
+    });
+    const state = { ...(this._activeSnapshot?.legend_hidden_series || {}) };
+    if (hidden.length) state[key] = hidden;
+    else delete state[key];
+    this._activeSnapshot = { ...(this._activeSnapshot || {}) };
+    if (Object.keys(state).length) this._activeSnapshot.legend_hidden_series = state;
+    else delete this._activeSnapshot.legend_hidden_series;
+  }
+
+  _restorePanelLegendVisibility(card) {
+    if (this._dashboardCardMode || this._suppressPanelLegendVisibilitySync) return;
+    const key = this._panelLegendStateKey(card);
+    const saved = new Set(this._activeSnapshot?.legend_hidden_series?.[key] || []);
+    if (!key || !saved.size) return;
+    const root = card?.shadowRoot;
+    if (!root) return;
+    const entries = [
+      ...root.querySelectorAll(
+        ".sgc-detail-legend-entity[data-id], .sgc-legend-item[data-id]",
+      ),
+    ];
+    this._suppressPanelLegendVisibilitySync = true;
+    try {
+      for (const legendId of saved) {
+        if (card._hiddenEntities?.has?.(legendId)) continue;
+        entries.find((entry) => entry.dataset.id === legendId)?.click();
+      }
+    } finally {
+      this._suppressPanelLegendVisibilitySync = false;
+    }
   }
 
   _applyDashboardGraphBackground(card, config) {
@@ -907,6 +953,10 @@ export class GraphMethods {
     );
     card.__advancedHistoryChartMode = mode;
     card.__advancedHistorySourceKey = sourceKey;
+    card.__advancedHistoryLegendStateKey = [
+      mode,
+      series.map((item) => this._seriesDescriptor(item).key).join("\u001f"),
+    ].join("\u001e");
     this._guardFutureEnergySeries(card);
     const cardOptionsConfig = this._effectiveCardOptionsConfig(mode);
     const cardOptions = { ...this._cardOptions(mode, cardOptionsConfig) };

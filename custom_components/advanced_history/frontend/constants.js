@@ -32,6 +32,7 @@ export const DASHBOARD_SNAPSHOT_SGCC_KEYS = [
   "attribute_selection",
   "default_hours",
   "source_graph_height",
+  "legend_hidden_series",
 ];
 export const DASHBOARD_SNAPSHOT_SOURCE_KEYS = [
   "source_bookmark_id",

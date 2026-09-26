@@ -97,6 +97,9 @@ test("bookmark snapshots capture detail mode and banner visibility", () => {
       defaults_mode: "overrides",
       card_options: {},
       entity_options: {},
+      legend_hidden_series: {
+        "timeline\u001esensor.power": ["sensor.power__1"],
+      },
     },
     _detailMode: "manual",
     _showDetailBanner: false,
@@ -116,6 +119,9 @@ test("bookmark snapshots capture detail mode and banner visibility", () => {
   assert.equal(chart.detail_mode, "manual");
   assert.equal(chart.show_detail_banner, false);
   assert.equal(chart.y2_compare_count, 4);
+  assert.deepEqual(chart.legend_hidden_series, {
+    "timeline\u001esensor.power": ["sensor.power__1"],
+  });
 });
 
 test("legacy bookmark detail mode is treated as Auto", () => {
