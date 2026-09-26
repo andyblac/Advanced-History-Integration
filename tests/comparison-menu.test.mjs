@@ -617,6 +617,50 @@ test("dashboard legend clicks lock the card before SGCC redraws", () => {
   assert.equal(card.__advancedHistoryLegendLayoutGuard, true);
 });
 
+test("panel legend clicks persist entity visibility as a bookmark change", async () => {
+  const listeners = new Map();
+  const classes = new Set();
+  const entry = {
+    dataset: { id: "sensor.power__0" },
+    classList: { contains: (name) => classes.has(name) },
+  };
+  const card = {
+    _entities: [{ entity: "sensor.power", y_axis: "primary" }],
+    shadowRoot: {
+      addEventListener: (type, listener, capture) => listeners.set(type, { listener, capture }),
+    },
+  };
+  const changes = [];
+  const synced = [];
+  let buttonSyncs = 0;
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _dashboardCardMode: false,
+    _hiddenTargets: { area_id: [], device_id: [], entity_id: [] },
+    _hiddenY2Targets: { area_id: [], device_id: [], entity_id: [] },
+    _recordChange: (...args) => changes.push(args),
+    _syncNativeTargetVisibility: (axis) => synced.push(axis),
+    _syncAxisVisibilityButtons: () => { buttonSyncs += 1; },
+  });
+
+  context._guardPanelLegendVisibility(card);
+  assert.equal(listeners.get("click").capture, true);
+  classes.add("legend-hidden");
+  listeners.get("click").listener({ target: { closest: () => entry } });
+  await Promise.resolve();
+
+  assert.deepEqual(context._hiddenTargets.entity_id, ["sensor.power"]);
+  assert.deepEqual(changes, [[null, true]]);
+  assert.deepEqual(synced, ["primary"]);
+  assert.equal(buttonSyncs, 1);
+  assert.equal(card.__advancedHistoryPanelLegendVisibilityGuard, true);
+
+  classes.delete("legend-hidden");
+  listeners.get("click").listener({ target: { closest: () => entry } });
+  await Promise.resolve();
+  assert.deepEqual(context._hiddenTargets.entity_id, []);
+  assert.deepEqual(changes, [[null, true], [null, true]]);
+});
+
 test("axis badges hide and restore every main legend series on their axis", () => {
   const legendEntry = (id, hidden = false) => {
     const classes = new Set(hidden ? ["legend-hidden"] : []);

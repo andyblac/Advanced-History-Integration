@@ -264,8 +264,7 @@ export class TargetPickerMethods {
           pane.dataset.advancedHistoryBound = "true";
           pane.addEventListener("close-filter-pane", () => {
             this._setTargetSidebarShown(axis, false);
-            if (typeof this._render === "function") this._render();
-            else this._syncTargetSidebars();
+            this._syncTargetSidebars();
           });
           pane.addEventListener(
             "clear-filter",
@@ -288,8 +287,7 @@ export class TargetPickerMethods {
           chip.addEventListener("click", () => {
             const shown = this._targetSidebarShown(axis);
             this._setTargetSidebarShown(axis, this._narrow ? !shown : true);
-            if (typeof this._render === "function") this._render();
-            else this._syncTargetSidebars();
+            this._syncTargetSidebars();
           });
         }
       }

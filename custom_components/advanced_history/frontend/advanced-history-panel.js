@@ -502,9 +502,9 @@ export class AdvancedHistoryPanel extends HTMLElement {
       </header>
       <main class="content${useTargetSidebar ? " target-sidebar-layout" : ""}${this._datePickerAutoHide ? " date-picker-auto-hide" : ""}">
         ${useTargetSidebar ? `
-          ${this._targetSidebarShown("primary") ? `<ha-filter-pane id="target-sources-pane-primary" class="target-sources-pane target-sources-primary">
+          <ha-filter-pane id="target-sources-pane-primary" class="target-sources-pane target-sources-primary" ${this._targetSidebarShown("primary") ? "" : "hidden"}>
             <section class="target-sidebar-targets">${primaryTargetControls}</section>
-          </ha-filter-pane>` : ""}
+          </ha-filter-pane>
           <div class="target-sidebar-content">
             <div class="target-sidebar-toolbar">
               <ha-filter-pane-chip id="target-sources-chip-primary"></ha-filter-pane-chip>
@@ -513,7 +513,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
             </div>
             ${centerContent}
           </div>
-          ${secondaryAxisEditable && this._targetSidebarShown("secondary") ? `<ha-filter-pane id="target-sources-pane-secondary" class="target-sources-pane target-sources-secondary">
+          ${secondaryAxisEditable ? `<ha-filter-pane id="target-sources-pane-secondary" class="target-sources-pane target-sources-secondary" ${this._targetSidebarShown("secondary") ? "" : "hidden"}>
             <section class="target-sidebar-targets">${secondaryTargetControls}</section>
           </ha-filter-pane>` : ""}` : `
           ${dependencyMissing ? "" : `<section class="filters axis-targets">

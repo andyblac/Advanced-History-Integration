@@ -127,6 +127,7 @@ test("target sidebar panes and chips receive axis-specific counts", () => {
     "target-sources-chip-secondary",
   ]) elements.set(id, element());
   const toolbar = element();
+  let renders = 0;
   const context = {
     _narrow: false,
     _hass: { config: { version: "2026.9.0" } },
@@ -154,6 +155,7 @@ test("target sidebar panes and chips receive axis-specific counts", () => {
     _secondaryAxisEditable() { return true; },
     clearedAxes: [],
     _requestClearTargetSources(axis) { this.clearedAxes.push(axis); },
+    _render() { renders += 1; },
   };
   for (const name of [
     "_homeAssistantVersionAtLeast",
@@ -239,6 +241,11 @@ test("target sidebar panes and chips receive axis-specific counts", () => {
   assert.equal(elements.get("target-sources-pane-primary").hidden, true);
   assert.equal(elements.get("target-sources-pane-secondary").hidden, false);
   assert.equal(toolbar.hidden, false);
+  assert.equal(renders, 0);
+
+  elements.get("target-sources-chip-primary").listeners.click();
+  assert.equal(elements.get("target-sources-pane-primary").hidden, false);
+  assert.equal(renders, 0);
 
   elements.get("target-sources-pane-primary").listeners["clear-filter"]();
   elements.get("target-sources-pane-secondary").listeners["clear-filter"]();
