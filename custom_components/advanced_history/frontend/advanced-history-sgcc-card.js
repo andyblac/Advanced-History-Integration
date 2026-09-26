@@ -8,7 +8,7 @@ import {
 } from "./constants.js";
 import { cardConfigToSnapshot } from "./card-handoff.js";
 import { ensureCardLoaded } from "./config-flow-defaults.js";
-import { compactDashboardSnapshot } from "./panel-export.js";
+import { compactDashboardSnapshot, dashboardCardConfigs } from "./panel-export.js";
 import { customLocalize, loadTranslations } from "./translations.js";
 import { panelStyles } from "./styles.js";
 import {
@@ -595,6 +595,74 @@ function seriesKey(row) {
   return attribute ? `${entity}::${attribute}` : entity;
 }
 
+export function dashboardConfigsWithToggledLegendHideOnLoad(
+  configs,
+  cardIndex,
+  renderedEntities,
+  legendId,
+) {
+  const next = clone(configs || []);
+  const config = next[cardIndex];
+  if (!config || !Array.isArray(config.entities) || !Array.isArray(renderedEntities)) {
+    return next;
+  }
+  const separator = String(legendId || "").lastIndexOf("__");
+  const renderedIndex = separator >= 0
+    ? Number.parseInt(String(legendId).slice(separator + 2), 10)
+    : Number.NaN;
+  const rendered = renderedEntities[renderedIndex];
+  if (!rendered || !Number.isInteger(renderedIndex)) return next;
+
+  const comparison = rendered._compareOf != null;
+  const mainRenderedIndex = comparison
+    ? Number.parseInt(rendered._compareOf, 10)
+    : renderedIndex;
+  const main = renderedEntities[mainRenderedIndex];
+  const key = seriesKey(main);
+  if (!main || !key || !Number.isInteger(mainRenderedIndex)) return next;
+  const occurrence = renderedEntities.slice(0, mainRenderedIndex + 1).filter(
+    (row) => row?._compareOf == null && seriesKey(row) === key,
+  ).length - 1;
+  let seen = 0;
+  const storedIndex = config.entities.findIndex((raw) => {
+    if (seriesKey(raw) !== key) return false;
+    if (seen === occurrence) return true;
+    seen += 1;
+    return false;
+  });
+  if (storedIndex < 0) return next;
+  const raw = config.entities[storedIndex];
+  const stored = typeof raw === "string" ? { entity: raw } : clone(raw);
+
+  if (!comparison) {
+    if (stored.auto_hide === true) delete stored.auto_hide;
+    else stored.auto_hide = true;
+    config.entities[storedIndex] = stored;
+    return next;
+  }
+
+  const comparisonIndexes = renderedEntities.flatMap((row, index) => (
+    Number.parseInt(row?._compareOf, 10) === mainRenderedIndex ? [index] : []
+  ));
+  const comparisonIndex = comparisonIndexes.indexOf(renderedIndex);
+  if (comparisonIndex < 0) return next;
+  const values = Array.isArray(stored.compare) ? clone(stored.compare) : [clone(stored.compare)];
+  const value = values[comparisonIndex];
+  if (value == null || value === false) return next;
+  const option = value === true
+    ? {}
+    : typeof value === "string"
+      ? { period: value }
+      : clone(value);
+  if (!option || typeof option !== "object" || Array.isArray(option)) return next;
+  if (option.hide_on_load === true) delete option.hide_on_load;
+  else option.hide_on_load = true;
+  values[comparisonIndex] = option;
+  stored.compare = Array.isArray(stored.compare) ? values : option;
+  config.entities[storedIndex] = stored;
+  return next;
+}
+
 export function dashboardEntityIdsInConfigOrder(entityIds, configs) {
   const configured = [];
   const seen = new Set();
@@ -1118,6 +1186,8 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     this._dashboardResolvedPrimaryScaleOptions = null;
     this._dashboardResolvedScaleLabels = new Map();
     this._dashboardScaleObservers = new Set();
+    this._dashboardGraphEditorSession = false;
+    this._dashboardGraphEditorPending = false;
     this._panelTabsPersistenceSuppressed = true;
   }
 
@@ -1381,51 +1451,6 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     return dashboardStateStorageKey(this._dashboardConfig);
   }
 
-  _syncDashboardSgccVisibilityFromCards() {
-    const configs = clone(this._dashboardConfig?.sgcc_configs || []);
-    let changed = false;
-    for (let cardIndex = 0; cardIndex < configs.length; cardIndex += 1) {
-      const card = this._graphCards?.[cardIndex];
-      const rows = configs[cardIndex]?.entities;
-      const root = card?.shadowRoot;
-      if (!root || !Array.isArray(rows) || !Array.isArray(card?._entities)) continue;
-      const detailed = [...root.querySelectorAll(".sgc-detail-legend-entity[data-id]")];
-      const compact = [...root.querySelectorAll(".sgc-legend-item[data-id]")];
-      const byId = new Map((detailed.length ? detailed : compact).map(
-        (entry) => [entry.dataset.id, entry],
-      ));
-      const indexesBySeries = new Map();
-      card._entities.forEach((row, index) => {
-        if (!row || row._compareOf != null) return;
-        const key = seriesKey(row);
-        if (!key) return;
-        const indexes = indexesBySeries.get(key) || [];
-        indexes.push(index);
-        indexesBySeries.set(key, indexes);
-      });
-      const usedBySeries = new Map();
-      configs[cardIndex].entities = rows.map((raw) => {
-        const row = typeof raw === "string" ? { entity: raw } : clone(raw);
-        const key = seriesKey(row);
-        const occurrence = usedBySeries.get(key) || 0;
-        usedBySeries.set(key, occurrence + 1);
-        const renderedIndex = indexesBySeries.get(key)?.[occurrence];
-        const entityId = row?.entity || row?.statistic_id;
-        const entry = renderedIndex == null || !entityId
-          ? null
-          : byId.get(`${entityId}__${renderedIndex}`);
-        if (!entry) return raw;
-        const enabled = !this._legendEntryHidden(entry);
-        if (row.enabled !== enabled || typeof raw === "string") changed = true;
-        row.enabled = enabled;
-        return row;
-      });
-    }
-    if (!changed) return;
-    this._dashboardConfig.sgcc_configs = configs;
-    this._dashboardConfig.snapshot = compactDashboardSnapshot(this._dashboardConfig.snapshot);
-  }
-
   _loadDashboardSnapshot() {
     const key = this._dashboardStateStorageKey();
     let state = null;
@@ -1472,6 +1497,69 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     } catch (error) {
       console.warn("Advanced History card: unable to save dashboard state", error);
     }
+  }
+
+  async _openGraphEditor(...args) {
+    this._dashboardGraphEditorSession = true;
+    try {
+      return await super._openGraphEditor(...args);
+    } finally {
+      this._dashboardGraphEditorSession = false;
+    }
+  }
+
+  _persistDashboardGraphEditorChanges() {
+    if (!this._dashboardGraphEditorPending) return;
+    this._dashboardGraphEditorPending = false;
+    const configs = dashboardCardConfigs(this._graphCards).map(compactDashboardSgccConfig);
+    if (!configs.length) return;
+    const previousConfigs = clone(this._dashboardConfig?.sgcc_configs || []);
+    if (sgccConfigsFingerprint(previousConfigs) === sgccConfigsFingerprint(configs)) return;
+    const current = this._captureSnapshot();
+    this._dashboardConfig = {
+      ...this._dashboardConfig,
+      sgcc_configs: configs,
+      snapshot: compactDashboardSnapshot(current),
+    };
+    try {
+      stageDashboardComparisonConfig(this._dashboardConfig, previousConfigs, configs);
+    } catch (error) {
+      console.warn("Advanced History card: unable to stage graph settings", error);
+    }
+    this._saveDashboardState(current, configs);
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: clone(this._dashboardConfig) },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  _toggleDashboardLegendHideOnLoad(card, legendId) {
+    const cardIndex = this._graphCards?.indexOf(card) ?? -1;
+    if (cardIndex < 0) return false;
+    const previousConfigs = clone(this._dashboardConfig?.sgcc_configs || []);
+    const configs = dashboardConfigsWithToggledLegendHideOnLoad(
+      previousConfigs,
+      cardIndex,
+      card?._entities,
+      legendId,
+    );
+    if (sgccConfigsFingerprint(previousConfigs) === sgccConfigsFingerprint(configs)) {
+      return false;
+    }
+    this._dashboardConfig = { ...this._dashboardConfig, sgcc_configs: configs };
+    try {
+      stageDashboardComparisonConfig(this._dashboardConfig, previousConfigs, configs);
+    } catch (error) {
+      console.warn("Advanced History card: unable to stage hide-on-load change", error);
+    }
+    this._saveDashboardState(this._captureSnapshot(), configs);
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: clone(this._dashboardConfig) },
+      bubbles: true,
+      composed: true,
+    }));
+    return true;
   }
 
   async _initialize() {
@@ -1613,6 +1701,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     this._syncStateStripsButton();
     this._syncDetailModeButton();
     this._renderContent();
+    this._persistDashboardGraphEditorChanges();
   }
 
   _saveTargets() {}
@@ -1701,7 +1790,10 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     void this._settleDashboardComparisonLayout();
   }
 
-  _recordChange(snapshot = null) { this._saveDashboardState(snapshot); }
+  _recordChange(snapshot = null) {
+    this._saveDashboardState(snapshot);
+    if (this._dashboardGraphEditorSession) this._dashboardGraphEditorPending = true;
+  }
   _scheduleExternalBookmarkRefresh() {}
 }
 

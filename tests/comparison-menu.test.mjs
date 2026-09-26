@@ -164,6 +164,21 @@ import {
   withoutDashboardWrapperNavigation,
 } from "../custom_components/advanced_history/frontend/graphs.js";
 
+test("dashboard cards expose Graph Settings without a panel settings path", () => {
+  const dashboard = Object.assign(Object.create(GraphMethods.prototype), {
+    _dashboardCardMode: true,
+    config: {},
+  });
+  const panel = Object.assign(Object.create(GraphMethods.prototype), {
+    _dashboardCardMode: false,
+    _loadedExternalBookmark: false,
+    config: {},
+  });
+
+  assert.equal(dashboard._canEditPanelChart(), true);
+  assert.equal(panel._canEditPanelChart(), false);
+});
+
 test("manual detail forces both SGCC resolution pickers on", () => {
   const context = Object.assign(Object.create(GraphMethods.prototype), {
     _detailMode: "manual",
@@ -590,7 +605,7 @@ test("dashboard navigation locks the rendered card height", () => {
   assert.equal(values.size, 0);
 });
 
-test("dashboard legend clicks lock the card before SGCC redraws", () => {
+test("dashboard Command/Ctrl-click toggles persistent hide-on-load separately", async () => {
   const listeners = new Map();
   const card = {
     shadowRoot: {
@@ -598,9 +613,11 @@ test("dashboard legend clicks lock the card before SGCC redraws", () => {
     },
   };
   let locks = 0;
+  const hideOnLoadToggles = [];
   const context = Object.assign(Object.create(GraphMethods.prototype), {
     _dashboardCardMode: true,
     _lockDashboardCardLayout: () => { locks += 1; },
+    _toggleDashboardLegendHideOnLoad: (...args) => hideOnLoadToggles.push(args),
   });
 
   context._guardDashboardLegendLayout(card);
@@ -612,8 +629,43 @@ test("dashboard legend clicks lock the card before SGCC redraws", () => {
   });
   assert.equal(locks, 1);
 
-  listeners.get("click").listener({ target: { closest: () => null } });
-  assert.equal(locks, 1);
+  listeners.get("click").listener({
+    metaKey: false,
+    target: {
+      closest: (selector) => selector.includes("sgc-detail-legend-entity")
+        ? { dataset: { id: "sensor.power__0" } }
+        : null,
+    },
+  });
+  assert.equal(locks, 2);
+  assert.equal(hideOnLoadToggles.length, 0);
+
+  listeners.get("click").listener({
+    metaKey: true,
+    target: {
+      closest: (selector) => selector.includes("sgc-detail-legend-entity")
+        ? { dataset: { id: "sensor.power__0" } }
+        : null,
+    },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(locks, 3);
+  assert.deepEqual(hideOnLoadToggles, [[card, "sensor.power__0"]]);
+
+  listeners.get("click").listener({
+    ctrlKey: true,
+    target: {
+      closest: (selector) => selector.includes("sgc-detail-legend-entity")
+        ? { dataset: { id: "sensor.power__1" } }
+        : null,
+    },
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  assert.equal(locks, 4);
+  assert.deepEqual(hideOnLoadToggles, [
+    [card, "sensor.power__0"],
+    [card, "sensor.power__1"],
+  ]);
   assert.equal(card.__advancedHistoryLegendLayoutGuard, true);
 });
 
@@ -849,6 +901,42 @@ test("axis badges hide and restore every main legend series on their axis", () =
     device_id: [],
     entity_id: [],
   });
+});
+
+test("dashboard axis badges keep hiding temporary and separate from sources", () => {
+  const classes = new Set();
+  const entry = {
+    dataset: { id: "sensor.power__0" },
+    classList: { contains: (name) => classes.has(name) },
+    click: () => {
+      if (classes.has("legend-hidden")) classes.delete("legend-hidden");
+      else classes.add("legend-hidden");
+    },
+  };
+  const hiddenTargets = { area_id: [], device_id: [], entity_id: [] };
+  let records = 0;
+  let sourceSyncs = 0;
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _dashboardCardMode: true,
+    _graphCards: [{
+      _entities: [{ entity: "sensor.power" }],
+      shadowRoot: {
+        querySelectorAll: (selector) => selector.startsWith(".sgc-detail") ? [entry] : [],
+      },
+    }],
+    _hiddenTargets: hiddenTargets,
+    _hiddenY2Targets: { area_id: [], device_id: [], entity_id: [] },
+    _recordChange: () => { records += 1; },
+    _syncNativeTargetVisibility: () => { sourceSyncs += 1; },
+    _syncAxisVisibilityButtons: () => {},
+  });
+
+  context._toggleAxisLegendVisibility("primary");
+
+  assert.equal(context._legendEntryHidden(entry), true);
+  assert.deepEqual(hiddenTargets, { area_id: [], device_id: [], entity_id: [] });
+  assert.equal(records, 0);
+  assert.equal(sourceSyncs, 0);
 });
 
 test("dashboard SGCC inherits the wrapper background when transparency is the default", () => {

@@ -388,6 +388,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
     dashboardConfigWithDateNavigation,
     dashboardConfigWithPendingComparison,
     dashboardConfigWithSnapshot,
+    dashboardConfigsWithToggledLegendHideOnLoad,
     dashboardCardTitle,
     dashboardDatePickerVisible,
     dashboardDownloadVisible,
@@ -418,6 +419,43 @@ test("SGCC editor changes retain Advanced History options and native height", as
     "sensor.andys_bedroom",
     "sensor.outside",
   ]);
+  const hideOnLoadConfig = [{
+    type: "custom:statistics-graph-chart-card",
+    entities: [{
+      entity: "sensor.power",
+      compare: [
+        { period: "last_year" },
+        { period: "last_year", periods_back: 2 },
+      ],
+    }],
+  }];
+  const renderedHideOnLoadEntities = [
+    { entity: "sensor.power" },
+    { entity: "sensor.power", _compareOf: 0 },
+    { entity: "sensor.power", _compareOf: 0 },
+  ];
+  const hiddenMain = dashboardConfigsWithToggledLegendHideOnLoad(
+    hideOnLoadConfig,
+    0,
+    renderedHideOnLoadEntities,
+    "sensor.power__0",
+  );
+  assert.equal(hiddenMain[0].entities[0].auto_hide, true);
+  const shownMain = dashboardConfigsWithToggledLegendHideOnLoad(
+    hiddenMain,
+    0,
+    renderedHideOnLoadEntities,
+    "sensor.power__0",
+  );
+  assert.equal(shownMain[0].entities[0].auto_hide, undefined);
+  const hiddenComparison = dashboardConfigsWithToggledLegendHideOnLoad(
+    hideOnLoadConfig,
+    0,
+    renderedHideOnLoadEntities,
+    "sensor.power__2",
+  );
+  assert.equal(hiddenComparison[0].entities[0].compare[0].hide_on_load, undefined);
+  assert.equal(hiddenComparison[0].entities[0].compare[1].hide_on_load, true);
   const pendingStorage = new Map();
   localStorage.getItem = (key) => pendingStorage.get(key) ?? null;
   localStorage.setItem = (key, value) => pendingStorage.set(key, value);
@@ -648,36 +686,42 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(combined.chart.card_options.numeric.card_header, "Battery (%)");
   assert.deepEqual(combined.chart.card_options.state, {});
 
-  const hiddenLegendEntry = {
-    dataset: { id: "sensor.gas__0" },
-    classList: { contains: (name) => name === "legend-hidden" },
-  };
-  const visibilityContext = Object.assign(
+  let savedGraphSettings = null;
+  let emittedGraphSettings = null;
+  const graphSettingsContext = Object.assign(
     Object.create(AdvancedHistorySgccCard.prototype),
     {
+      _dashboardGraphEditorPending: true,
       _dashboardConfig: {
-        snapshot: { chart: { card_options: { stale: true } } },
+        snapshot: { chart: {} },
         sgcc_configs: [{
           type: "custom:statistics-graph-chart-card",
-          entities: ["sensor.gas"],
+          entities: [{ entity: "sensor.gas", line_width: 1 }],
         }],
       },
       _graphCards: [{
-        _entities: [{ entity: "sensor.gas" }],
-        shadowRoot: {
-          querySelectorAll: (selector) => (
-            selector.startsWith(".sgc-detail") ? [hiddenLegendEntry] : []
-          ),
+        __advancedHistoryConfig: {
+          type: "custom:statistics-graph-chart-card",
+          entities: [{ entity: "sensor.gas", line_width: 4 }],
         },
       }],
+      _captureSnapshot: () => ({
+        chart: {
+          card_options: { numeric: { show_fill: false } },
+          entity_options: { "sensor.gas": { line_width: 4 } },
+        },
+      }),
+      _saveDashboardState: (snapshot, configs) => {
+        savedGraphSettings = { snapshot, configs };
+      },
+      dispatchEvent: (event) => { emittedGraphSettings = event.detail.config; },
     },
   );
-  visibilityContext._syncDashboardSgccVisibilityFromCards();
-  assert.equal(
-    visibilityContext._dashboardConfig.sgcc_configs[0].entities[0].enabled,
-    false,
-  );
-  assert.deepEqual(visibilityContext._dashboardConfig.snapshot, { chart: {} });
+  graphSettingsContext._persistDashboardGraphEditorChanges();
+  assert.equal(graphSettingsContext._dashboardGraphEditorPending, false);
+  assert.equal(graphSettingsContext._dashboardConfig.sgcc_configs[0].entities[0].line_width, 4);
+  assert.equal(savedGraphSettings.configs[0].entities[0].line_width, 4);
+  assert.deepEqual(emittedGraphSettings, graphSettingsContext._dashboardConfig);
 
   const runtime = dashboardRuntimeState({
     chart: {

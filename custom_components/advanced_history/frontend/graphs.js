@@ -649,14 +649,21 @@ export class GraphMethods {
       if (!event.target?.closest?.(".sgc-detail-legend-entity, .sgc-legend-item")) return;
       this._lockDashboardCardLayout?.();
     };
+    const selector = ".sgc-detail-legend-entity[data-id], .sgc-legend-item[data-id]";
+    const eventEntry = (event) => event.composedPath?.().find(
+      (node) => node?.matches?.(selector),
+    ) || event.target?.closest?.(selector);
     // Lock before SGCC handles the click and redraws its plot/legend. Waiting
     // for ResizeObserver is too late because Lovelace can already have seen
     // the transient size and repositioned the dashboard.
     root.addEventListener("pointerdown", lock, true);
     root.addEventListener("click", (event) => {
       lock(event);
-      if (event.target?.closest?.(".sgc-detail-legend-entity, .sgc-legend-item")) {
-        queueMicrotask(() => this._syncDashboardSgccVisibilityFromCards?.());
+      const entry = eventEntry(event);
+      if ((event.metaKey || event.ctrlKey) && entry?.dataset?.id) {
+        setTimeout(() => {
+          this._toggleDashboardLegendHideOnLoad?.(card, entry.dataset.id);
+        }, 0);
       }
     }, true);
     card.__advancedHistoryLegendLayoutGuard = true;
@@ -845,6 +852,10 @@ export class GraphMethods {
     } finally {
       this._suppressPanelLegendVisibilitySync = false;
     }
+    if (this._dashboardCardMode) {
+      this._syncAxisVisibilityButtons();
+      return;
+    }
     const secondary = axis === "secondary";
     const targets = secondary ? this._y2Targets : this._targets;
     const hiddenTargets = secondary ? this._hiddenY2Targets : this._hiddenTargets;
@@ -856,7 +867,6 @@ export class GraphMethods {
     }
     this._recordChange(null, true);
     this._syncNativeTargetVisibility?.(axis);
-    this._syncDashboardSgccVisibilityFromCards?.();
     this._syncAxisVisibilityButtons();
   }
 
@@ -1526,7 +1536,8 @@ export class GraphMethods {
   }
 
   _canEditPanelChart() {
-    return Boolean(this.config.settings_path) && !this._loadedExternalBookmark;
+    return this._dashboardCardMode
+      || (Boolean(this.config.settings_path) && !this._loadedExternalBookmark);
   }
 
   _createDataSourceTracker(indicator, active = true, sourceKey = null) {
