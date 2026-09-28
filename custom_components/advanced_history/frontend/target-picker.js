@@ -1397,6 +1397,10 @@ export class TargetPickerMethods {
       .filter((value) => value != null && value !== "")
       .map(String);
     const current = this._attributeValue(this._hass.states[entity], attribute);
+    if (typeof current === "boolean") {
+      values.push(String(current), String(!current));
+      return [...new Set(values)];
+    }
     if (
       current != null &&
       current !== "" &&
@@ -1448,13 +1452,17 @@ export class TargetPickerMethods {
       .filter(([attribute, value]) =>
         !metadataAttributes.has(attribute) &&
         value !== "" &&
-        (typeof value === "string" || typeof value === "number")
+        ["string", "number", "boolean"].includes(typeof value)
       );
     const numericAttributes = availableAttributes
-      .filter(([, value]) => Number.isFinite(Number(value)))
+      .filter(([, value]) =>
+        typeof value !== "boolean" && Number.isFinite(Number(value))
+      )
       .map(([attribute]) => attribute);
     const categoricalAttributes = availableAttributes
-      .filter(([, value]) => !Number.isFinite(Number(value)))
+      .filter(([, value]) =>
+        typeof value === "boolean" || !Number.isFinite(Number(value))
+      )
       .map(([attribute]) => attribute);
     const attributes = [...new Set([
       ...nativeAttributes,

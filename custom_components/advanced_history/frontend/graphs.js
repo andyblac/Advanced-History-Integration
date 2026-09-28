@@ -2116,6 +2116,7 @@ export class GraphMethods {
     if (attribute) {
       if (NATIVE_HISTORY_ATTRIBUTES[domain]?.includes(attribute)) return true;
       const attributeValue = this._attributeValue(state, attribute);
+      if (typeof attributeValue === "boolean") return false;
       return attributeValue !== "" && Number.isFinite(Number(attributeValue));
     }
     if (["counter", "input_number", "number"].includes(domain)) return true;

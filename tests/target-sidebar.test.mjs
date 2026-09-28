@@ -733,6 +733,45 @@ test("climate attribute choices exclude the base-state series descriptor", () =>
   );
 });
 
+test("boolean attributes are offered as categorical values", () => {
+  const entity = "climate.lounge";
+  const context = {
+    _hass: {
+      states: {
+        [entity]: {
+          state: "heat",
+          attributes: {
+            is_calling_for_heat: true,
+            is_heating: false,
+            current_temperature: 19.5,
+          },
+        },
+      },
+    },
+    _seriesDescriptors() { return [{ entity, attribute: null }]; },
+    _effectiveEntityOptionsConfig() { return {}; },
+    _nativeHistorySeries() { return []; },
+    _localize(_key, fallback) { return fallback; },
+    _attributeDisplayName(_entity, attribute) { return attribute; },
+    _attributeValue(state, attribute) { return state?.attributes?.[attribute]; },
+    _seriesKey(_entity, attribute) { return `${entity}::${attribute}`; },
+    _seriesChoiceValue: TargetPickerMethods.prototype._seriesChoiceValue,
+    _seriesStateMap: TargetPickerMethods.prototype._seriesStateMap,
+    _seriesStateMapValues: TargetPickerMethods.prototype._seriesStateMapValues,
+  };
+
+  const choices = TargetPickerMethods.prototype._seriesChoices.call(context, entity);
+  const calling = choices.find((choice) => choice.value === "is_calling_for_heat");
+  const heating = choices.find((choice) => choice.value === "is_heating");
+  const temperature = choices.find((choice) => choice.value === "current_temperature");
+
+  assert.equal(calling.categorical, true);
+  assert.deepEqual(calling.mapValues, ["true", "false"]);
+  assert.equal(heating.categorical, true);
+  assert.deepEqual(heating.mapValues, ["false", "true"]);
+  assert.equal(temperature.categorical, false);
+});
+
 test("only independent entity targets qualify for their own remove control", () => {
   const context = {
     _entities: [

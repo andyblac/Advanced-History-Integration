@@ -25,6 +25,7 @@ function context(singleGraph = false) {
           attributes: { device_class: "energy", unit_of_measurement: "kWh" },
         },
         "climate.room": { attributes: { temperature: 20, current_temperature: 19 } },
+        "climate.boiler": { attributes: { is_calling_for_heat: true } },
       },
     },
     _seriesKey: GraphMethods.prototype._seriesKey,
@@ -107,6 +108,19 @@ test("state strips are available only for a mixed timeline chart", () => {
   target._cardOptions = () => ({ chart_mode: "bar" });
   assert.equal(
     GraphMethods.prototype._stateStripsAvailable.call(target, mixed),
+    false,
+  );
+});
+
+test("boolean attributes render as categorical history", () => {
+  const target = context();
+  target._attributeValue = GraphMethods.prototype._attributeValue;
+
+  assert.equal(
+    GraphMethods.prototype._isNumeric.call(target, {
+      entity: "climate.boiler",
+      attribute: "is_calling_for_heat",
+    }),
     false,
   );
 });
