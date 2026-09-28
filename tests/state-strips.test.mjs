@@ -6,6 +6,49 @@ import {
   GraphMethods,
   stateStripPresentationOptions,
 } from "../custom_components/advanced_history/frontend/graphs.js";
+import { withBooleanStateColors } from "../custom_components/advanced_history/frontend/state-colors.js";
+
+test("boolean state maps receive distinct semantic colours", () => {
+  assert.deepEqual(withBooleanStateColors([
+    { value: "false", label: "False" },
+    { value: "true", label: "True" },
+  ]), [
+    {
+      value: "false",
+      label: "False",
+      color: "var(--state-inactive-color, var(--disabled-text-color, #9e9e9e))",
+    },
+    {
+      value: "true",
+      label: "True",
+      color: "var(--state-active-color, var(--success-color, #43a047))",
+    },
+  ]);
+  assert.deepEqual(withBooleanStateColors([
+    { value: "true", label: "True", color: "#123456" },
+  ]), [
+    { value: "true", label: "True", color: "#123456" },
+  ]);
+  assert.deepEqual(withBooleanStateColors([
+    {
+      value: "false",
+      label: "False",
+      color: "var(--state-inactive-color, var(--disabled-text-color, #9e9e9e))",
+    },
+    {
+      value: "true",
+      label: "True",
+      color: "var(--state-active-color, var(--success-color, #43a047))",
+    },
+  ], "#00bcd4", true), [
+    {
+      value: "false",
+      label: "False",
+      color: "var(--state-inactive-color, var(--disabled-text-color, #9e9e9e))",
+    },
+    { value: "true", label: "True", color: "#00bcd4" },
+  ]);
+});
 
 test("state-strip handoff records the Advanced History layout without persisting its render marker", () => {
   const snapshot = cardConfigToSnapshot({

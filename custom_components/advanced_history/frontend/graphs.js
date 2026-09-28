@@ -16,6 +16,7 @@ import { withClimateActionAnnotations } from "./climate.js";
 import {
   mergeStateMaps,
   nativeStateMap,
+  withBooleanStateColors,
 } from "./state-colors.js";
 import { cumulativeRunningTotalSeries } from "./running-total.js";
 import { configsWithToggledLegendHideOnLoad } from "./legend-visibility.js";
@@ -1042,6 +1043,19 @@ export class GraphMethods {
         0,
       ),
     );
+    entities.forEach((configured, index) => {
+      const current = configured.attribute
+        ? this._attributeValue(this._hass.states[configured.entity], configured.attribute)
+        : undefined;
+      if (typeof current !== "boolean" || !Array.isArray(configured.state_map)) return;
+      const activeColor = configured.color || palette[index % palette.length];
+      if (!configured.color && activeColor) configured.color = activeColor;
+      configured.state_map = withBooleanStateColors(
+        configured.state_map,
+        activeColor,
+        true,
+      );
+    });
     const usedColors = new Set();
     if (mode !== "state_timeline") {
       // Older scoped editor sessions could persist the first palette colour
@@ -2206,9 +2220,13 @@ export class GraphMethods {
         ? { ...options, entity, enabled }
         : { ...options, entity, enabled, compare };
     }
+    const configuredStateMap = attribute
+      && typeof this._attributeValue(this._hass.states[entity], attribute) === "boolean"
+      ? withBooleanStateColors(entityOptions.state_map, entityOptions.color)
+      : entityOptions.state_map;
     const stateMap = mergeStateMaps(
       nativeStateMap(this._hass, entity),
-      entityOptions.state_map
+      configuredStateMap
     );
     const generated = {
       entity,
