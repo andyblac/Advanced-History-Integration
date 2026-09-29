@@ -247,6 +247,23 @@ test("target sidebar panes and chips receive axis-specific counts", () => {
   assert.equal(elements.get("target-sources-pane-primary").hidden, false);
   assert.equal(renders, 0);
 
+  context._narrow = true;
+  context._targetPrimarySourcesShown = false;
+  context._targetSecondarySourcesShown = true;
+  context._syncTargetSidebars();
+  assert.equal(elements.get("target-sources-pane-primary").hidden, true);
+  assert.equal(elements.get("target-sources-pane-primary").narrow, false);
+  assert.equal(elements.get("target-sources-pane-secondary").hidden, false);
+  assert.equal(elements.get("target-sources-pane-secondary").narrow, true);
+
+  elements.get("target-sources-chip-primary").listeners.click();
+  assert.equal(elements.get("target-sources-pane-primary").hidden, false);
+  assert.equal(elements.get("target-sources-pane-primary").narrow, true);
+
+  elements.get("target-sources-pane-primary").listeners["close-filter-pane"]();
+  assert.equal(elements.get("target-sources-pane-primary").hidden, true);
+  assert.equal(elements.get("target-sources-pane-primary").narrow, false);
+
   elements.get("target-sources-pane-primary").listeners["clear-filter"]();
   elements.get("target-sources-pane-secondary").listeners["clear-filter"]();
   assert.deepEqual(context.clearedAxes, ["primary", "secondary"]);

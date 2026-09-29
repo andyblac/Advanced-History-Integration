@@ -250,7 +250,10 @@ export class TargetPickerMethods {
       const label = count ? `${axisLabel}: ${entityCount}` : axisLabel;
       const themeMode = this._hass?.themes?.darkMode ? "dark" : "light";
       if (pane) {
-        pane.narrow = this._narrow;
+        // A narrow ha-filter-pane always renders an open adaptive dialog.
+        // Keep closed mobile panes in their desktop render mode while hidden
+        // so they do not leave an invisible dialog backdrop intercepting taps.
+        pane.narrow = this._narrow && shown;
         pane.label = label;
         pane.path = TARGET_SOURCES_ICON_PATH;
         pane.count = count;
