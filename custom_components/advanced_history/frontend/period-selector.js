@@ -1266,12 +1266,15 @@ export class PeriodSelectorMethods {
     this._setPeriodSelectorRange(start, end);
   }
 
-  _selectCurrentOrRollingPeriod() {
+  _selectCurrentOrRollingPeriod(button = null) {
     if (this._panelRollingHours || this._panelRollingResumeHours) {
       this._refreshPanelRollingRange();
-      return;
+    } else {
+      this._selectCurrentPeriod();
     }
-    this._selectCurrentPeriod();
+    // Match the previous/next controls: focus-within must not keep an
+    // auto-hidden selector revealed after the pointer leaves.
+    button?.blur?.();
   }
 
   _renderPeriodSelector(host, collection) {
@@ -1326,8 +1329,8 @@ export class PeriodSelectorMethods {
         if (field) field.click();
         else picker.open?.();
       });
-      controller.querySelector(".period-selector-now")?.addEventListener("click", () => {
-        this._selectCurrentOrRollingPeriod();
+      controller.querySelector(".period-selector-now")?.addEventListener("click", (event) => {
+        this._selectCurrentOrRollingPeriod(event.currentTarget);
       });
       controller.querySelector(".period-selector-nav.previous")?.addEventListener("click", (event) => this._navigatePeriodSelector(-1, event.currentTarget));
       controller.querySelector(".period-selector-nav.next")?.addEventListener("click", (event) => this._navigatePeriodSelector(1, event.currentTarget));

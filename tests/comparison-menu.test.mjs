@@ -1381,6 +1381,7 @@ test("auto-hide keeps the date selector visible while its menu is open", () => {
 test("AHP and AHC Now controls both preserve an active rolling range", () => {
   for (const dashboardCardMode of [false, true]) {
     const calls = [];
+    const button = { blur: () => calls.push("blur") };
     const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
       _dashboardCardMode: dashboardCardMode,
       _panelRollingHours: 4,
@@ -1388,9 +1389,27 @@ test("AHP and AHC Now controls both preserve an active rolling range", () => {
       _selectCurrentPeriod: () => calls.push("fixed"),
     });
 
-    context._selectCurrentOrRollingPeriod();
+    context._selectCurrentOrRollingPeriod(button);
 
-    assert.deepEqual(calls, ["rolling"]);
+    assert.deepEqual(calls, ["rolling", "blur"]);
+  }
+});
+
+test("AHP and AHC Now controls release focus after selecting the current period", () => {
+  for (const dashboardCardMode of [false, true]) {
+    const calls = [];
+    const button = { blur: () => calls.push("blur") };
+    const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+      _dashboardCardMode: dashboardCardMode,
+      _panelRollingHours: null,
+      _panelRollingResumeHours: null,
+      _refreshPanelRollingRange: () => calls.push("rolling"),
+      _selectCurrentPeriod: () => calls.push("fixed"),
+    });
+
+    context._selectCurrentOrRollingPeriod(button);
+
+    assert.deepEqual(calls, ["fixed", "blur"]);
   }
 });
 
