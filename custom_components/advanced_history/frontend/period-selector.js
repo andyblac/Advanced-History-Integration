@@ -1972,6 +1972,7 @@ export class PeriodSelectorMethods {
     this._datePickerAutoHideTimer = null;
     const host = this.shadowRoot?.getElementById("date-controller");
     host?.classList.toggle("auto-hide", this._datePickerAutoHide);
+    host?.classList.toggle("docked", !this._datePickerAutoHide);
     host?.classList.remove("revealed");
     this.shadowRoot
       ?.querySelector("main.content")

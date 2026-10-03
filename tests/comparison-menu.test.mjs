@@ -160,9 +160,51 @@ test("reconnected dashboard followers restore comparison from SGCC config", () =
 });
 import {
   GraphMethods,
+  numericGraphLayoutHeight,
   renderedGraphDataSources,
+  usesDynamicNumericGraphHeight,
   withoutDashboardWrapperNavigation,
 } from "../custom_components/advanced_history/frontend/graphs.js";
+
+test("panel viewport height wins over a stale SGCC intrinsic measurement", () => {
+  assert.equal(numericGraphLayoutHeight({
+    layoutHeight: 700,
+    numericRequirement: 1200,
+  }), 700);
+  assert.equal(numericGraphLayoutHeight({
+    dashboardCardMode: true,
+    layoutHeight: 700,
+    numericRequirement: 1200,
+  }), 1200);
+  assert.equal(numericGraphLayoutHeight({
+    layoutHeight: 700,
+    numericRequirement: 1200,
+    hasState: true,
+    stateHeight: 200,
+  }), 484);
+});
+
+test("a docked selector enables dynamic height for a fixed-height panel chart", () => {
+  assert.equal(usesDynamicNumericGraphHeight({
+    hasNumeric: true,
+    numericChartCount: 1,
+    usesAutomaticHeight: false,
+    selectorDocked: true,
+  }), true);
+  assert.equal(usesDynamicNumericGraphHeight({
+    hasNumeric: true,
+    numericChartCount: 1,
+    usesAutomaticHeight: false,
+    selectorDocked: false,
+  }), false);
+  assert.equal(usesDynamicNumericGraphHeight({
+    hasNumeric: true,
+    numericChartCount: 1,
+    usesAutomaticHeight: false,
+    dashboardCardMode: true,
+    selectorDocked: true,
+  }), false);
+});
 
 test("dashboard cards expose Graph Settings without a panel settings path", () => {
   const dashboard = Object.assign(Object.create(GraphMethods.prototype), {
@@ -1010,6 +1052,32 @@ test("automatic numeric cards retain their measured plot height after width chan
   assert.equal(configs.length, 1);
 });
 
+test("docked panel fitting can shrink an explicitly sized SGCC card", () => {
+  const configs = [];
+  const card = {
+    __advancedHistoryConfig: { height: 900 },
+    shadowRoot: {
+      querySelector(selector) {
+        return {
+          getBoundingClientRect: () => ({
+            height: selector === "ha-card.sgc-card" ? 900 : 800,
+          }),
+        };
+      },
+    },
+    setConfig: (config) => configs.push(config),
+  };
+  const context = {
+    _hass: {},
+    _setGraphCardHass() {},
+  };
+
+  GraphMethods.prototype._fitAutomaticNumericCard.call(context, card, 700, true);
+
+  assert.equal(configs.at(-1).height, 600);
+  assert.equal(card.__advancedHistoryAutoHeight, undefined);
+});
+
 test("dashboard period store publishes local state without an Energy request", async () => {
   const context = Object.create(PeriodSelectorMethods.prototype);
   const store = context._createPeriodStore();
@@ -1376,6 +1444,46 @@ test("auto-hide keeps the date selector visible while its menu is open", () => {
     if (previousWindow === undefined) delete globalThis.window;
     else globalThis.window = previousWindow;
   }
+});
+
+test("disabling auto-hide docks the panel date selector", () => {
+  const classList = (initial = []) => ({
+    values: new Set(initial),
+    toggle(name, enabled) {
+      if (enabled) this.values.add(name);
+      else this.values.delete(name);
+    },
+    remove(name) { this.values.delete(name); },
+    contains(name) { return this.values.has(name); },
+  });
+  const host = { classList: classList(["period-selector-floating", "auto-hide", "revealed"]) };
+  const zone = { hidden: false };
+  const content = { classList: classList(["date-picker-auto-hide"]) };
+  let layoutSchedules = 0;
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _datePickerAutoHide: true,
+    _datePickerAutoHideTimer: null,
+    shadowRoot: {
+      getElementById: (id) => id === "date-controller" ? host : zone,
+      querySelector: () => content,
+    },
+    _syncPeriodSelectorAutoHideAction() {},
+    _graphLayoutSchedule: () => { layoutSchedules += 1; },
+  });
+
+  context._setPeriodSelectorAutoHide(false);
+  assert.equal(host.classList.contains("auto-hide"), false);
+  assert.equal(host.classList.contains("docked"), true);
+  assert.equal(host.classList.contains("revealed"), false);
+  assert.equal(zone.hidden, true);
+  assert.equal(content.classList.contains("date-picker-auto-hide"), false);
+
+  context._setPeriodSelectorAutoHide(true);
+  assert.equal(host.classList.contains("auto-hide"), true);
+  assert.equal(host.classList.contains("docked"), false);
+  assert.equal(zone.hidden, false);
+  assert.equal(content.classList.contains("date-picker-auto-hide"), true);
+  assert.equal(layoutSchedules, 2);
 });
 
 test("AHP and AHC Now controls both preserve an active rolling range", () => {
