@@ -1,0 +1,1756 @@
+import { AdvancedHistoryPanel } from "./advanced-history-panel.js";
+import {
+  ADVANCED_HISTORY_CARD_SCHEMA,
+  ADVANCED_HISTORY_CARD_TAG,
+  CARD_TAG,
+  DASHBOARD_STORED_SGCC_OMIT_KEYS,
+  DASHBOARD_SYNC_GROUP_KEYS,
+} from "./constants.js";
+import { cardConfigToSnapshot } from "./card-handoff.js";
+import { ensureCardLoaded } from "./config-flow-defaults.js";
+import { compactDashboardSnapshot, dashboardCardConfigs } from "./panel-export.js";
+import { customLocalize, loadTranslations } from "./translations.js";
+import { panelStyles } from "./styles.js";
+import {
+  configsWithToggledLegendHideOnLoad as dashboardConfigsWithToggledLegendHideOnLoad,
+} from "./legend-visibility.js";
+import {
+  dashboardPrimaryScaleOptions,
+  dashboardScaleGroupOwners,
+  registerDashboardScaleSource,
+  releaseDashboardScaleSource,
+  scaleOptionsFromPicker,
+} from "./dashboard-scale-mode.js";
+
+const DASHBOARD_CARD_STATE_STORAGE_PREFIX = "advanced_history_dashboard_card_state_v1";
+const DASHBOARD_PENDING_COMPARISON_STORAGE_PREFIX = "advanced_history_dashboard_comparison_v1";
+const DASHBOARD_PERIOD_GROUP_STORES = new Map();
+const DASHBOARD_RUNTIME_CHART_KEYS = [
+  "time_range",
+  "rolling_hours",
+  "rolling_resume_hours",
+  "series_transforms",
+  "running_total_axes",
+  "state_strips",
+  "exclude_y2_comparison",
+  "y2_compare_count",
+  "show_comparison_banner",
+  "detail_mode",
+  "show_detail_banner",
+];
+
+const cardStyles = `
+  ${panelStyles}
+  :host { min-height:0; height:100%; background:transparent; }
+  ha-card.dashboard-card {
+    height:100%; overflow:hidden; display:flex; flex-direction:column;
+    background:var(--ha-card-background,var(--card-background-color));
+  }
+  .dashboard-card-title { padding:14px 16px 4px; font-size:16px; font-weight:500; }
+  .dashboard-card-content {
+    min-height:0; padding:8px 12px 12px; display:flex; flex:1 1 auto; flex-direction:column;
+  }
+  .dashboard-axis-strip {
+    min-height:47px; margin:0 4px 6px; display:grid;
+    grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);
+    align-items:center; gap:12px; color:var(--secondary-text-color); font-size:12px; font-weight:500;
+  }
+  .dashboard-axis-group { min-width:0; display:flex; align-items:center; gap:7px; }
+  .dashboard-axis-group.primary { grid-column:1; grid-row:1; }
+  .dashboard-axis-group.secondary { grid-column:3; grid-row:1; justify-content:flex-end; }
+  .dashboard-axis-group:not([data-advanced-history-has-targets]) .axis-visibility-toggle {
+    color:var(--secondary-text-color);
+    background:rgba(127,127,127,.28);
+  }
+  .dashboard-axis-group[data-advanced-history-has-targets] .axis-visibility-toggle:not(.all-hidden),
+  .dashboard-axis-group[data-advanced-history-has-targets] .axis-compare-toggle.active,
+  .dashboard-axis-group[data-advanced-history-has-targets] .axis-running-total-toggle.active,
+  .dashboard-axis-group[data-advanced-history-has-targets] .axis-state-strips-toggle.active,
+  .dashboard-axis-group[data-advanced-history-has-targets] .axis-detail-toggle.active {
+    color:var(--advanced-history-axis-chip-foreground);
+  }
+  .dashboard-date-controls {
+    position:relative; min-width:0; max-width:100%; display:flex; align-items:center;
+    grid-column:2; grid-row:1; justify-self:center; width:max-content;
+  }
+  .dashboard-date-controls[hidden] { display:none; }
+  .dashboard-download-button {
+    position:absolute; left:calc(100% + 5px); top:50%; transform:translateY(-50%);
+    width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center;
+    color:var(--secondary-text-color); background:var(--secondary-background-color);
+    border:1px solid var(--divider-color); border-radius:15px; cursor:pointer;
+    line-height:0;
+  }
+  .dashboard-download-button:hover { color:var(--primary-text-color); }
+  .dashboard-download-button ha-icon {
+    display:block; flex:0 0 16px; width:16px; height:16px; line-height:0;
+    --mdc-icon-size:16px;
+  }
+  .dashboard-card-content > .compare-banner,
+  .dashboard-card-content > .detail-banner,
+  .dashboard-card-content > .loading-banner { margin-bottom:8px; }
+  .charts {
+    position:static; left:auto; width:100%; min-height:260px; transform:none;
+    display:grid; flex:1 1 auto; gap:8px;
+  }
+  .graph-shell .data-source-indicator {
+    top:8px; right:8px; min-height:20px; padding:0 6px;
+    max-width:calc(100% - 16px); border-radius:10px; font-size:10px;
+  }
+  .period-selector-card { position:relative; z-index:4; width:max-content; max-width:100%; height:46px; }
+  .advanced-history-period-selector {
+    box-sizing:border-box; width:max-content; max-width:100%; height:46px;
+    padding:3px 8px; display:flex; align-items:center; gap:4px;
+    color:var(--primary-text-color); background:var(--card-background-color);
+    border:1px solid var(--divider-color); border-radius:23px;
+  }
+  .advanced-history-period-selector ha-date-range-picker {
+    flex:0 0 32px; width:32px; --ha-icon-button-size:32px; --mdc-icon-size:20px;
+  }
+  .period-selector-label {
+    min-width:0; padding:0 5px 0 0; display:flex; flex-direction:column;
+    align-items:flex-start; justify-content:center; color:inherit; background:transparent;
+    border:0; font:inherit; white-space:nowrap; cursor:pointer;
+  }
+  .period-selector-primary { font-size:15px; font-weight:500; line-height:18px; }
+  .period-selector-secondary { color:var(--secondary-text-color); font-size:11px; line-height:14px; }
+  .period-selector-secondary:empty { display:none; }
+  .advanced-history-period-selector[data-period-kind="day"] .period-selector-label { min-width:72px; }
+  .advanced-history-period-selector[data-period-kind="week"] .period-selector-label { min-width:112px; }
+  .advanced-history-period-selector[data-period-kind="month"] .period-selector-label { min-width:96px; }
+  .advanced-history-period-selector[data-period-kind="year"] .period-selector-label { min-width:64px; }
+  .advanced-history-period-selector[data-period-kind="other"] .period-selector-label { min-width:128px; }
+  .period-selector-now {
+    min-width:52px; height:30px; padding:0 10px; color:var(--primary-color);
+    background:color-mix(in srgb,var(--primary-color) 16%,transparent);
+    border:0; border-radius:15px; font:inherit; font-size:14px; font-weight:500; cursor:pointer;
+  }
+  .period-selector-nav {
+    width:30px; height:30px; padding:0; display:flex; align-items:center; justify-content:center;
+    color:var(--primary-text-color); background:transparent; border:0; border-radius:15px; cursor:pointer;
+  }
+  .period-selector-nav ha-icon { width:18px; height:18px; --mdc-icon-size:18px; }
+  .period-selector-nav:hover, .period-selector-label:hover { background:var(--secondary-background-color); }
+  .advanced-history-period-selector .panel-time-range {
+    position:static; transform:none; flex:0 0 auto;
+  }
+  .period-selector-card .panel-time-range {
+    height:32px; min-height:32px; padding-inline:7px; gap:4px; border-radius:16px;
+    font-size:13px;
+  }
+  .period-selector-card .panel-time-range ha-icon { width:16px; height:16px; flex-basis:16px; }
+  .period-selector-card .panel-time-range-value { min-width:96px; }
+  @container (max-width:900px) {
+    .dashboard-axis-strip { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+    .dashboard-axis-group.secondary { grid-column:2; }
+    .dashboard-date-controls {
+      grid-column:1 / -1; grid-row:2; margin-inline:auto;
+    }
+  }
+  @container (max-width:520px) {
+    .dashboard-card-content { padding-inline:6px; }
+    .dashboard-axis-strip { margin-inline:2px; }
+    .dashboard-axis-group > span:not(.axis-badge) { display:none; }
+  }
+`;
+
+function clone(value) {
+  if (value == null) return value;
+  return typeof structuredClone === "function"
+    ? structuredClone(value)
+    : JSON.parse(JSON.stringify(value));
+}
+
+export function cardConfigWithTitle(config, title) {
+  const next = clone(config) || {};
+  const value = String(title ?? "");
+  if (value) next.title = value;
+  else delete next.title;
+  return next;
+}
+
+export function dashboardCardTitle(config) {
+  return String(config?.title || "").trim();
+}
+
+export function dashboardDatePickerVisible(config) {
+  return config?.show_date_picker !== false;
+}
+
+export function dashboardDownloadVisible(config) {
+  return config?.show_download_button === true;
+}
+
+export function compactDashboardSgccConfig(config) {
+  const next = clone(config) || {};
+  for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) delete next[key];
+  if (next.card_background_color === "transparent") delete next.card_background_color;
+  return next;
+}
+
+export function dashboardSgccConfigWithGroupDefaults(
+  config,
+  group,
+) {
+  const next = compactDashboardSgccConfig(config);
+  for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+    next[key] = group;
+  }
+  return next;
+}
+
+export function dashboardConfigWithDateNavigation(config, source = {}) {
+  const next = clone(config) || {};
+  const showDatePicker = Object.prototype.hasOwnProperty.call(source, "show_date_picker")
+    ? source.show_date_picker !== false
+    : dashboardDatePickerVisible(next);
+  const datePickerGroup = Object.prototype.hasOwnProperty.call(source, "date_picker_group")
+    ? String(source.date_picker_group || "").trim()
+    : String(next.date_picker_group || "").trim();
+  const showDownloadButton = Object.prototype.hasOwnProperty.call(source, "show_download_button")
+    ? source.show_download_button === true
+    : dashboardDownloadVisible(next);
+  next.show_date_picker = showDatePicker;
+  next.date_picker_group = datePickerGroup;
+  next.show_download_button = showDownloadButton;
+  next.sgcc_configs = (next.sgcc_configs || []).map((sgccConfig) => (
+    dashboardSgccConfigWithGroupDefaults(sgccConfig, datePickerGroup)
+  ));
+  next.snapshot = compactDashboardSnapshot(next.snapshot);
+  return next;
+}
+
+export function dashboardSgccRuntimeConfig(config, wrapperConfig) {
+  const next = {
+    ...clone(config),
+    show_date_picker: dashboardDatePickerVisible(wrapperConfig),
+  };
+  if (next.card_background_color == null || next.card_background_color === "") {
+    next.card_background_color = "transparent";
+  }
+  const group = String(wrapperConfig?.date_picker_group || "").trim();
+  for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+    next[key] = group;
+  }
+  return next;
+}
+
+export function leaveHiddenCalendarTab(root) {
+  const calendar = root?.querySelector?.('button[data-mtab="calendar"]');
+  if (!calendar?.classList?.contains?.("active")) return false;
+  const display = root.querySelector?.('button[data-mtab="display"]');
+  if (!display) return false;
+  display.click();
+  return true;
+}
+
+export function dashboardConfigWithSnapshot(config, snapshot) {
+  const compact = compactDashboardSnapshot(snapshot);
+  if (JSON.stringify(config?.snapshot || null) === JSON.stringify(compact || null)) {
+    return config;
+  }
+  return { ...clone(config), snapshot: compact };
+}
+
+function dashboardStateStorageKey(config) {
+  const id = String(config?.snapshot?.id || "").trim();
+  if (!id) return "";
+  const role = dashboardDatePickerVisible(config) ? "controller" : "follower";
+  return `${DASHBOARD_CARD_STATE_STORAGE_PREFIX}:${id}:${role}`;
+}
+
+function legacyDashboardStateStorageKey(config) {
+  const id = String(config?.snapshot?.id || "").trim();
+  return id ? `${DASHBOARD_CARD_STATE_STORAGE_PREFIX}:${id}` : "";
+}
+
+function dashboardPendingComparisonStorageKey(config) {
+  const id = String(config?.snapshot?.id || "").trim();
+  if (!id) return "";
+  const role = dashboardDatePickerVisible(config) ? "controller" : "follower";
+  return `${DASHBOARD_PENDING_COMPARISON_STORAGE_PREFIX}:${id}:${role}`;
+}
+
+function sgccConfigsFingerprint(configs) {
+  return JSON.stringify((configs || []).map(compactDashboardSgccConfig));
+}
+
+export function stageDashboardComparisonConfig(config, previousConfigs, nextConfigs) {
+  const key = dashboardPendingComparisonStorageKey(config);
+  if (!key) return;
+  const previousFingerprint = sgccConfigsFingerprint(previousConfigs);
+  const existing = JSON.parse(localStorage.getItem(key) || "null");
+  const base = Number(existing?.schema) === 1
+    && Array.isArray(existing.next)
+    && sgccConfigsFingerprint(existing.next) === previousFingerprint
+    ? existing.base
+    : previousFingerprint;
+  localStorage.setItem(key, JSON.stringify({
+    schema: 1,
+    base,
+    next: clone(nextConfigs),
+  }));
+}
+
+export function dashboardConfigWithPendingComparison(config) {
+  const key = dashboardPendingComparisonStorageKey(config);
+  if (!key) return config;
+  const saved = JSON.parse(localStorage.getItem(key) || "null");
+  if (Number(saved?.schema) !== 1 || !Array.isArray(saved.next)) return config;
+  const currentFingerprint = sgccConfigsFingerprint(config?.sgcc_configs);
+  const nextFingerprint = sgccConfigsFingerprint(saved.next);
+  if (currentFingerprint === nextFingerprint) {
+    // Lovelace echoes runtime `config-changed` values back through setConfig,
+    // even though they are not durable until the dashboard is explicitly
+    // saved. Keep the staged comparison in that case so a subsequent page
+    // reload cannot fall back to the persisted, older SGCC rows.
+    return config;
+  }
+  if (currentFingerprint !== saved.base) {
+    localStorage.removeItem(key);
+    return config;
+  }
+  return { ...clone(config), sgcc_configs: clone(saved.next) };
+}
+
+export function loadDashboardRuntimeState(config) {
+  const key = dashboardStateStorageKey(config);
+  if (!key) return null;
+  const legacyKey = legacyDashboardStateStorageKey(config);
+  const saved = localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
+  return JSON.parse(saved || "null");
+}
+
+function snapshotComparison(snapshot, countOverride = null) {
+  const configured = Object.prototype.hasOwnProperty.call(snapshot?.chart || {}, "compare")
+    ? clone(snapshot.chart.compare)
+    : null;
+  const active = configured ?? (snapshot?.period?.compare ? true : null);
+  if (
+    active === false
+    || active == null
+    || active === ""
+    || (Array.isArray(active) && !active.length)
+  ) return active;
+  if (countOverride == null && configured != null) return configured;
+  const first = Array.isArray(configured) ? configured[0] : configured;
+  const configuredPeriod = first && typeof first === "object" ? first.period : first;
+  const choice = configuredPeriod && configuredPeriod !== true
+    ? configuredPeriod
+    : snapshot.period?.compare_choice
+      || (snapshot.period?.compare === "yoy" ? "last_year" : "previous_period");
+  const count = Math.max(
+    1,
+    Math.min(10, Math.trunc(Number(
+      countOverride ?? snapshot.period.compare_count,
+    )) || 1),
+  );
+  const configuredRows = Array.isArray(configured) ? configured : [configured];
+  const comparison = (index) => {
+    const template = configuredRows[index] || configuredRows[0];
+    if (!template || typeof template !== "object") {
+      return { period: choice, periods_back: index + 1 };
+    }
+    return { ...clone(template), period: choice, periods_back: index + 1 };
+  };
+  if (count === 1) {
+    if (!first || typeof first !== "object") return choice;
+    const result = comparison(0);
+    delete result.periods_back;
+    return result;
+  }
+  return Array.from({ length: count }, (_, index) => comparison(index));
+}
+
+function mergeComparisonStyle(active, configured, preserved = null) {
+  const mergeOne = (activeRow, configuredRow) => {
+    const style = configuredRow
+      && typeof configuredRow === "object"
+      && !Array.isArray(configuredRow)
+      ? clone(configuredRow)
+      : {};
+    if (activeRow === true) return Object.keys(style).length ? style : true;
+    if (activeRow && typeof activeRow === "object" && !Array.isArray(activeRow)) {
+      return { ...style, ...clone(activeRow) };
+    }
+    return { ...style, period: activeRow };
+  };
+  if (Array.isArray(active)) {
+    const configuredRows = Array.isArray(configured) ? configured : null;
+    const preservedRows = Array.isArray(preserved) ? preserved : null;
+    return active.map((row, index) => mergeOne(
+      row,
+      configuredRows
+        ? configuredRows.length === 1
+          ? configuredRows[0]
+          : configuredRows[index] ?? preservedRows?.[index]
+        : configured ?? preservedRows?.[index],
+    ));
+  }
+  return mergeOne(
+    active,
+    (Array.isArray(configured) ? configured[0] : configured)
+      ?? (Array.isArray(preserved) ? preserved[0] : preserved),
+  );
+}
+
+function comparisonStyleBank(configs, previous = []) {
+  const bank = clone(previous || []);
+  for (let configIndex = 0; configIndex < (configs || []).length; configIndex += 1) {
+    const entities = Array.isArray(configs[configIndex]?.entities)
+      ? configs[configIndex].entities
+      : [];
+    if (!Array.isArray(bank[configIndex])) bank[configIndex] = [];
+    for (let entityIndex = 0; entityIndex < entities.length; entityIndex += 1) {
+      const row = entities[entityIndex];
+      if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+      if (!Object.prototype.hasOwnProperty.call(row, "compare")) continue;
+      const current = Array.isArray(row.compare) ? row.compare : [row.compare];
+      const saved = Array.isArray(bank[configIndex][entityIndex])
+        ? bank[configIndex][entityIndex]
+        : [];
+      current.forEach((comparison, index) => {
+        saved[index] = clone(comparison);
+      });
+      bank[configIndex][entityIndex] = saved;
+    }
+  }
+  return bank;
+}
+
+function comparisonStyleOnly(value) {
+  const clean = (row) => {
+    if (!row || typeof row !== "object" || Array.isArray(row)) return {};
+    const style = clone(row);
+    delete style.period;
+    delete style.periods_back;
+    return style;
+  };
+  return Array.isArray(value) ? value.map(clean) : clean(value);
+}
+
+function mergeComparisonDefaults(...sources) {
+  let merged = {};
+  for (const source of sources) {
+    if (source === undefined) continue;
+    const styles = comparisonStyleOnly(source);
+    if (Array.isArray(styles)) {
+      merged = styles.map((style, index) => ({
+        ...(Array.isArray(merged)
+          ? (merged.length === 1 ? merged[0] : merged[index])
+          : merged),
+        ...style,
+      }));
+    } else if (Array.isArray(merged)) {
+      merged = merged.map((style) => ({ ...style, ...styles }));
+    } else {
+      merged = { ...merged, ...styles };
+    }
+  }
+  return merged;
+}
+
+function typedOptions(value, variant = "numeric") {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value.numeric || value.state
+    ? value[variant] || {}
+    : value;
+}
+
+function comparisonDefaults(row, snapshot, settings) {
+  const configuredCard = {
+    ...clone(typedOptions(settings?.card_options)),
+    ...clone(typedOptions(snapshot?.chart?.card_options)),
+  };
+  const templates = [];
+  for (const key of ["entities", "numeric_entities"]) {
+    const values = Array.isArray(configuredCard[key])
+      ? configuredCard[key]
+      : configuredCard[key] ? [configuredCard[key]] : [];
+    for (const value of values) {
+      if (
+        value
+        && typeof value === "object"
+        && !Array.isArray(value)
+        && value.entity == null
+        && value.statistic_id == null
+      ) templates.push(value.compare);
+    }
+  }
+  const entity = row.entity || row.statistic_id;
+  const key = row.attribute ? `${entity}::${row.attribute}` : entity;
+  const configuredEntities = settings?.entity_options || {};
+  const snapshotEntities = snapshot?.chart?.entity_options || {};
+  return mergeComparisonDefaults(
+    row.compare,
+    ...templates,
+    configuredEntities[entity]?.compare,
+    configuredEntities[key]?.compare,
+    snapshotEntities[entity]?.compare,
+    snapshotEntities[key]?.compare,
+  );
+}
+
+export function sgccConfigsWithSnapshotComparisons(configs, snapshot, settings = {}) {
+  const active = snapshotComparison(snapshot);
+  const excludeSecondary = Boolean(snapshot?.chart?.exclude_y2_comparison);
+  const secondaryActive = excludeSecondary
+    ? false
+    : snapshotComparison(
+        snapshot,
+        snapshot?.chart?.y2_compare_count ?? snapshot?.period?.compare_count,
+      );
+  return clone(configs || []).map((config) => {
+    if (!config || config.chart_mode === "state_timeline" || !Array.isArray(config.entities)) {
+      return config;
+    }
+    config.entities = config.entities.map((raw) => {
+      const row = typeof raw === "string" ? { entity: raw } : clone(raw);
+      if (!row || typeof row !== "object") return raw;
+      const rowActive = row.y_axis === "secondary" ? secondaryActive : active;
+      if (rowActive === false) {
+        delete row.compare;
+      } else if (rowActive != null) {
+        row.compare = mergeComparisonStyle(
+          rowActive,
+          comparisonDefaults(row, snapshot, settings),
+        );
+      }
+      return row;
+    });
+    return config;
+  });
+}
+
+export function dashboardRuntimeState(snapshot, comparisonStyles = null) {
+  const chart = {};
+  for (const key of DASHBOARD_RUNTIME_CHART_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(snapshot?.chart || {}, key)) {
+      chart[key] = clone(snapshot.chart[key]);
+    }
+  }
+  const period = clone(snapshot?.period || {});
+  delete period.compare;
+  delete period.compare_choice;
+  delete period.compare_count;
+  const state = {
+    schema: 1,
+    period,
+    chart,
+    comparison: {
+      compare: snapshot?.period?.compare || "",
+      compare_choice: snapshot?.period?.compare_choice || null,
+      compare_count: Math.max(
+        1,
+        Math.min(10, Math.trunc(Number(snapshot?.period?.compare_count)) || 1),
+      ),
+    },
+  };
+  if (Array.isArray(comparisonStyles) && comparisonStyles.length) {
+    state.comparison_styles = clone(comparisonStyles);
+  }
+  return state;
+}
+
+export function applyDashboardRuntimeState(snapshot, state) {
+  const next = clone(snapshot);
+  if (!next || Number(state?.schema) !== 1) return next;
+  if (state.period && typeof state.period === "object") {
+    const runtimePeriod = clone(state.period);
+    delete runtimePeriod.compare;
+    delete runtimePeriod.compare_choice;
+    delete runtimePeriod.compare_count;
+    next.period = { ...clone(next.period || {}), ...runtimePeriod };
+  }
+  if (state.comparison && typeof state.comparison === "object") {
+    next.period = {
+      ...clone(next.period || {}),
+      compare: state.comparison.compare || "",
+      compare_choice: state.comparison.compare_choice || null,
+      compare_count: Math.max(
+        1,
+        Math.min(10, Math.trunc(Number(state.comparison.compare_count)) || 1),
+      ),
+    };
+  }
+  next.chart = clone(next.chart || {});
+  for (const key of DASHBOARD_RUNTIME_CHART_KEYS) {
+    if (Object.prototype.hasOwnProperty.call(state.chart || {}, key)) {
+      next.chart[key] = clone(state.chart[key]);
+    } else {
+      delete next.chart[key];
+    }
+  }
+  return next;
+}
+
+function mergeTargets(targets) {
+  const keys = ["area_id", "device_id", "entity_id"];
+  return Object.fromEntries(keys.map((key) => [
+    key,
+    [...new Set(targets.flatMap((target) => target?.[key] || []))],
+  ]));
+}
+
+function seriesKey(row) {
+  const entity = typeof row === "string" ? row : row?.entity || row?.statistic_id;
+  const attribute = typeof row === "object" ? row?.attribute : null;
+  return attribute ? `${entity}::${attribute}` : entity;
+}
+
+export { dashboardConfigsWithToggledLegendHideOnLoad };
+
+export function dashboardEntityIdsInConfigOrder(entityIds, configs) {
+  const configured = [];
+  const seen = new Set();
+  for (const config of configs || []) {
+    for (const raw of config?.entities || []) {
+      const entity = typeof raw === "string" ? raw : raw?.entity || raw?.statistic_id;
+      if (!entity || seen.has(entity)) continue;
+      seen.add(entity);
+      configured.push(entity);
+    }
+  }
+  const rank = new Map(configured.map((entity, index) => [entity, index]));
+  return (entityIds || [])
+    .map((entity, index) => ({ entity, index }))
+    .sort((left, right) => (
+      (rank.get(left.entity) ?? configured.length + left.index)
+      - (rank.get(right.entity) ?? configured.length + right.index)
+    ))
+    .map(({ entity }) => entity);
+}
+
+export function containSgccEditorConfigEvent(event) {
+  event.stopPropagation();
+  return clone(event.detail?.config);
+}
+
+function comparisonPeriodFromSgccConfigs(configs) {
+  for (const config of configs || []) {
+    if (config?.chart_mode === "state_timeline") continue;
+    const entities = Array.isArray(config?.entities) ? config.entities : [];
+    const entity = entities.find((raw) => {
+      const row = typeof raw === "string" ? null : raw;
+      return row
+        && row.y_axis !== "secondary"
+        && Object.prototype.hasOwnProperty.call(row, "compare")
+        && row.compare !== false
+        && row.compare != null;
+    });
+    if (!entity) continue;
+    const comparisons = (Array.isArray(entity.compare) ? entity.compare : [entity.compare])
+      .filter((value) => value !== false && value != null);
+    if (!comparisons.length) continue;
+    const first = comparisons[0];
+    const choice = first === true
+      ? "previous_period"
+      : typeof first === "string"
+        ? first
+        : first.period || "previous_period";
+    const count = Math.max(
+      comparisons.length,
+      ...comparisons.map((value, index) => (
+        value && typeof value === "object"
+          ? Math.trunc(Number(value.periods_back)) || index + 1
+          : index + 1
+      )),
+    );
+    return {
+      compare: choice === "last_year" ? "yoy" : "previous",
+      compare_choice: choice,
+      compare_count: Math.max(1, Math.min(10, count)),
+    };
+  }
+  return null;
+}
+
+export function applySgccComparisonPeriod(snapshot, configs) {
+  const next = clone(snapshot);
+  const comparisonPeriod = comparisonPeriodFromSgccConfigs(configs);
+  if (comparisonPeriod) {
+    next.period = { ...clone(next.period || {}), ...comparisonPeriod };
+  }
+  return next;
+}
+
+export function snapshotFromSgccConfigs(snapshot, configs) {
+  const converted = configs.map((config) => cardConfigToSnapshot(config, null, true))
+    .filter(Boolean);
+  if (!converted.length) return clone(snapshot);
+  const next = clone(snapshot);
+  next.targets = mergeTargets(converted.map((item) => item.targets));
+  next.hidden_targets = mergeTargets(converted.map((item) => item.hidden_targets));
+  next.y2_targets = mergeTargets(converted.map((item) => item.y2_targets));
+  next.hidden_y2_targets = mergeTargets(converted.map((item) => item.hidden_y2_targets));
+
+  const chart = clone(next.chart || {});
+  // SGCC entity rows are the sole source of comparison configuration. Older
+  // dashboard snapshots may still contain this legacy aggregate override.
+  delete chart.compare;
+  const existingCardOptions = chart.card_options || {};
+  const typed = configs.length > 1
+    || converted.some((item) => item.chart?.state_strips === true)
+    || Boolean(existingCardOptions.numeric || existingCardOptions.state);
+  if (typed) {
+    const options = existingCardOptions.numeric || existingCardOptions.state
+      ? clone(existingCardOptions)
+      : { numeric: clone(existingCardOptions), state: clone(existingCardOptions) };
+    for (let index = 0; index < converted.length; index++) {
+      const variant = configs[index]?.chart_mode === "state_timeline" ? "state" : "numeric";
+      options[variant] = clone(converted[index].chart.card_options || {});
+      if (variant === "numeric" && configs[index].height !== undefined) {
+        options[variant].height = clone(configs[index].height);
+      }
+    }
+    chart.card_options = options;
+  } else {
+    chart.card_options = clone(converted[0].chart.card_options || {});
+    if (configs[0].height !== undefined) {
+      chart.card_options.height = clone(configs[0].height);
+    }
+  }
+
+  const editedKeys = new Set(configs.flatMap((config) => (
+    (config.entities || []).map(seriesKey).filter(Boolean)
+  )));
+  const entityOptions = clone(chart.entity_options || {});
+  for (const key of editedKeys) delete entityOptions[key];
+  for (const item of converted) {
+    Object.assign(entityOptions, clone(item.chart.entity_options || {}));
+  }
+  chart.entity_options = entityOptions;
+  chart.attribute_selection = Object.assign(
+    {},
+    ...converted.map((item) => clone(item.chart.attribute_selection || {})),
+  );
+  const numeric = converted.find((_, index) => configs[index]?.chart_mode !== "state_timeline");
+  if (numeric?.chart.default_hours !== undefined) {
+    chart.default_hours = numeric.chart.default_hours;
+  }
+  next.chart = chart;
+  return applySgccComparisonPeriod(next, configs);
+}
+
+export class AdvancedHistorySgccCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._hass = null;
+    this._config = null;
+    this._editor = null;
+    this._editorSectionObserver = null;
+    this._renderToken = 0;
+    this._activeIndex = 0;
+  }
+
+  disconnectedCallback() {
+    this._editorSectionObserver?.disconnect();
+  }
+
+  set hass(value) {
+    this._hass = value;
+    if (this._editor) {
+      this._editor.hass = value;
+    } else if (!this.shadowRoot.querySelector(".sgcc-editor-host")) {
+      void this._render();
+    }
+    void loadTranslations(value?.locale?.language || value?.language).then(() => {
+      this._refreshTabLabels();
+    });
+  }
+
+  setConfig(config) {
+    this._config = clone(config);
+    if (!this.shadowRoot.querySelector(".sgcc-editor-host")) this._render();
+  }
+
+  async _render() {
+    if (!this._config || !this._hass) return;
+    const token = ++this._renderToken;
+    this._editorSectionObserver?.disconnect();
+    this._editorSectionObserver = null;
+    this._editor = null;
+    let pendingComparisonChanged = false;
+    let groupDefaultsChanged = false;
+    const groupedConfig = dashboardConfigWithDateNavigation(this._config, {
+      show_date_picker: dashboardDatePickerVisible(this._config),
+      date_picker_group: this._config.date_picker_group,
+      show_download_button: dashboardDownloadVisible(this._config),
+    });
+    if (JSON.stringify(groupedConfig) !== JSON.stringify(this._config)) {
+      this._config = groupedConfig;
+      groupDefaultsChanged = true;
+    }
+    try {
+      const pendingConfig = dashboardConfigWithPendingComparison(this._config);
+      pendingComparisonChanged = pendingConfig !== this._config;
+      this._config = pendingConfig;
+    } catch (error) {
+      console.warn("Advanced History card editor: unable to restore comparison changes", error);
+    }
+    const storedConfigs = Array.isArray(this._config.sgcc_configs)
+      ? this._config.sgcc_configs.filter(Boolean)
+      : [];
+    let runtimeState = null;
+    const stateKey = dashboardStateStorageKey(this._config);
+    if (stateKey) {
+      try {
+        runtimeState = loadDashboardRuntimeState(this._config);
+      } catch (error) {
+        console.warn("Advanced History card editor: unable to restore dashboard state", error);
+      }
+    }
+    const baseConfigs = storedConfigs;
+    let snapshot = snapshotFromSgccConfigs(
+      this._config.snapshot,
+      baseConfigs,
+    );
+    if (stateKey) {
+      try {
+        snapshot = applyDashboardRuntimeState(
+          snapshot,
+          runtimeState,
+        );
+        if (!runtimeState?.comparison) {
+          snapshot = applySgccComparisonPeriod(snapshot, baseConfigs);
+        }
+      } catch (error) {
+        console.warn("Advanced History card editor: unable to restore dashboard state", error);
+      }
+    }
+    const syncedConfig = dashboardConfigWithSnapshot(this._config, snapshot);
+    if (syncedConfig !== this._config || pendingComparisonChanged || groupDefaultsChanged) {
+      this._config = syncedConfig;
+      queueMicrotask(() => {
+        if (token !== this._renderToken) return;
+        this.dispatchEvent(new CustomEvent("config-changed", {
+          detail: { config: syncedConfig },
+          bubbles: true,
+          composed: true,
+        }));
+      });
+    }
+    const configs = sgccConfigsWithSnapshotComparisons(
+      baseConfigs,
+      snapshot,
+      this._config.settings,
+    ).map((config) => dashboardSgccRuntimeConfig(config, this._config));
+    if (!configs.length) {
+      this.shadowRoot.innerHTML = `<p>${this._customLocalize("dashboard_card_editor_unavailable")}</p>`;
+      return;
+    }
+    this._activeIndex = Math.min(this._activeIndex, configs.length - 1);
+    const tabs = configs.length > 1 ? `<nav>${configs.map((config, index) => {
+      const label = config.chart_mode === "state_timeline"
+        ? this._customLocalize("state_history")
+        : this._customLocalize("numeric_history");
+      return `<button type="button" data-index="${index}" class="${index === this._activeIndex ? "active" : ""}">${label}</button>`;
+    }).join("")}</nav>` : "";
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display:block; }
+        nav { margin:0 0 12px; display:flex; gap:4px; border-bottom:1px solid var(--divider-color); }
+        button { min-height:40px; padding:0 12px; border:0; border-bottom:3px solid transparent; color:var(--secondary-text-color); background:transparent; font:inherit; cursor:pointer; }
+        button.active { color:var(--primary-color); border-bottom-color:var(--primary-color); }
+        .sgcc-editor-host { min-height:120px; }
+        .loading, p { padding:24px 8px; color:var(--secondary-text-color); text-align:center; }
+      </style>
+      ${tabs}<div class="sgcc-editor-host"><div class="loading">${this._hass.localize?.("ui.common.loading") || "Loading"}…</div></div>`;
+    for (const button of this.shadowRoot.querySelectorAll("[data-index]")) {
+      button.addEventListener("click", () => {
+        this._activeIndex = Number(button.dataset.index) || 0;
+        void this._render();
+      });
+    }
+    try {
+      await ensureCardLoaded(this._hass, this._config.settings?.card_module_url || "");
+      if (token !== this._renderToken) return;
+      const cardClass = customElements.get(CARD_TAG);
+      let editor = typeof cardClass?.getConfigElement === "function"
+        ? await cardClass.getConfigElement()
+        : null;
+      if (!editor) {
+        await customElements.whenDefined("statistics-graph-chart-card-editor");
+        editor = document.createElement("statistics-graph-chart-card-editor");
+      }
+      if (token !== this._renderToken) return;
+      editor.hass = this._hass;
+      editor.setConfig(clone(configs[this._activeIndex]));
+      editor.addEventListener("config-changed", (event) => {
+        // Keep SGCC's native card configuration inside the wrapper. If this
+        // event reaches Lovelace, it temporarily replaces our card config with
+        // `custom:statistics-graph-chart-card` while a field is being edited,
+        // which makes Home Assistant switch the dialog to the YAML editor.
+        const draft = containSgccEditorConfigEvent(event);
+        if (!draft) return;
+        const nextConfigs = clone(
+          this._config.sgcc_configs?.length
+            ? this._config.sgcc_configs
+            : configs,
+        );
+        nextConfigs[this._activeIndex] = compactDashboardSgccConfig(draft);
+        const next = dashboardConfigWithDateNavigation({
+          ...clone(this._config),
+          sgcc_configs: nextConfigs,
+          snapshot: snapshotFromSgccConfigs(this._config.snapshot, nextConfigs),
+        }, {
+          show_date_picker: dashboardDatePickerVisible(this._config),
+          date_picker_group: this._config.date_picker_group,
+          show_download_button: dashboardDownloadVisible(this._config),
+        });
+        this._config = next;
+        this.dispatchEvent(new CustomEvent("config-changed", {
+          detail: { config: next },
+          bubbles: true,
+          composed: true,
+        }));
+      });
+      const host = this.shadowRoot.querySelector(".sgcc-editor-host");
+      if (!host) return;
+      host.replaceChildren(editor);
+      this._editor = editor;
+      await editor.updateComplete;
+      if (token !== this._renderToken) return;
+      const syncManagedGroupFields = () => {
+        const group = String(this._config?.date_picker_group || "").trim();
+        const stored = this._config?.sgcc_configs?.[this._activeIndex] || {};
+        if (editor._config && typeof editor._config === "object") {
+          for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+            if (!Object.prototype.hasOwnProperty.call(editor._config, key)) {
+              editor._config[key] = Object.prototype.hasOwnProperty.call(stored, key)
+                ? stored[key]
+                : group;
+            }
+          }
+        }
+        for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+          const value = Object.prototype.hasOwnProperty.call(stored, key)
+            ? stored[key]
+            : group;
+          const control = editor.shadowRoot?.querySelector(
+            `#${key}, [name="${key}"]`,
+          );
+          if (control && "value" in control && control.value !== value) {
+            control.value = value;
+          }
+        }
+      };
+      const mountAdvancedHistoryPanel = () => {
+        const editorRoot = editor.shadowRoot?.querySelector(".root");
+        if (!editorRoot || editorRoot.querySelector('[data-panel="advanced-history"]')) return;
+        const sgccFieldLabel = (id, fallback) => {
+          const control = editor.shadowRoot?.querySelector(`#${id}`);
+          const label = control?.closest?.(".si")?.querySelector?.(".sn")
+            || control?.closest?.(".f")?.querySelector?.(":scope > label")
+            || control?.closest?.("label");
+          return String(label?.textContent || "").trim() || fallback;
+        };
+        const titleLabel = this._hass.localize?.(
+          "ui.panel.lovelace.editor.card.generic.title",
+        ) || "Title";
+        const advancedHistoryCard = this._customLocalize("advanced_history_card");
+        const titleDateNavigation = this._customLocalize("title_date_navigation");
+        const datePickerLabel = this._customLocalize("date_picker");
+        const downloadButtonLabel = this._customLocalize("show_download_button");
+        const groupLabel = sgccFieldLabel(
+          "date_picker_group",
+          this._customLocalize("group"),
+        );
+        const panel = document.createElement("div");
+        panel.className = "panel open";
+        panel.dataset.panel = "advanced-history";
+        panel.innerHTML = `
+          <div class="panel-header" data-toggle="advanced-history">
+            <div class="panel-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></div>
+            <span class="panel-title">${this._escape(advancedHistoryCard)}</span>
+            <span class="panel-subtitle">${this._escape(titleDateNavigation)}</span>
+            <span class="panel-chevron"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg></span>
+          </div>
+          <div class="panel-body">
+            <div class="fg">
+              <div class="f"><label>${this._escape(titleLabel)}</label><input id="advanced_history_title" type="text" autocomplete="off" value="${this._escape(this._config.title || "")}"></div>
+              <div class="advanced-history-navigation-row mt8">
+                <label class="si advanced-history-date-toggle"><div class="st"><input id="advanced_history_show_date_picker" type="checkbox" ${dashboardDatePickerVisible(this._config) ? "checked" : ""}><span class="ss"></span></div><div class="sl"><span class="sn">${this._escape(datePickerLabel)}</span></div></label>
+                <div class="f advanced-history-group-field"><input id="advanced_history_date_picker_group" class="advanced-history-group-input" type="text" autocomplete="off" placeholder="${this._escape(groupLabel)}" value="${this._escape(String(this._config.date_picker_group || "").trim())}"></div>
+              </div>
+              <label class="si advanced-history-download-toggle mt8"><div class="st"><input id="advanced_history_show_download_button" type="checkbox" ${dashboardDownloadVisible(this._config) ? "checked" : ""}><span class="ss"></span></div><div class="sl"><span class="sn">${this._escape(downloadButtonLabel)}</span></div></label>
+            </div>
+          </div>`;
+        editorRoot.prepend(panel);
+        panel.querySelector(".panel-header")?.addEventListener("click", (event) => {
+          event.stopPropagation();
+          panel.classList.toggle("open");
+        });
+        const titleInput = panel.querySelector("#advanced_history_title");
+        const showDatePickerInput = panel.querySelector("#advanced_history_show_date_picker");
+        const datePickerGroupInput = panel.querySelector("#advanced_history_date_picker_group");
+        const showDownloadButtonInput = panel.querySelector("#advanced_history_show_download_button");
+        titleInput?.addEventListener("input", (event) => {
+          event.stopPropagation();
+          const next = cardConfigWithTitle(this._config, titleInput.value);
+          this._config = next;
+          this.dispatchEvent(new CustomEvent("config-changed", {
+            detail: { config: next }, bubbles: true, composed: true,
+          }));
+        });
+        const updateDateNavigation = (event) => {
+          event.stopPropagation();
+          const next = dashboardConfigWithDateNavigation(this._config, {
+            show_date_picker: showDatePickerInput.checked,
+            date_picker_group: datePickerGroupInput.value,
+            show_download_button: showDownloadButtonInput.checked,
+          });
+          this._config = next;
+          syncManagedGroupFields();
+          this.dispatchEvent(new CustomEvent("config-changed", {
+            detail: { config: next }, bubbles: true, composed: true,
+          }));
+        };
+        showDatePickerInput?.addEventListener("change", updateDateNavigation);
+        datePickerGroupInput?.addEventListener("input", updateDateNavigation);
+        showDownloadButtonInput?.addEventListener("change", updateDateNavigation);
+      };
+      const mountManagedStyles = () => {
+        if (!editor.shadowRoot || editor.shadowRoot.querySelector("[data-advanced-history-comparisons]")) return;
+        const managedStyles = document.createElement("style");
+        managedStyles.dataset.advancedHistoryComparisons = "";
+        managedStyles.textContent = `
+          .advanced-history-navigation-row {
+            width:100%; min-width:0; display:grid !important;
+            grid-template-columns:minmax(180px,240px) minmax(0,1fr) !important;
+            align-items:center; gap:8px;
+          }
+          .advanced-history-date-toggle {
+            width:auto !important; min-width:0 !important; max-width:none !important;
+            box-sizing:border-box; white-space:nowrap;
+          }
+          .advanced-history-date-toggle .sl,
+          .advanced-history-date-toggle .sn { min-width:0 !important; white-space:nowrap; }
+          .advanced-history-group-field,
+          .advanced-history-group-input {
+            width:100% !important; min-width:0 !important;
+            box-sizing:border-box;
+          }
+          @media (max-width:700px) {
+            .advanced-history-navigation-row {
+              grid-template-columns:minmax(0,1fr) !important;
+              align-items:stretch;
+            }
+            .advanced-history-date-toggle { width:100% !important; }
+          }
+          .cmp-add,
+          .cmp-del,
+          .cmp-row .f:has(.cmp-period),
+          .cmp-row .f:has(.cmp-back),
+          [data-mtab="calendar"],
+          [data-mtc="calendar"],
+          .overlay-row:has(#energy_date_sync),
+          .overlay-row:has(#show_interval_picker),
+          .overlay-row:has(#show_date_picker) { display:none !important; }
+        `;
+        editor.shadowRoot.append(managedStyles);
+      };
+      const restoreManagedEditorContent = () => {
+        if (token !== this._renderToken || this._editor !== editor) return;
+        mountAdvancedHistoryPanel();
+        mountManagedStyles();
+        leaveHiddenCalendarTab(editor.shadowRoot);
+        syncManagedGroupFields();
+      };
+      restoreManagedEditorContent();
+      if (typeof MutationObserver !== "undefined" && editor.shadowRoot) {
+        this._editorSectionObserver = new MutationObserver(() => {
+          queueMicrotask(restoreManagedEditorContent);
+        });
+        this._editorSectionObserver.observe(editor.shadowRoot, {
+          childList: true,
+          subtree: true,
+        });
+      }
+    } catch (error) {
+      if (token !== this._renderToken) return;
+      this._editor = null;
+      console.error("Advanced History: SGCC editor could not be loaded", error);
+      const host = this.shadowRoot.querySelector(".sgcc-editor-host");
+      if (host) host.textContent = this._customLocalize("dashboard_card_editor_unavailable");
+    }
+  }
+
+  _refreshTabLabels() {
+    if (!this._config) return;
+    const storedConfigs = Array.isArray(this._config.sgcc_configs)
+      ? this._config.sgcc_configs.filter(Boolean)
+      : [];
+    const configs = storedConfigs;
+    for (const button of this.shadowRoot.querySelectorAll("[data-index]")) {
+      const config = configs[Number(button.dataset.index) || 0];
+      button.textContent = config?.chart_mode === "state_timeline"
+        ? this._customLocalize("state_history")
+        : this._customLocalize("numeric_history");
+    }
+  }
+
+  _customLocalize(key) {
+    const language = this._hass?.locale?.language || this._hass?.language;
+    return customLocalize(language, key);
+  }
+
+  _escape(value) {
+    return String(value ?? "").replace(/[&<>\"']/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+      '"': "&quot;",
+      "'": "&#39;",
+    })[character]);
+  }
+}
+
+export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
+  static getConfigElement() {
+    return document.createElement("advanced-history-sgcc-card-editor");
+  }
+
+  constructor() {
+    super();
+    this._dashboardCardMode = true;
+    this._datePickerAutoHide = false;
+    this._dashboardConfig = null;
+    this._dashboardPeriodState = null;
+    this._dashboardComparisonStyles = [];
+    this._dashboardInheritedScaleOptions = null;
+    this._dashboardResolvedPrimaryScaleOptions = null;
+    this._dashboardResolvedScaleLabels = new Map();
+    this._dashboardScaleObservers = new Set();
+    this._dashboardGraphEditorSession = false;
+    this._dashboardGraphEditorPending = false;
+    this._panelTabsPersistenceSuppressed = true;
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    this._registerDashboardScaleInheritance();
+  }
+
+  setConfig(config) {
+    if (
+      !config
+      || Number(config.schema) !== ADVANCED_HISTORY_CARD_SCHEMA
+      || !config.snapshot?.chart
+      || !Array.isArray(config.sgcc_configs)
+      || !config.sgcc_configs.length
+    ) {
+      throw new Error("Advanced History SGCC Card requires a valid panel snapshot");
+    }
+    let resolvedConfig = config;
+    try {
+      // Comparison controls update the wrapper config immediately, but
+      // Lovelace does not persist runtime config-changed events until the
+      // dashboard is saved. Restore the staged SGCC rows on an ordinary or
+      // forced page refresh, just as the visual editor already does.
+      resolvedConfig = dashboardConfigWithPendingComparison(config);
+    } catch (error) {
+      console.warn("Advanced History card: unable to restore comparison changes", error);
+    }
+    this._dashboardPeriodState = null;
+    this._dashboardConfig = clone(resolvedConfig);
+    this._dashboardResolvedPrimaryScaleOptions = null;
+    if (this.isConnected) this._registerDashboardScaleInheritance();
+    this._panel = {
+      config: {
+        ...(clone(resolvedConfig.settings) || {}),
+        title: resolvedConfig.title || "",
+      },
+    };
+    if (this._initialized) {
+      this._applySnapshot(this._loadDashboardSnapshot(), false, true);
+    } else if (this._hass && !this._loaded) {
+      void this._initialize();
+    }
+  }
+
+  set hass(value) {
+    this._hass = value;
+    for (const card of this._cards) this._setGraphCardHass(card, value);
+    if (value && this._dashboardConfig && !this._loaded) void this._initialize();
+  }
+
+  get hass() { return this._hass; }
+
+  getCardSize() {
+    const graphRows = (this._graphCards || []).reduce((rows, card) => (
+      rows + (typeof card.getCardSize === "function" ? Number(card.getCardSize()) || 0 : 0)
+    ), 0);
+    return graphRows ? graphRows + 2 : 9;
+  }
+
+  getGridOptions() {
+    return { columns: 12, rows: "auto", min_columns: 6, min_rows: 4 };
+  }
+
+  _dashboardDatePickerGroup() {
+    const wrapperGroup = typeof this._dashboardConfig?.date_picker_group === "string"
+      ? this._dashboardConfig.date_picker_group.trim()
+      : "";
+    if (wrapperGroup) return wrapperGroup;
+    const id = String(this._dashboardConfig?.snapshot?.id || "").trim();
+    return id ? `advanced-history-${id}` : "advanced-history-dashboard";
+  }
+
+  _dashboardDatePickerVisible() {
+    return dashboardDatePickerVisible(this._dashboardConfig);
+  }
+
+  _downloadChartData() {
+    const seen = new Set();
+    const graphCards = dashboardScaleGroupOwners(this._dashboardDatePickerGroup())
+      .flatMap((owner) => {
+        const cards = owner?._graphCards || [];
+        const ownerTitle = String(owner?._dashboardConfig?.title || "").trim();
+        return cards.flatMap((card, index) => {
+          if (!card || seen.has(card)) return [];
+          seen.add(card);
+          const chartTitle = String(card._config?.card_header || "").trim();
+          const title = chartTitle || (
+            cards.length > 1 && ownerTitle
+              ? `${ownerTitle}-${index + 1}`
+              : ownerTitle
+          );
+          return [{ card, title }];
+        });
+      });
+    return AdvancedHistoryPanel.prototype._downloadChartData.call(
+      this,
+      graphCards.length ? graphCards : this._graphCards,
+    );
+  }
+
+  _registerDashboardScaleInheritance() {
+    if (!this._dashboardConfig) return;
+    registerDashboardScaleSource(
+      this,
+      this._dashboardDatePickerGroup(),
+      dashboardDatePickerVisible(this._dashboardConfig),
+      this._dashboardResolvedPrimaryScaleOptions
+        || dashboardPrimaryScaleOptions(this._dashboardConfig),
+      (options) => {
+        const previous = JSON.stringify(this._dashboardInheritedScaleOptions);
+        const next = JSON.stringify(options);
+        if (previous === next) return;
+        this._dashboardInheritedScaleOptions = clone(options);
+        if (this._initialized) this._render();
+      },
+    );
+  }
+
+  _applyDashboardChildScaleOptions(config) {
+    if (
+      dashboardDatePickerVisible(this._dashboardConfig)
+      || config?.chart_mode === "state_timeline"
+      || !this._dashboardInheritedScaleOptions
+    ) return config;
+    const next = { ...config };
+    const inherited = this._dashboardInheritedScaleOptions;
+    if (inherited.autoScaleDefined) {
+      next.auto_scale_points = inherited.autoScalePoints;
+    } else {
+      delete next.auto_scale_points;
+    }
+    if (inherited.groupByDefined) next.group_by = inherited.groupBy;
+    else delete next.group_by;
+    return next;
+  }
+
+  _trackDashboardScaleCard(card, index = 0) {
+    const root = card?.shadowRoot;
+    if (!root) return;
+    let scheduled = false;
+    const readScale = () => {
+      scheduled = false;
+      const picker = root.querySelector(
+        '[data-qp="gby"] select, select[data-qp="gby"], .sgc-group-by-picker select',
+      );
+      const label = String(
+        picker?.selectedOptions?.[0]?.textContent
+        || picker?.options?.[picker?.selectedIndex]?.textContent
+        || "",
+      ).trim();
+      if (!label || this._dashboardResolvedScaleLabels.get(index) === label) return;
+      this._dashboardResolvedScaleLabels.set(index, label);
+      if (
+        dashboardDatePickerVisible(this._dashboardConfig)
+        && card.__advancedHistoryConfig?.chart_mode !== "state_timeline"
+      ) {
+        this._dashboardResolvedPrimaryScaleOptions = scaleOptionsFromPicker(
+          label,
+          picker?.value,
+          card.__advancedHistoryConfig?.auto_scale_points === true,
+        );
+      }
+      this._registerDashboardScaleInheritance();
+    };
+    const observer = new MutationObserver(() => {
+      if (scheduled) return;
+      scheduled = true;
+      queueMicrotask(readScale);
+    });
+    observer.observe(root, {
+      subtree: true,
+      childList: true,
+      characterData: true,
+      attributes: true,
+      attributeFilter: ["value", "selected"],
+    });
+    this._dashboardScaleObservers.add(observer);
+    queueMicrotask(readScale);
+  }
+
+  _releaseDashboardScaleTracking() {
+    this._disconnectDashboardScaleObservers();
+    this._dashboardResolvedScaleLabels.clear();
+  }
+
+  _disconnectDashboardScaleObservers() {
+    for (const observer of this._dashboardScaleObservers) observer.disconnect();
+    this._dashboardScaleObservers.clear();
+  }
+
+  _dashboardConfiguredComparisonPeriod() {
+    return comparisonPeriodFromSgccConfigs(this._dashboardConfig?.sgcc_configs) || {
+      compare: "",
+      compare_choice: null,
+      compare_count: 1,
+    };
+  }
+
+  _resolvedEntityIds() {
+    return dashboardEntityIdsInConfigOrder(
+      super._resolvedEntityIds(),
+      this._dashboardConfig?.sgcc_configs,
+    );
+  }
+
+  _createPeriodStore() {
+    const group = this._dashboardDatePickerGroup();
+    if (!group) {
+      this._dashboardPeriodStoreFollower = false;
+      return super._createPeriodStore();
+    }
+    const store = super._createPeriodStore();
+    const originalSetPeriod = store.setPeriod.bind(store);
+    let coordinator = DASHBOARD_PERIOD_GROUP_STORES.get(group);
+    this._dashboardPeriodStoreFollower = Boolean(coordinator);
+    if (!coordinator) {
+      coordinator = {
+        start: new Date(store.start),
+        end: new Date(store.end),
+        members: new Set(),
+      };
+      DASHBOARD_PERIOD_GROUP_STORES.set(group, coordinator);
+    } else {
+      originalSetPeriod(coordinator.start, coordinator.end);
+    }
+    const member = { store, setPeriod: originalSetPeriod };
+    coordinator.members.add(member);
+    this._dashboardPeriodGroupMember = { group, coordinator, member };
+    store.setPeriod = (start, end) => {
+      originalSetPeriod(start, end);
+      coordinator.start = new Date(store.start);
+      coordinator.end = new Date(store.end);
+      for (const other of coordinator.members) {
+        if (other === member) continue;
+        other.setPeriod(coordinator.start, coordinator.end);
+        other.store.refresh?.();
+      }
+    };
+    return store;
+  }
+
+  _releaseDashboardPeriodStore() {
+    const registration = this._dashboardPeriodGroupMember;
+    if (!registration) return;
+    registration.coordinator.members.delete(registration.member);
+    if (!registration.coordinator.members.size) {
+      DASHBOARD_PERIOD_GROUP_STORES.delete(registration.group);
+    }
+    this._dashboardPeriodGroupMember = null;
+  }
+
+  disconnectedCallback() {
+    releaseDashboardScaleSource(this);
+    this._releaseDashboardScaleTracking();
+    this._releaseDashboardPeriodStore();
+    super.disconnectedCallback();
+  }
+
+  _dashboardStateStorageKey() {
+    return dashboardStateStorageKey(this._dashboardConfig);
+  }
+
+  _loadDashboardSnapshot() {
+    const key = this._dashboardStateStorageKey();
+    let state = null;
+    try {
+      if (key) state = loadDashboardRuntimeState(this._dashboardConfig);
+    } catch (error) {
+      console.warn("Advanced History card: unable to restore dashboard state", error);
+    }
+    const storedConfigs = Array.isArray(this._dashboardConfig?.sgcc_configs)
+      ? this._dashboardConfig.sgcc_configs.filter(Boolean)
+      : [];
+    this._dashboardComparisonStyles = comparisonStyleBank(
+      storedConfigs,
+      state?.comparison_styles || this._dashboardComparisonStyles,
+    );
+    const snapshot = snapshotFromSgccConfigs(
+      this._dashboardConfig?.snapshot,
+      storedConfigs,
+    );
+    const runtimeSnapshot = applyDashboardRuntimeState(snapshot, state);
+    const resolved = state?.comparison
+      ? runtimeSnapshot
+      : applySgccComparisonPeriod(runtimeSnapshot, storedConfigs);
+    return resolved;
+  }
+
+  _saveDashboardState(snapshot = null, sgccConfigs = null) {
+    const key = this._dashboardStateStorageKey();
+    if (!key || !this._initialized) return;
+    try {
+      const current = snapshot ? clone(snapshot) : this._captureSnapshot();
+      const effectiveConfigs = Array.isArray(sgccConfigs)
+        ? sgccConfigs
+        : this._dashboardConfig?.sgcc_configs;
+      this._dashboardComparisonStyles = comparisonStyleBank(
+        effectiveConfigs,
+        this._dashboardComparisonStyles,
+      );
+      const state = dashboardRuntimeState(
+        current,
+        this._dashboardComparisonStyles,
+      );
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch (error) {
+      console.warn("Advanced History card: unable to save dashboard state", error);
+    }
+  }
+
+  async _openGraphEditor(...args) {
+    this._dashboardGraphEditorSession = true;
+    try {
+      return await super._openGraphEditor(...args);
+    } finally {
+      this._dashboardGraphEditorSession = false;
+    }
+  }
+
+  _persistDashboardGraphEditorChanges() {
+    if (!this._dashboardGraphEditorPending) return;
+    this._dashboardGraphEditorPending = false;
+    const configs = dashboardCardConfigs(this._graphCards).map(compactDashboardSgccConfig);
+    if (!configs.length) return;
+    const previousConfigs = clone(this._dashboardConfig?.sgcc_configs || []);
+    if (sgccConfigsFingerprint(previousConfigs) === sgccConfigsFingerprint(configs)) return;
+    const current = this._captureSnapshot();
+    this._dashboardConfig = {
+      ...this._dashboardConfig,
+      sgcc_configs: configs,
+      snapshot: compactDashboardSnapshot(current),
+    };
+    try {
+      stageDashboardComparisonConfig(this._dashboardConfig, previousConfigs, configs);
+    } catch (error) {
+      console.warn("Advanced History card: unable to stage graph settings", error);
+    }
+    this._saveDashboardState(current, configs);
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: clone(this._dashboardConfig) },
+      bubbles: true,
+      composed: true,
+    }));
+  }
+
+  _toggleDashboardLegendHideOnLoad(card, legendId) {
+    const cardIndex = this._graphCards?.indexOf(card) ?? -1;
+    if (cardIndex < 0) return false;
+    const previousConfigs = clone(this._dashboardConfig?.sgcc_configs || []);
+    const configs = dashboardConfigsWithToggledLegendHideOnLoad(
+      previousConfigs,
+      cardIndex,
+      card?._entities,
+      legendId,
+    );
+    if (sgccConfigsFingerprint(previousConfigs) === sgccConfigsFingerprint(configs)) {
+      return false;
+    }
+    this._dashboardConfig = { ...this._dashboardConfig, sgcc_configs: configs };
+    try {
+      stageDashboardComparisonConfig(this._dashboardConfig, previousConfigs, configs);
+    } catch (error) {
+      console.warn("Advanced History card: unable to stage hide-on-load change", error);
+    }
+    this._saveDashboardState(this._captureSnapshot(), configs);
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: clone(this._dashboardConfig) },
+      bubbles: true,
+      composed: true,
+    }));
+    return true;
+  }
+
+  async _initialize() {
+    if (this._loaded || !this._hass || !this._dashboardConfig) return;
+    this._loaded = true;
+    await loadTranslations(this._hass?.locale?.language || this._hass?.language);
+    this._loadingView();
+    try {
+      [this._areas, this._devices, this._entities] = await Promise.all([
+        this._hass.callWS({ type: "config/area_registry/list" }),
+        this._hass.callWS({ type: "config/device_registry/list" }),
+        this._hass.callWS({ type: "config/entity_registry/list" }),
+      ]);
+    } catch (error) {
+      console.warn("Advanced History card: registry lookup failed", error);
+      this._entities = Object.keys(this._hass.states || {}).map((entity_id) => ({ entity_id }));
+    }
+    await Promise.all([
+      this._loadPeriodSelectorTranslations(),
+      this._ensureCardLoaded(),
+    ]);
+    this._initialized = true;
+    this._applySnapshot(this._loadDashboardSnapshot(), false, true);
+  }
+
+  _loadingView() {
+    const loading = this._localize("ui.common.loading", "Loading");
+    this.shadowRoot.innerHTML = `<style>${cardStyles}</style><ha-card class="dashboard-card"><div class="start"><p>${this._escape(loading)}…</p></div></ha-card>`;
+  }
+
+  _render() {
+    if (!this._dashboardConfig) return;
+    this._disconnectDashboardScaleObservers();
+    this._releaseDashboardCardLayout();
+    const title = dashboardCardTitle(this._dashboardConfig);
+    const dependencyMissing = Boolean(this._cardLoadError);
+    const hasY1Targets = Boolean(this._targetCount(this._targets));
+    const hasY2Targets = Boolean(this._targetCount(this._y2Targets));
+    const themeMode = this._hass?.themes?.darkMode ? "dark" : "light";
+    const showDatePicker = dashboardDatePickerVisible(this._dashboardConfig);
+    const showDownloadButton = dashboardDownloadVisible(this._dashboardConfig);
+    const downloadData = this._localize(
+      "ui.panel.lovelace.components.energy_period_selector.download_data",
+      "Download data",
+    );
+    this.shadowRoot.innerHTML = `
+      <style>${cardStyles}</style>
+      <ha-card class="dashboard-card">
+        ${title ? `<div class="dashboard-card-title">${this._escape(title)}</div>` : ""}
+        <div class="dashboard-card-content">
+          ${dependencyMissing ? "" : `<div class="dashboard-axis-strip">
+            <div class="dashboard-axis-group primary axis-target-primary" ${hasY1Targets ? `data-advanced-history-has-targets data-advanced-history-theme-mode="${themeMode}"` : ""}>
+              <span>${this._escape(this._customLocalize("primary_axis"))}</span><button id="toggle-y1-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("primary_axis"))}" aria-label="${this._escape(this._customLocalize("primary_axis"))}" aria-pressed="true">Y1</button>
+              <div class="axis-comparison-menu-shell">
+                <button id="toggle-y1-comparison" class="axis-compare-toggle axis-compare-primary" type="button" ${hasY1Targets ? "" : "hidden"} aria-haspopup="menu" aria-expanded="false" aria-pressed="false"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+                <ha-dropdown id="y1-comparison-menu" class="axis-comparison-menu" placement="bottom-start" distance="7"></ha-dropdown>
+              </div>
+              <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" ${hasY1Targets ? "" : "hidden"} role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
+              <button id="toggle-state-strips" class="axis-state-strips-toggle axis-state-strips-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:view-sequential-outline"></ha-icon></button>
+              <div class="axis-detail-menu-shell">
+                <button id="toggle-detail-mode" class="axis-detail-toggle axis-detail-primary" type="button" hidden aria-haspopup="menu" aria-expanded="false"><ha-icon icon="mdi:speedometer"></ha-icon></button>
+                <ha-dropdown id="detail-mode-menu" class="axis-detail-menu" placement="bottom-start" distance="7"></ha-dropdown>
+              </div>
+            </div>
+            <div class="dashboard-date-controls" ${showDatePicker ? "" : "hidden"}>
+              <div id="date-controller" class="period-selector-card"></div>
+              ${showDownloadButton ? `<button id="download-chart-data" class="dashboard-download-button" type="button" title="${this._escape(downloadData)}" aria-label="${this._escape(downloadData)}"><ha-icon icon="mdi:download"></ha-icon></button>` : ""}
+            </div>
+            <div class="dashboard-axis-group secondary axis-target-secondary" ${hasY2Targets ? `data-advanced-history-has-targets data-advanced-history-theme-mode="${themeMode}"` : "hidden"}>
+              <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
+              <div class="axis-comparison-menu-shell">
+                <button id="toggle-y2-comparison" class="axis-compare-toggle" type="button" aria-haspopup="menu" aria-expanded="false" aria-pressed="true"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+                <ha-dropdown id="y2-comparison-menu" class="axis-comparison-menu" placement="bottom-end" distance="7"></ha-dropdown>
+              </div>
+              <button id="toggle-y2-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("secondary_axis"))}" aria-label="${this._escape(this._customLocalize("secondary_axis"))}" aria-pressed="true">Y2</button><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
+            </div>
+          </div>`}
+          <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
+            <ha-circular-progress active size="small"></ha-circular-progress>
+            <span id="period-loading-text">${this._escape(this._customLocalize("loading_requested_range"))}</span>
+          </section>
+          ${dependencyMissing ? "" : `<section id="compare-banner" class="compare-banner" hidden></section>`}
+          <section id="detail-banner" class="detail-banner" hidden></section>
+          ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
+          <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>
+        </div>
+      </ha-card>`;
+    this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
+      "click",
+      (event) => this._toggleY2ComparisonMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
+    );
+    this.shadowRoot.getElementById("toggle-y1-visibility")?.addEventListener(
+      "click",
+      () => this._toggleAxisLegendVisibility("primary"),
+    );
+    this.shadowRoot.getElementById("toggle-y2-visibility")?.addEventListener(
+      "click",
+      () => this._toggleAxisLegendVisibility("secondary"),
+    );
+    this.shadowRoot.getElementById("toggle-y1-comparison")?.addEventListener(
+      "click",
+      (event) => this._toggleY1ComparisonMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-y1-comparison")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
+    );
+    this.shadowRoot.getElementById("toggle-y1-running-total")?.addEventListener(
+      "click",
+      () => this._toggleAxisRunningTotal("primary"),
+    );
+    this.shadowRoot.getElementById("toggle-y2-running-total")?.addEventListener(
+      "click",
+      () => this._toggleAxisRunningTotal("secondary"),
+    );
+    this.shadowRoot.getElementById("toggle-state-strips")?.addEventListener(
+      "click",
+      () => this._toggleStateStrips(),
+    );
+    this.shadowRoot.getElementById("toggle-detail-mode")?.addEventListener(
+      "click",
+      (event) => this._toggleDetailModeMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-detail-mode")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
+    );
+    this.shadowRoot.getElementById("download-chart-data")?.addEventListener(
+      "click",
+      () => this._downloadChartData(),
+    );
+    this._syncY2ComparisonToggle();
+    this._syncY1ComparisonToggle();
+    this._syncRunningTotalAxisButtons();
+    this._syncStateStripsButton();
+    this._syncDetailModeButton();
+    this._renderContent();
+    this._persistDashboardGraphEditorChanges();
+  }
+
+  _saveTargets() {}
+  _saveCurrentSnapshot() {}
+  _persistPanelTabs() {}
+  _settleDashboardComparisonLayout() {
+    const updates = (this._graphCards || [])
+      .map((card) => card?.updateComplete)
+      .filter((update) => update && typeof update.then === "function");
+    this._dashboardComparisonLayoutSettlement = Promise.allSettled(updates).then(() => {
+      // Date navigation keeps the existing card height locked to prevent a
+      // transient dashboard jump. Comparison changes legitimately add or
+      // remove legend rows, so release that lock once SGCC has rendered the
+      // new rows and let the dynamic layout measure their natural height.
+      this._releaseDashboardCardLayout();
+      this._graphLayoutSchedule?.();
+    });
+    return this._dashboardComparisonLayoutSettlement;
+  }
+
+  _recordComparisonChange() {
+    const current = this._captureSnapshot();
+    if (!current?.period) return;
+    const stableSnapshotId = String(this._dashboardConfig?.snapshot?.id || "").trim();
+    if (stableSnapshotId) current.id = stableSnapshotId;
+    const compare = this._periodStore?.compare ?? current.period.compare ?? "";
+    const choice = this._comparisonChoice || current.period.compare_choice || null;
+    const count = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._comparisonCount)) || 1),
+    );
+    current.period = {
+      ...current.period,
+      compare,
+      compare_choice: choice,
+      compare_count: count,
+    };
+    const active = compare ? this._comparisonValue(choice || "previous_period", count) : false;
+    const secondaryCount = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._y2ComparisonCount)) || 1),
+    );
+    const secondaryActive = compare && !this._excludeY2Comparison
+      ? this._comparisonValue(choice || "previous_period", secondaryCount)
+      : false;
+    current.chart = clone(current.chart || {});
+    delete current.chart.compare;
+    const previousConfigs = clone(this._dashboardConfig?.sgcc_configs || []);
+    this._dashboardComparisonStyles = comparisonStyleBank(
+      previousConfigs,
+      this._dashboardComparisonStyles,
+    );
+    const configs = clone(this._dashboardConfig?.sgcc_configs || []).map((config, configIndex) => {
+      if (config?.chart_mode === "state_timeline" || !Array.isArray(config?.entities)) {
+        return config;
+      }
+      config.entities = config.entities.map((raw, entityIndex) => {
+        if (!raw || typeof raw !== "object" || Array.isArray(raw)) return raw;
+        const rowActive = raw.y_axis === "secondary" ? secondaryActive : active;
+        if (rowActive === false) delete raw.compare;
+        else raw.compare = mergeComparisonStyle(
+          rowActive,
+          raw.compare,
+          this._dashboardComparisonStyles?.[configIndex]?.[entityIndex],
+        );
+        return raw;
+      });
+      return compactDashboardSgccConfig(config);
+    });
+    this._dashboardConfig = {
+      ...this._dashboardConfig,
+      sgcc_configs: configs,
+      snapshot: compactDashboardSnapshot(current),
+    };
+    try {
+      stageDashboardComparisonConfig(this._dashboardConfig, previousConfigs, configs);
+    } catch (error) {
+      console.warn("Advanced History card: unable to stage comparison changes", error);
+    }
+    this._saveDashboardState(current, configs);
+    this.dispatchEvent(new CustomEvent("config-changed", {
+      detail: { config: clone(this._dashboardConfig) },
+      bubbles: true,
+      composed: true,
+    }));
+    void this._settleDashboardComparisonLayout();
+  }
+
+  _recordChange(snapshot = null) {
+    this._saveDashboardState(snapshot);
+    if (this._dashboardGraphEditorSession) this._dashboardGraphEditorPending = true;
+  }
+  _scheduleExternalBookmarkRefresh() {}
+}
+
+if (!customElements.get("advanced-history-sgcc-card-editor")) {
+  customElements.define(
+    "advanced-history-sgcc-card-editor",
+    AdvancedHistorySgccCardEditor,
+  );
+}
+
+if (!customElements.get(ADVANCED_HISTORY_CARD_TAG)) {
+  customElements.define(ADVANCED_HISTORY_CARD_TAG, AdvancedHistorySgccCard);
+}
+
+window.customCards = window.customCards || [];
+if (!window.customCards.some((card) => card.type === ADVANCED_HISTORY_CARD_TAG)) {
+  window.customCards.push({
+    type: ADVANCED_HISTORY_CARD_TAG,
+    name: "Advanced History SGCC Card",
+    description: "An Advanced History panel chart with its date and time controls.",
+    preview: true,
+  });
+}

@@ -1,11 +1,22 @@
-import { CARD_TAG } from "./constants.js";
+import {
+  ADVANCED_HISTORY_CARD_SCHEMA,
+  ADVANCED_HISTORY_CARD_TYPE,
+  CARD_TAG,
+  DASHBOARD_SNAPSHOT_SGCC_KEYS,
+  DASHBOARD_SNAPSHOT_SOURCE_KEYS,
+  DASHBOARD_STORED_SGCC_OMIT_KEYS,
+  DASHBOARD_SYNC_GROUP_KEYS,
+} from "./constants.js";
 
 const BRIDGE_TAG = "ha-panel-history";
 const SUGGEST_DIALOG_TAG = "hui-dialog-suggest-card";
 const WIDE_PREVIEW_MARKER = Symbol("advanced-history-wide-dashboard-preview");
 const DIALOG_TITLE_MARKER = Symbol("advanced-history-dashboard-dialog-title");
 const DESELECTED_OPTIONS_MARKER = Symbol("advanced-history-deselected-export-options");
+const EXPORT_WARNING_MARKER = Symbol("advanced-history-dashboard-export-warning");
+const CREATE_VIEW_MARKER = Symbol("advanced-history-create-dashboard-view");
 const WIDE_PREVIEW_PATCH = "__advancedHistoryWidePreviewPatched";
+const SELECT_VIEW_PATCH = "__advancedHistoryCreateViewPatched";
 const OMITTED_RUNTIME_KEYS = new Set([
   "energy_date_sync",
   "energy_collection_key",
@@ -22,6 +33,181 @@ function clone(value) {
   return typeof structuredClone === "function"
     ? structuredClone(value)
     : JSON.parse(JSON.stringify(value));
+}
+
+function viewPath(title) {
+  const slug = String(title || "")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9_-]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "view";
+  return /^\d+$/.test(slug) ? `view-${slug}` : slug;
+}
+
+export function dashboardConfigWithNewView(config, title, layout = "sections") {
+  const next = clone(config);
+  const existingPaths = new Set((next.views || []).map((view) => view?.path).filter(Boolean));
+  const basePath = viewPath(title);
+  let path = basePath;
+  let suffix = 2;
+  while (existingPaths.has(path)) path = `${basePath}-${suffix++}`;
+  const view = { title: String(title || "").trim(), path };
+  if (layout === "sections") view.type = "sections";
+  else if (layout !== "masonry") view.type = layout;
+  if (layout === "sections") view.sections = [];
+  else view.cards = [];
+  next.views = [...(next.views || []), view];
+  return { config: next, viewIndex: next.views.length - 1 };
+}
+
+function compactPanelSettings(config = {}) {
+  const keys = [
+    "card_module_url",
+    "large_range_automatic_detail",
+    "large_range_detail_threshold_days",
+  ];
+  const settings = Object.fromEntries(keys.flatMap((key) => (
+    config[key] === undefined ? [] : [[key, clone(config[key])]]
+  )));
+  if (settings.large_range_automatic_detail !== false) {
+    delete settings.large_range_automatic_detail;
+  }
+  if (
+    !Number(settings.large_range_detail_threshold_days)
+    || Number(settings.large_range_detail_threshold_days) === 31
+  ) {
+    delete settings.large_range_detail_threshold_days;
+  }
+  return settings;
+}
+
+export function compactDashboardSnapshot(snapshot) {
+  const next = clone(snapshot);
+  if (!next) return next;
+  delete next.schema;
+  delete next.name;
+  delete next.saved_at;
+  delete next.targets;
+  delete next.hidden_targets;
+  delete next.y2_targets;
+  delete next.hidden_y2_targets;
+  delete next.target_filters;
+  delete next.y2_target_filters;
+  for (const key of DASHBOARD_SNAPSHOT_SOURCE_KEYS) delete next[key];
+  next.chart = clone(next.chart || {});
+  delete next.chart.defaults_mode;
+  for (const key of DASHBOARD_SNAPSHOT_SGCC_KEYS) delete next.chart[key];
+  return next;
+}
+
+function typedCardOptions(value, variant) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return value.numeric || value.state ? value[variant] || {} : value;
+}
+
+function dashboardGraphConfig(config, panelConfig = {}) {
+  const variant = config.chart_mode === "state_timeline" ? "state" : "numeric";
+  const source = clone(config);
+  const defaults = clone(typedCardOptions(panelConfig.card_options, variant));
+  const templates = ["entities", "numeric_entities", "state_entities"]
+    .flatMap((key) => {
+      const value = defaults[key];
+      delete defaults[key];
+      return Array.isArray(value) ? value : value ? [value] : [];
+    })
+    .filter((value) => (
+      value
+      && typeof value === "object"
+      && !Array.isArray(value)
+      && value.entity == null
+      && value.statistic_id == null
+    ));
+  const next = {
+    type: source.type || `custom:${CARD_TAG}`,
+    ...defaults,
+    ...source,
+  };
+  if (Array.isArray(next.entities)) {
+    const configuredEntities = panelConfig.entity_options || {};
+    next.entities = next.entities.map((raw) => {
+      const row = typeof raw === "string" ? { entity: raw } : clone(raw);
+      const entity = row?.entity || row?.statistic_id;
+      if (!entity) return raw;
+      const key = row.attribute ? `${entity}::${row.attribute}` : entity;
+      const merged = Object.assign(
+        {},
+        ...templates.map(clone),
+        clone(configuredEntities[entity] || {}),
+        clone(configuredEntities[key] || {}),
+        row,
+      );
+      // The rendered AHP row is authoritative about whether comparison is
+      // active. Configured compare objects can contain useful styling, but
+      // must not turn comparison back on when the runtime row omitted it.
+      if (!Object.prototype.hasOwnProperty.call(row, "compare")) {
+        delete merged.compare;
+      }
+      return merged;
+    });
+  }
+  for (const key of DASHBOARD_STORED_SGCC_OMIT_KEYS) delete next[key];
+  if (next.card_background_color === "transparent") delete next.card_background_color;
+  return next;
+}
+
+function uuid() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  const bytes = new Uint8Array(16);
+  if (globalThis.crypto?.getRandomValues) globalThis.crypto.getRandomValues(bytes);
+  else {
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = Math.floor(Math.random() * 256);
+    }
+  }
+  bytes[6] = (bytes[6] & 0x0f) | 0x40;
+  bytes[8] = (bytes[8] & 0x3f) | 0x80;
+  const hex = [...bytes].map((value) => value.toString(16).padStart(2, "0"));
+  return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10).join("")}`;
+}
+
+export function dashboardDatePickerGroup(panelName = "") {
+  const configuredName = String(panelName || "").trim();
+  return configuredName || `advanced-history-${uuid()}`;
+}
+
+export function advancedHistoryDashboardCard(
+  snapshot,
+  panelConfig = {},
+  title = "",
+  graphConfigs = [],
+  panelName = "",
+) {
+  if (!snapshot?.targets || !snapshot?.chart) return null;
+  const datePickerGroup = dashboardDatePickerGroup(panelName);
+  const settings = compactPanelSettings(panelConfig);
+  const normalizedTitle = String(title || "").trim();
+  const sgccConfigs = graphConfigs
+    .filter((config) => config && typeof config === "object" && !Array.isArray(config))
+    .map((config) => {
+      const next = dashboardGraphConfig(config, panelConfig);
+      for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+        next[key] = datePickerGroup;
+      }
+      return next;
+    });
+  const config = {
+    type: ADVANCED_HISTORY_CARD_TYPE,
+    schema: ADVANCED_HISTORY_CARD_SCHEMA,
+    grid_options: { columns: "full" },
+    show_date_picker: true,
+    date_picker_group: datePickerGroup,
+    ...(normalizedTitle ? { title: normalizedTitle } : {}),
+    sgcc_configs: sgccConfigs,
+    snapshot: compactDashboardSnapshot(snapshot),
+    ...(Object.keys(settings).length ? { settings } : {}),
+  };
+  return config;
 }
 
 function escapeHtml(value) {
@@ -65,6 +251,24 @@ function defaultDatePickerMode(start, end, rollingHours) {
   return "last_24h";
 }
 
+export function dashboardCardConfigs(cards) {
+  return (cards || []).map((card) => {
+    const source = card?.__advancedHistoryConfig || card?._config;
+    if (!source || typeof source !== "object" || Array.isArray(source)) return null;
+    const config = clone(source);
+    if (card?.__advancedHistoryAutoHeight) config.height = "auto";
+    const exportAggregates = card?.__advancedHistoryRunningTotalExportAggregates || {};
+    for (const row of config.entities || []) {
+      if (!row || typeof row !== "object" || row.attribute != null) continue;
+      const original = exportAggregates[entityId(row)];
+      if (!original) continue;
+      if (original.defined) row.aggregate_func = clone(original.value);
+      else delete row.aggregate_func;
+    }
+    return config;
+  }).filter(Boolean);
+}
+
 export function dashboardCardSnapshots(cards, period = {}) {
   const group = exportGroup();
   const mode = defaultDatePickerMode(
@@ -72,11 +276,9 @@ export function dashboardCardSnapshots(cards, period = {}) {
     period.end,
     period.rollingHours,
   );
-  return (cards || []).map((card) => {
-    const source = card?.__advancedHistoryConfig || card?._config;
-    if (!source || typeof source !== "object" || Array.isArray(source)) return null;
-    const config = clone(source);
+  return dashboardCardConfigs(cards).map((config) => {
     for (const key of OMITTED_RUNTIME_KEYS) delete config[key];
+    config.grid_options = { columns: "full" };
     if (config.chart_mode === "state_timeline") delete config.height;
     config.type = `custom:${CARD_TAG}`;
     config.show_date_picker = true;
@@ -88,7 +290,7 @@ export function dashboardCardSnapshots(cards, period = {}) {
       ? config.date_picker_modes[0] || mode
       : mode;
     return config;
-  }).filter(Boolean);
+  });
 }
 
 function yamlScalar(value) {
@@ -134,32 +336,40 @@ function entityId(row) {
   return typeof row === "string" ? row : row?.entity || row?.statistic_id;
 }
 
+function exportedSgccConfigs(card) {
+  return card?.type === ADVANCED_HISTORY_CARD_TYPE
+    ? card.sgcc_configs || []
+    : [card];
+}
+
+function exportedEntityRows(cards) {
+  return cards.flatMap((card) => (
+    exportedSgccConfigs(card).flatMap((config) => config?.entities || [])
+  ));
+}
+
 function deselectedEntityIds(cards) {
-  return [...new Set(cards.flatMap((card) => (
-    card.entities || []
-  ).filter((row) => row && typeof row === "object" && row.enabled === false)
+  return [...new Set(exportedEntityRows(cards)
+    .filter((row) => row && typeof row === "object" && row.enabled === false)
     .map(entityId)
-    .filter(Boolean)))];
+    .filter(Boolean))];
 }
 
 export function dashboardCardsWithHiddenEntitiesOnLoad(cards) {
-  return cards.map((card) => ({
-    ...clone(card),
-    entities: (card.entities || []).map((row) => {
-      if (!row || typeof row !== "object" || row.enabled !== false) return clone(row);
-      return {
-        ...clone(row),
-        enabled: true,
-        auto_hide: true,
-      };
-    }),
-  }));
+  return cards.map((card) => {
+    const next = clone(card);
+    for (const config of exportedSgccConfigs(next)) {
+      config.entities = (config.entities || []).map((row) => {
+        if (!row || typeof row !== "object" || row.enabled !== false) return clone(row);
+        return { ...clone(row), enabled: true, auto_hide: true };
+      });
+    }
+    return next;
+  });
 }
 
-function exportEntityIds(cards) {
-  return [...new Set(cards.flatMap((card) => (
-    card.entities || []
-  ).map(entityId).filter(Boolean)))];
+export function dashboardCardEntityIds(cards) {
+  return [...new Set(exportedEntityRows(cards).map(entityId).filter(Boolean))];
 }
 
 function deselectedOptions(cards, labels) {
@@ -168,7 +378,7 @@ function deselectedOptions(cards, labels) {
   return {
     hiddenOnLoadCards: dashboardCardsWithHiddenEntitiesOnLoad(cards),
     disabledCards: clone(cards),
-    entities: exportEntityIds(cards),
+    entities: dashboardCardEntityIds(cards),
     label: labels.hideEntitiesOnLoad,
     note: labels.hideEntitiesOnLoadNote,
   };
@@ -193,6 +403,8 @@ function showYamlFallback(container, cards, labels) {
       .deselected-choice input { width:20px; height:20px; margin:1px 0 0; accent-color:var(--primary-color); }
       .deselected-choice strong, .deselected-choice small { display:block; }
       .deselected-choice small { margin-top:3px; color:var(--secondary-text-color); line-height:1.35; }
+      .export-warning { margin:16px 16px 0; padding:12px; display:flex; align-items:flex-start; gap:10px; border-left:4px solid var(--warning-color,#ffa600); border-radius:6px; background:var(--secondary-background-color); line-height:1.4; }
+      .export-warning ha-icon { flex:0 0 20px; width:20px; height:20px; color:var(--warning-color,#ffa600); --mdc-icon-size:20px; }
       textarea { display:block; width:calc(100% - 32px); min-height:360px; margin:16px; padding:12px; resize:vertical; color:var(--primary-text-color); background:var(--secondary-background-color); border:1px solid var(--divider-color); border-radius:6px; font:13px/1.45 monospace; }
       button { min-height:40px; padding:0 16px; border:0; border-radius:8px; color:var(--primary-color); background:transparent; cursor:pointer; font:inherit; font-weight:500; }
       button.primary { color:var(--text-primary-color,white); background:var(--primary-color); }
@@ -200,6 +412,7 @@ function showYamlFallback(container, cards, labels) {
     </style>
     <dialog aria-label="${escapeHtml(labels.fallbackTitle)}">
       <header><h2>${escapeHtml(labels.fallbackTitle)}</h2></header>
+      ${labels.exportWarning ? `<div class="export-warning" role="note"><ha-icon icon="mdi:alert-outline"></ha-icon><span>${escapeHtml(labels.exportWarning)}</span></div>` : ""}
       ${choices ? `<label class="deselected-choice"><input type="checkbox"><span><strong>${escapeHtml(choices.label)}</strong><small>${escapeHtml(choices.note)}</small></span></label>` : ""}
       <textarea readonly></textarea>
       <footer><span class="status"></span><button data-close>${escapeHtml(labels.close)}</button><button class="primary" data-copy>${escapeHtml(labels.copyYaml)}</button></footer>
@@ -252,7 +465,8 @@ function installWideNativePreview() {
   prototype.showDialog = function showAdvancedHistoryDashboardPreview(params) {
     const result = showDialog.call(this, params);
     const choices = params?.[DESELECTED_OPTIONS_MARKER];
-    if (!params?.[WIDE_PREVIEW_MARKER] && !choices) return result;
+    const exportWarning = params?.[EXPORT_WARNING_MARKER];
+    if (!params?.[WIDE_PREVIEW_MARKER] && !choices && !exportWarning) return result;
     Promise.resolve(this.updateComplete).then(() => {
       if (!this.shadowRoot) return;
       const dialog = this.shadowRoot.querySelector("ha-dialog");
@@ -281,12 +495,34 @@ function installWideNativePreview() {
         .advanced-history-deselected-choice small {
           margin-top:3px; color:var(--secondary-text-color); line-height:1.35;
         }
+        .advanced-history-export-warning {
+          width:100%; margin:0 auto 12px; padding:12px; box-sizing:border-box;
+          display:flex; align-items:flex-start; gap:10px; line-height:1.4;
+          border-left:4px solid var(--warning-color,#ffa600); border-radius:6px;
+          background:var(--secondary-background-color);
+        }
+        .advanced-history-export-warning ha-icon {
+          flex:0 0 20px; width:20px; height:20px;
+          color:var(--warning-color,#ffa600); --mdc-icon-size:20px;
+        }
       `;
         this.shadowRoot.append(style);
       }
+      this.shadowRoot.querySelector(".advanced-history-export-warning")?.remove();
       this.shadowRoot.querySelector(".advanced-history-deselected-choice")?.remove();
+      const preview = this.shadowRoot.querySelector(".element-preview");
+      if (exportWarning && preview) {
+        const warning = document.createElement("div");
+        warning.className = "advanced-history-export-warning";
+        warning.setAttribute("role", "note");
+        const icon = document.createElement("ha-icon");
+        icon.setAttribute("icon", "mdi:alert-outline");
+        const message = document.createElement("span");
+        message.textContent = exportWarning;
+        warning.append(icon, message);
+        preview.parentElement?.before(warning);
+      }
       if (choices) {
-        const preview = this.shadowRoot.querySelector(".element-preview");
         if (preview) {
           const choice = document.createElement("label");
           choice.className = "advanced-history-deselected-choice";
@@ -330,6 +566,100 @@ function installWideNativePreview() {
   };
 }
 
+function showCreateDashboardView(dialog, hass) {
+  const params = dialog?._params;
+  const createView = params?.[CREATE_VIEW_MARKER];
+  const config = dialog?._config;
+  if (typeof createView !== "function" || !config) return;
+
+  const host = document.createElement("advanced-history-create-dashboard-view");
+  document.body.append(host);
+  const root = host.attachShadow({ mode: "open" });
+  const addView = hass.localize("ui.panel.lovelace.editor.edit_view.add") || "Add view";
+  const titleLabel = hass.localize("ui.panel.lovelace.editor.card.generic.title") || "Title";
+  const layoutLabel = hass.localize("ui.panel.lovelace.editor.edit_view.type") || "Layout";
+  const sectionsLabel = hass.localize("ui.panel.lovelace.editor.edit_view.types.sections") || "Sections (default)";
+  const masonryLabel = hass.localize("ui.panel.lovelace.editor.edit_view.types.masonry") || "Masonry";
+  const cancel = hass.localize("ui.common.cancel") || "Cancel";
+  const create = hass.localize("ui.common.create") || "Create";
+  root.innerHTML = `
+    <style>
+      :host { color:var(--primary-text-color); }
+      dialog { width:min(460px,calc(100vw - 32px)); padding:0; border:0; border-radius:12px; color:inherit; background:var(--card-background-color); }
+      dialog::backdrop { background:rgba(0,0,0,.56); }
+      header, footer { min-height:64px; padding:12px 20px; box-sizing:border-box; display:flex; align-items:center; gap:12px; }
+      header { border-bottom:1px solid var(--divider-color); }
+      footer { justify-content:flex-end; border-top:1px solid var(--divider-color); }
+      h2 { margin:0; font-size:20px; font-weight:500; }
+      main { padding:20px; display:grid; gap:18px; }
+      label, label span { display:block; }
+      label span { margin-bottom:7px; color:var(--secondary-text-color); font-size:13px; }
+      input, select { width:100%; min-height:48px; padding:0 12px; box-sizing:border-box; border:1px solid var(--divider-color); border-radius:6px; color:var(--primary-text-color); background:var(--secondary-background-color); font:inherit; }
+      input:focus, select:focus { border-color:var(--primary-color); outline:1px solid var(--primary-color); }
+      button { min-height:40px; padding:0 16px; border:0; border-radius:8px; color:var(--primary-color); background:transparent; cursor:pointer; font:inherit; font-weight:500; }
+      button.primary { color:var(--text-primary-color,white); background:var(--primary-color); }
+      button.primary:disabled { opacity:.45; cursor:default; }
+    </style>
+    <dialog aria-label="${escapeHtml(addView)}">
+      <header><h2>${escapeHtml(addView)}</h2></header>
+      <main>
+        <label><span>${escapeHtml(titleLabel)}</span><input name="title" autocomplete="off" autofocus></label>
+        <label><span>${escapeHtml(layoutLabel)}</span><select name="layout"><option value="sections">${escapeHtml(sectionsLabel)}</option><option value="masonry">${escapeHtml(masonryLabel)}</option></select></label>
+      </main>
+      <footer><button data-cancel>${escapeHtml(cancel)}</button><button class="primary" data-create disabled>${escapeHtml(create)}</button></footer>
+    </dialog>`;
+  const createDialog = root.querySelector("dialog");
+  const input = root.querySelector("input[name=title]");
+  const createButton = root.querySelector("[data-create]");
+  const close = () => {
+    createDialog.close();
+    host.remove();
+  };
+  input.addEventListener("input", () => {
+    createButton.disabled = !input.value.trim();
+  });
+  root.querySelector("[data-cancel]").addEventListener("click", close);
+  createButton.addEventListener("click", () => {
+    const result = dashboardConfigWithNewView(
+      config,
+      input.value,
+      root.querySelector("select[name=layout]").value,
+    );
+    createView(dialog._urlPath ?? null, result.config, result.viewIndex);
+    dialog.closeDialog?.();
+    close();
+  });
+  createDialog.addEventListener("cancel", (event) => {
+    event.preventDefault();
+    close();
+  });
+  createDialog.showModal();
+  input.focus();
+}
+
+function installNativeCreateView() {
+  const dialogClass = customElements.get("hui-dialog-select-view");
+  const prototype = dialogClass?.prototype;
+  if (!prototype || prototype[SELECT_VIEW_PATCH]) return;
+  const updated = prototype.updated;
+  prototype[SELECT_VIEW_PATCH] = true;
+  prototype.updated = function updateAdvancedHistoryViewChooser(changedProperties) {
+    updated?.call(this, changedProperties);
+    Promise.resolve(this.updateComplete).then(() => {
+      if (!this._params?.[CREATE_VIEW_MARKER] || !this.shadowRoot) return;
+      const footer = this.shadowRoot.querySelector("ha-dialog-footer");
+      if (!footer || footer.querySelector("[data-advanced-history-create-view]")) return;
+      const button = document.createElement("ha-button");
+      button.dataset.advancedHistoryCreateView = "";
+      button.slot = "secondaryAction";
+      button.appearance = "plain";
+      button.textContent = this.hass.localize("ui.panel.lovelace.editor.edit_view.add") || "Add view";
+      button.addEventListener("click", () => showCreateDashboardView(this, this.hass));
+      footer.prepend(button);
+    }).catch(() => undefined);
+  };
+}
+
 export async function addCardsToDashboard({ hass, container, cards, labels, ensureNativeHistory }) {
   if (!cards.length) return false;
   try {
@@ -345,7 +675,7 @@ export async function addCardsToDashboard({ hass, container, cards, labels, ensu
     const bridge = document.createElement("div");
     bridge.hidden = true;
     bridge.hass = hass;
-    bridge._getEntityIds = () => exportEntityIds(cards);
+    bridge._getEntityIds = () => dashboardCardEntityIds(cards);
     bridge._mungedStateHistory = {};
     bridge._startDate = new Date(Date.now() - 3_600_000);
     bridge._endDate = new Date();
@@ -365,6 +695,7 @@ export async function addCardsToDashboard({ hass, container, cards, labels, ensu
           try {
             const result = await nativeImport();
             installWideNativePreview();
+            installNativeCreateView();
             return result;
           } catch (error) {
             fallback();
@@ -381,8 +712,16 @@ export async function addCardsToDashboard({ hass, container, cards, labels, ensu
         detail.dialogParams[WIDE_PREVIEW_MARKER] = true;
         detail.dialogParams[DIALOG_TITLE_MARKER] = labels.dialogTitle;
         if (choices) detail.dialogParams[DESELECTED_OPTIONS_MARKER] = choices;
+        if (labels.exportWarning) {
+          detail.dialogParams[EXPORT_WARNING_MARKER] = labels.exportWarning;
+        }
         installWideNativePreview();
         queueMicrotask(cleanup);
+      } else if (detail?.dialogTag === "hui-dialog-select-view") {
+        detail.dialogParams[CREATE_VIEW_MARKER] = (urlPath, config, viewIndex) => {
+          detail.dialogParams.viewSelectedCallback(urlPath, config, viewIndex);
+        };
+        installNativeCreateView();
       } else if (detail?.dialogTag === "dialog-box") {
         // The native flow uses an alert instead of YAML when all storage
         // dashboards are generated or contain no editable views.

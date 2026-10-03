@@ -15,6 +15,38 @@ VERSION = json.loads(
 )["version"]
 
 
+def _build_metadata() -> dict[str, str]:
+    """Return optional metadata injected by a packaged development build."""
+    path = _INTEGRATION_DIR / "build.json"
+    try:
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        return {}
+    if not isinstance(value, dict):
+        return {}
+    return {
+        key: str(value[key]).strip()
+        for key in ("channel", "number", "commit")
+        if value.get(key) is not None and str(value[key]).strip()
+    }
+
+
+BUILD_METADATA = _build_metadata()
+BUILD_CHANNEL = BUILD_METADATA.get("channel", "")
+BUILD_NUMBER = BUILD_METADATA.get("number", "")
+
+
+def _display_version(version: str, channel: str, number: str) -> str:
+    """Return the user-facing integration version."""
+    if not channel or not number:
+        return version
+    suffix = f"-{channel}.{number}"
+    return version if version.endswith(suffix) else f"{version}{suffix}"
+
+
+DISPLAY_VERSION = _display_version(VERSION, BUILD_CHANNEL, BUILD_NUMBER)
+
+
 def _frontend_build_id() -> str:
     """Return a stable fingerprint for the complete frontend module tree."""
     digest = hashlib.sha256()
@@ -40,6 +72,7 @@ CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS = "large_range_detail_threshold_days"
 CONF_DEFAULT_HOURS = "default_hours"
 CONF_GRAPH_HEIGHT = "graph_height"
 CONF_INCLUDE_HIDDEN = "include_hidden"
+CONF_USE_LEGACY_TARGET_PICKER = "use_legacy_target_picker"
 CONF_REDIRECT_SHOW_MORE = "redirect_show_more"
 CONF_REPLACE_MORE_INFO_HISTORY = "replace_more_info_history"
 CONF_MORE_INFO_SHOW_DATE_PICKER = "more_info_show_date_picker"
@@ -89,6 +122,7 @@ DEFAULT_MORE_INFO_CARD_OPTIONS = {
     "auto_scale_points": True,
     "card_background_color": "transparent",
     "card_border": False,
+    "card_border_radius": 0,
     "card_padding": 0,
     "card_shadow": False,
     "date_picker_default_mode": "last_24h",
@@ -239,6 +273,7 @@ DEFAULT_OPTIONS = {
     CONF_LARGE_RANGE_DETAIL_THRESHOLD_DAYS: 31,
     CONF_DEFAULT_HOURS: 24,
     CONF_INCLUDE_HIDDEN: False,
+    CONF_USE_LEGACY_TARGET_PICKER: False,
     CONF_CARD_MODULE_URL: "",
     CONF_NUMERIC_CARD_OPTIONS: DEFAULT_NUMERIC_CARD_OPTIONS,
     CONF_STATE_CARD_OPTIONS: DEFAULT_STATE_CARD_OPTIONS,

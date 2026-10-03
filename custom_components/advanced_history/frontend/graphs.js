@@ -1,19 +1,29 @@
-import { CARD_HACS_INSTALL_URL, CARD_TAG } from "./constants.js";
+import {
+  CARD_HACS_INSTALL_URL,
+  CARD_TAG,
+  DASHBOARD_SYNC_GROUP_KEYS,
+} from "./constants.js";
 import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { CARD_DEFAULT_AGGREGATE, automaticEntityOptions } from "./entity-defaults.js";
 import {
   NATIVE_HISTORY_ATTRIBUTES,
   historyAttributeDisplayName,
   historyAttributeUnit,
+  nativeHistoryAttributeColor,
   nativeHistoryAttributes,
 } from "./history-series.js";
+import { withClimateActionAnnotations } from "./climate.js";
 import {
   mergeStateMaps,
   nativeStateMap,
+  withBooleanStateColors,
 } from "./state-colors.js";
+import { cumulativeRunningTotalSeries } from "./running-total.js";
+import { configsWithToggledLegendHideOnLoad } from "./legend-visibility.js";
 
 const DATA_SOURCE_CACHE = new Map();
 const ENTITY_OPTION_REMOVALS = "__advanced_history_remove_options";
+const MIN_NUMERIC_GRAPH_HEIGHT = 320;
 const EXTENDED_ENTITY_COLORS = Object.freeze([
   // The card's compact palette already covers red, blue, green, orange,
   // purple and teal. Start its extension with a visibly separate colour so
@@ -31,6 +41,30 @@ const EXTENDED_ENTITY_COLORS = Object.freeze([
   "#4fc3f7",
   "#fff176",
 ]);
+
+export function stateStripPresentationOptions(numericOptions = {}, stateOptions = {}) {
+  const options = { ...numericOptions };
+  if (
+    !Object.prototype.hasOwnProperty.call(options, "state_strip_labels")
+    && Object.prototype.hasOwnProperty.call(stateOptions, "state_timeline_show_labels")
+  ) {
+    options.state_strip_labels = stateOptions.state_timeline_show_labels;
+  }
+  const labelFontSize = Number.parseFloat(
+    options.state_timeline_label_font_size
+    ?? stateOptions.state_timeline_label_font_size,
+  );
+  const resolvedFontSize = Number.isFinite(labelFontSize)
+    ? Math.max(6, Math.min(40, labelFontSize))
+    : null;
+  if (
+    resolvedFontSize != null
+    && !Object.prototype.hasOwnProperty.call(options, "state_strip_height")
+  ) {
+    options.state_strip_height = Math.max(16, Math.ceil(resolvedFontSize + 6));
+  }
+  return { options, labelFontSize: resolvedFontSize };
+}
 
 function extendedEntityPalette(cardPalette, minimumSize = 0) {
   const colors = [];
@@ -66,6 +100,16 @@ function graphComparisonRows(configured) {
   const compare = configured?.compare;
   if (Array.isArray(compare)) return compare;
   return compare && typeof compare === "object" ? [compare] : [];
+}
+
+export function renderedGraphDataSources(card) {
+  const sources = new Set();
+  for (const series of card?._graphData?.series || []) {
+    if (!Array.isArray(series?.points) || !series.points.length) continue;
+    if (series._isStat === true) sources.add("statistics");
+    else if (series._isStat === false) sources.add("history");
+  }
+  return [...sources];
 }
 
 function graphColorRgb(color) {
@@ -175,12 +219,36 @@ function normalizeCompactHistoryResponse(response) {
   return changed ? normalized : response;
 }
 
+const DASHBOARD_WRAPPER_NAVIGATION_KEYS = [
+  "energy_date_sync",
+  "energy_collection_key",
+  "show_date_picker",
+  "date_picker_position",
+  "date_picker_nav_position",
+  "date_picker_shortcuts_position",
+  "date_picker_modes",
+  "date_picker_default_mode",
+  "date_picker_step",
+  "show_interval_picker",
+  "interval_picker_position",
+  "interval_options",
+];
+
+export function withoutDashboardWrapperNavigation(config) {
+  const next = { ...(config || {}) };
+  for (const key of DASHBOARD_WRAPPER_NAVIGATION_KEYS) delete next[key];
+  return next;
+}
+
 export class GraphMethods {
   _renderGraphs() {
     const host = this.shadowRoot.getElementById("charts");
     if (!host) return;
     this._disconnectDynamicGraphLayout();
     const detail = this._largeRangeDetailProfile();
+    for (const card of this._graphCards || []) {
+      card.__advancedHistorySourceObserver?.disconnect?.();
+    }
     this._cards = this._cards.filter((card) => !this._graphCards.includes(card));
     this._graphCards = [];
     host.replaceChildren();
@@ -204,6 +272,7 @@ export class GraphMethods {
     }
     const entityIds = this._resolvedEntityIds();
     const series = this._seriesDescriptors(entityIds);
+    this._syncStateStripsButton();
     if (this._notice && !this.shadowRoot.querySelector(".notice")) host.insertAdjacentHTML("beforebegin", `<div class="notice">${this._escape(this._notice)}</div>`);
     if (!entityIds.length) {
       this._renderLargeRangeDetailBanner(null);
@@ -229,22 +298,37 @@ export class GraphMethods {
     }
     const numeric = series.filter((item) => this._isNumeric(item));
     const states = series.filter((item) => !this._isNumeric(item));
-    const multipleCharts = Boolean(numeric.length && states.length);
+    const numericGroups = this._numericSeriesGroups(numeric);
+    const stateStrips = this._stateStripsEnabled(series);
+    const separateStates = states.length && !stateStrips;
+    // A state strip changes where the categorical series is rendered, not the
+    // logical grouping of the chart. Keep the same automatic numeric heading
+    // that is shown when state history uses its own card.
+    const multipleCharts = this._hasMultipleChartGroups(numericGroups, states);
     this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
     // Establish the available chart region before configuring cards with the
     // card's native height:auto + numeric grid-row contract.
-    this._configureDynamicGraphLayout(host, Boolean(numeric.length), Boolean(states.length));
-    if (numeric.length) {
+    this._configureDynamicGraphLayout(
+      host,
+      Boolean(numeric.length),
+      Boolean(separateStates),
+      numericGroups.length,
+    );
+    if (numericGroups.length) {
       const numericMode = this._cardOptions("timeline").chart_mode || "timeline";
-      this._createGraph(
-        host,
-        numeric,
-        multipleCharts ? this._customLocalize("numeric_history") : "",
-        numericMode,
-        detail,
-      );
+      numericGroups.forEach((group, index) => {
+        const embeddedStates = stateStrips && index === 0 ? states : [];
+        this._createGraph(
+          host,
+          [...group.series, ...embeddedStates],
+          multipleCharts ? this._numericSeriesGroupTitle(group) : "",
+          numericMode,
+          detail,
+          new Set(embeddedStates.map((item) => this._seriesDescriptor(item).key)),
+        );
+      });
     }
-    if (states.length) {
+    if (separateStates) {
       this._createGraph(
         host,
         states,
@@ -351,11 +435,49 @@ export class GraphMethods {
     card.setConfig(fittedConfig);
   }
 
-  _configureDynamicGraphLayout(host, hasNumeric, hasState) {
+  _fitAutomaticNumericCard(card, cardHeight) {
+    const config = card?.__advancedHistoryConfig;
+    if (
+      !config
+      || (!card.__advancedHistoryAutoHeight && config.height !== "auto")
+      || !Number.isFinite(cardHeight)
+    ) return;
+    const root = card.shadowRoot;
+    const cardElement = root?.querySelector("ha-card.sgc-card");
+    const plotWrap = root?.querySelector(".sgc-plot-wrap");
+    if (!cardElement || !plotWrap) return;
+    const outerHeight = cardElement.getBoundingClientRect().height;
+    const plotHeight = plotWrap.getBoundingClientRect().height;
+    if (!outerHeight || !plotHeight) return;
+
+    // SGCC 4.03 correctly fills height:auto on its first render, but a
+    // width-only host resize can rebuild the inner SVG at its generic 200px
+    // fallback while the card and plot wrapper remain full height. Resolve
+    // the automatic height to the measured plot allocation so subsequent
+    // sidebar/entity layout changes keep using the real panel height.
+    const nonPlotHeight = Math.max(0, outerHeight - plotHeight);
+    const fittedHeight = Math.max(200, Math.floor(cardHeight - nonPlotHeight));
+    if (card.__advancedHistoryAutoPlotHeight === fittedHeight) return;
+    card.__advancedHistoryAutoHeight = true;
+    card.__advancedHistoryAutoPlotHeight = fittedHeight;
+    const fittedConfig = { ...config, height: fittedHeight };
+    card.__advancedHistoryConfig = fittedConfig;
+    card.setConfig(fittedConfig);
+    this._setGraphCardHass(card, this._hass);
+  }
+
+  _configureDynamicGraphLayout(
+    host,
+    hasNumeric,
+    hasState,
+    numericChartCount = hasNumeric ? 1 : 0,
+  ) {
     const configuredNumericHeight = this._cardOptions("timeline").height;
-    const autoNumericHeight = hasNumeric && (
+    const usesAutomaticNumericHeight = hasNumeric && (
       configuredNumericHeight == null || configuredNumericHeight === "auto"
     );
+    const autoNumericHeight = numericChartCount === 1 && usesAutomaticNumericHeight;
+    host.classList.toggle("auto-numeric-height", usesAutomaticNumericHeight);
     host.classList.toggle("dynamic-numeric", autoNumericHeight);
     host.classList.toggle("has-state-graph", autoNumericHeight && hasState);
     if (!autoNumericHeight) {
@@ -365,6 +487,11 @@ export class GraphMethods {
     }
     const resize = () => {
       if (!this.isConnected || this.shadowRoot?.getElementById("charts") !== host) return;
+      for (const card of this._graphCards || []) {
+        this._applyComparisonSeriesPeriodLabels?.(card);
+        this._applyStateStripLabelStyle(card);
+      }
+      this._syncAxisVisibilityButtons?.();
       if (hasState) {
         for (const stateCard of host.querySelectorAll(".state-graph > statistics-graph-chart-card")) {
           this._fitStateTimelineCard(stateCard);
@@ -374,11 +501,19 @@ export class GraphMethods {
       const viewportHeight = window.visualViewport?.height || window.innerHeight;
       const controller = this.shadowRoot?.getElementById("date-controller");
       const controllerRect = controller?.getBoundingClientRect?.();
-      const bottom = controllerRect?.height > 0
-        ? Math.min(viewportHeight, controllerRect.top)
-        : viewportHeight;
+      const controllerBottom = Number.parseFloat(
+        controller ? getComputedStyle(controller).bottom : "",
+      );
+      const controllerTop = Number.isFinite(controllerBottom) && controllerRect?.height > 0
+        ? viewportHeight - controllerBottom - controllerRect.height
+        : controllerRect?.top;
+      const bottom = this._datePickerAutoHide
+        ? viewportHeight
+        : controllerRect?.height > 0
+          ? Math.min(viewportHeight, controllerTop)
+          : viewportHeight;
       const top = Math.max(0, host.getBoundingClientRect().top);
-      const available = Math.max(240, Math.floor(bottom - top - 16));
+      const available = Math.max(MIN_NUMERIC_GRAPH_HEIGHT, Math.floor(bottom - top - 16));
       const numericShell = host.querySelector(".graph-shell.numeric-graph");
       const numericCard = numericShell?.querySelector(CARD_TAG);
       const cardRoot = numericCard?.shadowRoot;
@@ -396,6 +531,9 @@ export class GraphMethods {
       observe(cardElement);
       observe(detailLegend);
       const numericRequirement = this._numericCardRequiredHeight(numericCard);
+      const layoutHeight = this._dashboardCardMode
+        ? Math.max(MIN_NUMERIC_GRAPH_HEIGHT, numericRequirement)
+        : available;
       if (hasState) {
         host.style.removeProperty("height");
         // Do not give the grid a viewport-sized minimum: an auto state row is
@@ -404,19 +542,23 @@ export class GraphMethods {
         host.style.removeProperty("min-height");
         const stateShell = host.querySelector(".graph-shell.state-graph");
         const stateHeight = Math.ceil(stateShell?.getBoundingClientRect().height || 0);
-        const numericHeight = `${Math.max(
-          240,
-          available - stateHeight - 16,
+        const numericHeightValue = Math.max(
+          MIN_NUMERIC_GRAPH_HEIGHT,
+          layoutHeight - stateHeight - 16,
           numericRequirement,
-        )}px`;
+        );
+        const numericHeight = `${numericHeightValue}px`;
         if (host.style.getPropertyValue("--numeric-graph-height") !== numericHeight) {
           host.style.setProperty("--numeric-graph-height", numericHeight);
         }
+        this._fitAutomaticNumericCard(numericCard, numericHeightValue);
       } else {
         host.style.removeProperty("min-height");
         host.style.removeProperty("--numeric-graph-height");
-        const next = `${Math.max(available, numericRequirement)}px`;
+        const numericHeightValue = Math.max(layoutHeight, numericRequirement);
+        const next = `${numericHeightValue}px`;
         if (host.style.height !== next) host.style.height = next;
+        this._fitAutomaticNumericCard(numericCard, numericHeightValue);
       }
     };
     const schedule = () => {
@@ -447,25 +589,41 @@ export class GraphMethods {
       }
     }
     if (typeof MutationObserver !== "undefined") {
-      this._graphLayoutMutationObserver = new MutationObserver(schedule);
+      this._graphLayoutMutationObserver = new MutationObserver((mutations) => {
+        // SGCC rewrites tooltip rows continuously while the pointer moves.
+        // Relabel those new text nodes in this mutation microtask, before the
+        // browser can paint SGCC's generic comparison name for one frame.
+        this._applyComparisonLabelsForMutations(mutations);
+        schedule();
+      });
       this._graphLayoutObservedRoots = new WeakSet();
     }
     this._graphLayoutObserveCard = (card) => {
       const observeRoot = () => {
         const root = card?.shadowRoot;
         if (!root || this._graphLayoutObservedRoots?.has(root)) return Boolean(root);
+        this._guardDashboardLegendLayout(card);
+        this._guardPanelLegendVisibility(card);
+        this._restorePanelLegendVisibility(card);
+        root.addEventListener("change", (event) => {
+          if (!event.target?.closest?.('[data-qp="gby"], .sgc-group-by-picker')) return;
+          this._syncLargeRangeDetailBannerFromCard(card);
+          this._persistFineDetailGroupSelection(card);
+        });
         this._graphLayoutMutationObserver?.observe(root, {
           childList: true,
           characterData: true,
           subtree: true,
         });
         this._graphLayoutObservedRoots?.add(root);
+        this._syncLargeRangeDetailBannerFromCard(card);
         schedule();
         return true;
       };
       if (!observeRoot()) requestAnimationFrame(observeRoot);
       card?.updateComplete?.then(() => {
         observeRoot();
+        this._syncLargeRangeDetailBannerFromCard(card);
         schedule();
       });
     };
@@ -473,28 +631,291 @@ export class GraphMethods {
     schedule();
   }
 
-  _detailCardOptions(detail = null) {
-    if (!detail) {
-      const configured = this._effectiveCardOptionsConfig("timeline");
-      const hasManualResolution = (
-        ["points_per_hour", "group_by"].some(
-          (key) => Object.prototype.hasOwnProperty.call(configured || {}, key),
-        )
-        || configured?.show_pph_picker === true
-        || configured?.show_group_by_picker === true
+  _applyComparisonLabelsForMutations(mutations) {
+    const cards = new Set();
+    for (const mutation of mutations || []) {
+      const card = mutation?.target?.getRootNode?.()?.host;
+      if (card) cards.add(card);
+    }
+    for (const card of cards) {
+      this._applyComparisonSeriesPeriodLabels?.(card);
+      this._restorePanelLegendVisibility(card);
+    }
+  }
+
+  _guardDashboardLegendLayout(card) {
+    if (!this._dashboardCardMode || card?.__advancedHistoryLegendLayoutGuard) return;
+    const root = card?.shadowRoot;
+    if (!root) return;
+    const lock = (event) => {
+      if (!event.target?.closest?.(".sgc-detail-legend-entity, .sgc-legend-item")) return;
+      this._lockDashboardCardLayout?.();
+    };
+    const selector = ".sgc-detail-legend-entity[data-id], .sgc-legend-item[data-id]";
+    const eventEntry = (event) => event.composedPath?.().find(
+      (node) => node?.matches?.(selector),
+    ) || event.target?.closest?.(selector);
+    // Lock before SGCC handles the click and redraws its plot/legend. Waiting
+    // for ResizeObserver is too late because Lovelace can already have seen
+    // the transient size and repositioned the dashboard.
+    root.addEventListener("pointerdown", lock, true);
+    root.addEventListener("click", (event) => {
+      lock(event);
+      const entry = eventEntry(event);
+      if ((event.metaKey || event.ctrlKey) && entry?.dataset?.id) {
+        setTimeout(() => {
+          this._toggleDashboardLegendHideOnLoad?.(card, entry.dataset.id);
+        }, 0);
+      }
+    }, true);
+    card.__advancedHistoryLegendLayoutGuard = true;
+  }
+
+  _guardPanelLegendVisibility(card) {
+    if (this._dashboardCardMode || card?.__advancedHistoryPanelLegendVisibilityGuard) return;
+    const root = card?.shadowRoot;
+    if (!root) return;
+    const selector = ".sgc-detail-legend-entity[data-id], .sgc-legend-item[data-id]";
+    const eventEntry = (event) => event.composedPath?.().find(
+      (node) => node?.matches?.(selector),
+    ) || event.target?.closest?.(selector);
+    root.addEventListener("click", (event) => {
+      if (this._suppressPanelLegendVisibilitySync) return;
+      const entry = eventEntry(event);
+      if (!entry) return;
+      card.__advancedHistoryLegendVisibilityOverridden = true;
+      if (event.metaKey || event.ctrlKey) {
+        setTimeout(() => {
+          this._togglePanelLegendHideOnLoad(card, entry.dataset.id);
+        }, 0);
+      }
+    }, true);
+    card.__advancedHistoryPanelLegendVisibilityGuard = true;
+  }
+
+  _panelLegendStateKey(card) {
+    return card?.__advancedHistoryLegendStateKey || "";
+  }
+
+  _togglePanelLegendHideOnLoad(card, legendId) {
+    const current = card?.__advancedHistoryConfig;
+    if (!current || !Array.isArray(card?._entities)) return false;
+    const [config] = configsWithToggledLegendHideOnLoad(
+      [current],
+      0,
+      card._entities,
+      legendId,
+    );
+    if (!config || JSON.stringify(config) === JSON.stringify(current)) return false;
+    this._applyGraphEditorConfig(config, card.__advancedHistorySeries, current);
+    this._renderGraphs();
+    return true;
+  }
+
+  // TODO(v2.5): Remove the legacy `legend_hidden_series` compatibility path:
+  // this migration, `_restorePanelLegendVisibility`, its snapshot preservation
+  // in `_commitGraphEditorConfig`, the storage/constant allow-list entries, and
+  // their legacy-only tests. SGCC's `auto_hide`/`hide_on_load` is authoritative.
+  _migrateLegacyLegendVisibility(card, config) {
+    if (this._dashboardCardMode || this._loadedExternalBookmark) return config;
+    const key = this._panelLegendStateKey(card);
+    const hidden = this._activeSnapshot?.legend_hidden_series?.[key];
+    if (!key || !Array.isArray(hidden) || !hidden.length || !Array.isArray(card?._entities)) {
+      return config;
+    }
+    let migrated = config;
+    for (const legendId of hidden) {
+      [migrated] = configsWithToggledLegendHideOnLoad(
+        [migrated],
+        0,
+        card._entities,
+        legendId,
+        true,
       );
+    }
+    const remaining = { ...(this._activeSnapshot.legend_hidden_series || {}) };
+    delete remaining[key];
+    this._activeSnapshot = { ...(this._activeSnapshot || {}) };
+    if (Object.keys(remaining).length) this._activeSnapshot.legend_hidden_series = remaining;
+    else delete this._activeSnapshot.legend_hidden_series;
+    if (JSON.stringify(migrated) === JSON.stringify(config)) {
+      this._recordChange(null, true);
+      return config;
+    }
+    this._applyGraphEditorConfig(
+      migrated,
+      card.__advancedHistorySeries,
+      config,
+    );
+    return migrated;
+  }
+
+  _restorePanelLegendVisibility(card) {
+    if (
+      this._dashboardCardMode
+      || this._suppressPanelLegendVisibilitySync
+      || card?.__advancedHistoryLegendVisibilityOverridden
+    ) return;
+    const key = this._panelLegendStateKey(card);
+    const saved = new Set(this._activeSnapshot?.legend_hidden_series?.[key] || []);
+    if (!key || !saved.size) return;
+    const root = card?.shadowRoot;
+    if (!root) return;
+    const entries = [
+      ...root.querySelectorAll(
+        ".sgc-detail-legend-entity[data-id], .sgc-legend-item[data-id]",
+      ),
+    ];
+    this._suppressPanelLegendVisibilitySync = true;
+    try {
+      for (const legendId of saved) {
+        if (card._hiddenEntities?.has?.(legendId)) continue;
+        entries.find((entry) => entry.dataset.id === legendId)?.click();
+      }
+    } finally {
+      this._suppressPanelLegendVisibilitySync = false;
+    }
+  }
+
+  _applyDashboardGraphBackground(card, config) {
+    if (!this._dashboardCardMode || !card?.style) return;
+    const transparent = String(config?.card_background_color || "")
+      .trim()
+      .toLowerCase() === "transparent";
+    // Do not make the theme surface variables transparent. SGCC also uses
+    // them for floating UI such as graph and pie tooltips and the date picker
+    // panel. Transparency is deliberately scoped to the card/plot below.
+    for (const property of ["--ha-card-background", "--card-background-color"]) {
+      card.style.removeProperty(property);
+    }
+
+    const root = card.shadowRoot;
+    if (!root) return;
+    const selector = "style[data-advanced-history-transparent-sgcc]";
+    const existing = root.querySelector?.(selector);
+    if (!transparent) {
+      existing?.remove?.();
+      return;
+    }
+    if (existing) return;
+
+    const ownerDocument = card.ownerDocument || root.ownerDocument;
+    const style = ownerDocument?.createElement?.("style");
+    if (!style) return;
+    style.dataset.advancedHistoryTransparentSgcc = "";
+    // SGCC applies its card background inside its own shadow root. Keep those
+    // surfaces transparent so AHC's themed background remains visible. Only
+    // the colour component is overridden, preserving any configured image.
+    style.textContent = `
+      .sgc-card,
+      .sgc-plot-wrap,
+      .sgc-plot {
+        background-color: transparent !important;
+      }
+      .sgc-card {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+      }
+    `;
+    root.append?.(style);
+  }
+
+  _axisLegendEntries(axis) {
+    const entries = [];
+    for (const card of this._graphCards || []) {
+      const root = card?.shadowRoot;
+      const entities = card?._entities;
+      if (!root || !Array.isArray(entities)) continue;
+
+      // SGCC renders either its detailed or compact legend depending on the
+      // available width. Use whichever is active and address its entries with
+      // the same stable id SGCC assigns to each configured main series.
+      const detailed = [...root.querySelectorAll(".sgc-detail-legend-entity[data-id]")];
+      const compact = [...root.querySelectorAll(".sgc-legend-item[data-id]")];
+      const rendered = detailed.length ? detailed : compact;
+      const byId = new Map(rendered.map((entry) => [entry.dataset.id, entry]));
+
+      entities.forEach((entity, index) => {
+        if (!entity || entity._compareOf != null) return;
+        const entityAxis = entity.y_axis === "secondary" ? "secondary" : "primary";
+        if (entityAxis !== axis) return;
+        const entityId = entity.entity || entity.statistic_id;
+        const entry = entityId ? byId.get(`${entityId}__${index}`) : null;
+        if (entry) entries.push(entry);
+      });
+    }
+    return entries;
+  }
+
+  _legendEntryHidden(entry) {
+    return Boolean(
+      entry?.classList?.contains("legend-hidden")
+      || entry?.classList?.contains("hidden")
+    );
+  }
+
+  _syncAxisVisibilityButtons() {
+    for (const [axis, id] of [["primary", "toggle-y1-visibility"], ["secondary", "toggle-y2-visibility"]]) {
+      const entries = this._axisLegendEntries(axis);
+      const allHidden = entries.length > 0
+        && entries.every((entry) => this._legendEntryHidden(entry));
+      const button = this.shadowRoot?.getElementById(id);
+      if (!button) continue;
+      button.classList.toggle("all-hidden", allHidden);
+      button.setAttribute("aria-pressed", String(!allHidden));
+    }
+  }
+
+  _toggleAxisLegendVisibility(axis) {
+    const entries = this._axisLegendEntries(axis);
+    if (!entries.length) return;
+    const hide = entries.some((entry) => !this._legendEntryHidden(entry));
+    this._suppressPanelLegendVisibilitySync = true;
+    try {
+      for (const entry of entries) {
+        if (this._legendEntryHidden(entry) !== hide) entry.click();
+      }
+    } finally {
+      this._suppressPanelLegendVisibilitySync = false;
+    }
+    this._syncAxisVisibilityButtons();
+  }
+
+  _detailCardOptions(detail = null) {
+    const mode = this._detailModeValue();
+    if (mode === "manual") {
       return {
-        auto_scale_points: hasManualResolution
-          ? false
-          : this.config.large_range_automatic_detail !== false,
+        auto_scale_points: false,
+        show_pph_picker: true,
+        show_group_by_picker: true,
       };
     }
-    if (detail.automatic) return { auto_scale_points: true };
-    return {
+    if (!detail) {
+      return {
+        auto_scale_points: true,
+        show_pph_picker: false,
+        show_group_by_picker: false,
+      };
+    }
+    if (detail.automatic) {
+      return {
+        auto_scale_points: true,
+        show_pph_picker: false,
+        show_group_by_picker: false,
+      };
+    }
+    const options = {
       auto_scale_points: false,
       group_by: detail.groupBy,
+      show_pph_picker: false,
       show_group_by_picker: true,
     };
+    if (Number.isFinite(detail.pointsPerHour)) {
+      options.points_per_hour = detail.pointsPerHour;
+    }
+    return options;
   }
 
   _hasDetailResolutionOverride() {
@@ -508,12 +929,37 @@ export class GraphMethods {
   }
 
   _resolvedDetailCardOptions(detail = null, cardOptions = {}) {
-    // Automatic detail supplies inherited defaults. Explicit integration or
-    // chart options are always applied afterwards and therefore win.
-    return { ...this._detailCardOptions(detail), ...cardOptions };
+    const detailOptions = this._detailCardOptions(detail);
+    if (this._detailModeValue() === "manual") {
+      return { ...cardOptions, ...detailOptions };
+    }
+    const resolved = { ...cardOptions };
+    for (const key of [
+      "auto_scale_points",
+      "points_per_hour",
+      "group_by",
+      "show_pph_picker",
+      "pph_picker_position",
+      "pph_picker_group",
+      "show_group_by_picker",
+      "group_by_picker_position",
+      "group_by_picker_group",
+    ]) delete resolved[key];
+    return { ...resolved, ...detailOptions };
   }
 
-  _createGraph(host, series, title, mode, detail = null) {
+  _mountConfiguredGraphCard(host, shell, card) {
+    host.append(shell);
+    this._cards.push(card);
+    this._graphCards.push(card);
+    // Match Home Assistant's card lifecycle: mount the configured element
+    // before assigning hass. Cached recorder responses can otherwise finish
+    // while SGCC is disconnected, making its first SVG measure the generic
+    // 200px fallback instead of the available panel height.
+    this._setGraphCardHass(card, this._hass);
+  }
+
+  _createGraph(host, series, title, mode, detail = null, stateStripKeys = new Set()) {
     const shell = document.createElement("div");
     shell.className = "graph-shell";
     shell.classList.add(mode === "state_timeline" ? "state-graph" : "numeric-graph");
@@ -525,23 +971,71 @@ export class GraphMethods {
     const sourceKey = this._dataSourceCacheKey(mode, series);
     card.__advancedHistorySourceTracker = this._createDataSourceTracker(
       sourceIndicator,
-      Boolean(this._energyCollection),
+      Boolean(this._periodStore),
       sourceKey
     );
     card.__advancedHistoryChartMode = mode;
     card.__advancedHistorySourceKey = sourceKey;
+    card.__advancedHistorySeries = series;
+    card.__advancedHistoryLegendStateKey = [
+      mode,
+      series.map((item) => this._seriesDescriptor(item).key).join("\u001f"),
+    ].join("\u001e");
     this._guardFutureEnergySeries(card);
     const cardOptionsConfig = this._effectiveCardOptionsConfig(mode);
     const cardOptions = { ...this._cardOptions(mode, cardOptionsConfig) };
     if (cardOptions.chart_mode && cardOptions.chart_mode !== mode) {
       delete cardOptions.chart_mode;
     }
-    const resolvedCardOptions = this._resolvedDetailCardOptions(detail, cardOptions);
-    const entities = series.map((item) => this._entityCardConfig(
-      item,
-      mode,
-      cardOptionsConfig,
-    ));
+    let resolvedCardOptions = mode === "state_timeline"
+      ? cardOptions
+      : this._resolvedDetailCardOptions(detail, cardOptions);
+    if (stateStripKeys.size) {
+      const stateOptions = this._cardOptions("state_timeline");
+      const presentation = stateStripPresentationOptions(resolvedCardOptions, stateOptions);
+      resolvedCardOptions = presentation.options;
+      card.__advancedHistoryStateStripLabelFontSize = presentation.labelFontSize;
+    }
+    const entities = series.map((item) => {
+      const descriptor = this._seriesDescriptor(item);
+      const stateStrip = stateStripKeys.has(descriptor.key);
+      const configured = this._entityCardConfig(
+        item,
+        stateStrip ? "state_timeline" : mode,
+        stateStrip ? this._effectiveCardOptionsConfig("state_timeline") : cardOptionsConfig,
+      );
+      if (!stateStrip) return configured;
+      delete configured.y_axis;
+      return { ...configured, graph_type: "state_strip" };
+    });
+    const runningTotalEntities = new Set();
+    const runningTotalExportAggregates = {};
+    if (mode !== "state_timeline") {
+      const transforms = this._activeSnapshot?.series_transforms || {};
+      const axisTransforms = this._activeSnapshot?.running_total_axes || {};
+      entities.forEach((configured) => {
+        if (configured.graph_type === "state_strip") return;
+        const axis = configured.y_axis === "secondary" ? "secondary" : "primary";
+        if (
+          configured.attribute == null
+          && (
+            transforms[configured.entity] === "running_total"
+            || axisTransforms[axis] === true
+          )
+        ) {
+          runningTotalEntities.add(configured.entity);
+          runningTotalExportAggregates[configured.entity] = {
+            defined: Object.prototype.hasOwnProperty.call(configured, "aggregate_func"),
+            value: configured.aggregate_func,
+          };
+          // Let the card calculate accurate per-bucket usage first. Its
+          // bucketing hook below then turns those changes into a running total.
+          configured.aggregate_func = "change";
+        }
+      });
+    }
+    card.__advancedHistoryRunningTotalEntities = runningTotalEntities;
+    card.__advancedHistoryRunningTotalExportAggregates = runningTotalExportAggregates;
     const palette = extendedEntityPalette(
       customElements.get(CARD_TAG)?.PALETTE,
       entities.length + entities.reduce(
@@ -549,6 +1043,19 @@ export class GraphMethods {
         0,
       ),
     );
+    entities.forEach((configured, index) => {
+      const current = configured.attribute
+        ? this._attributeValue(this._hass.states[configured.entity], configured.attribute)
+        : undefined;
+      if (typeof current !== "boolean" || !Array.isArray(configured.state_map)) return;
+      const activeColor = configured.color || palette[index % palette.length];
+      if (!configured.color && activeColor) configured.color = activeColor;
+      configured.state_map = withBooleanStateColors(
+        configured.state_map,
+        activeColor,
+        true,
+      );
+    });
     const usedColors = new Set();
     if (mode !== "state_timeline") {
       // Older scoped editor sessions could persist the first palette colour
@@ -575,6 +1082,7 @@ export class GraphMethods {
       // removed, causing the remaining series to change color.
       if (
         mode !== "state_timeline"
+        && configured.graph_type !== "state_strip"
         && configured.color == null
         && Array.isArray(palette)
         && palette.length
@@ -643,7 +1151,7 @@ export class GraphMethods {
       promoteBatteryUpperBound("primary", "upper_bound");
       promoteBatteryUpperBound("secondary", "upper_bound_secondary");
     }
-    const config = {
+    let config = {
       type: `custom:${CARD_TAG}`, card_header: title,
       entities,
       hours_to_show: this._effectiveDefaultHours(),
@@ -657,12 +1165,27 @@ export class GraphMethods {
         ? { auto_scale_points: false, group_by: "raw" }
         : {}),
       time_zone: cardOptions.time_zone ?? this._resolvedTimeZone(),
-      energy_date_sync: true,
-      ...(this._panelEnergyCollectionKey()
-        ? { energy_collection_key: this._panelEnergyCollectionKey() }
-        : {}),
       ...this._panelGraphHourOptions(),
     };
+    if (!this._dashboardCardMode) {
+      config.show_date_picker = false;
+      config.date_picker_group = this._periodSyncGroup?.();
+    }
+    if (this._dashboardCardMode) {
+      config = withoutDashboardWrapperNavigation(config);
+      if (config.card_background_color == null || config.card_background_color === "") {
+        config.card_background_color = "transparent";
+      }
+      config.show_date_picker = false;
+      const syncGroup = this._dashboardDatePickerGroup?.() || "advanced-history-dashboard";
+      for (const key of DASHBOARD_SYNC_GROUP_KEYS) {
+        if (!Object.prototype.hasOwnProperty.call(config, key)) config[key] = syncGroup;
+      }
+      config = this._applyDashboardChildScaleOptions?.(config) || config;
+    }
+    if (mode !== "state_timeline") {
+      config = withClimateActionAnnotations(config, entities);
+    }
     if (mode !== "state_timeline" && config.height === "auto") {
       // The card's native height:auto implementation only enables its
       // fill-height path when it is hosted in a numeric grid row. AHP owns
@@ -680,11 +1203,11 @@ export class GraphMethods {
       shell.classList.add("state-controls-row");
     }
     try {
-      if (detail?.automatic) {
+      this._applyDashboardGraphBackground(card, config);
+      if (mode !== "state_timeline" && this._detailModeValue() !== "manual") {
         // Statistics Graph Chart Card persists its on-card Group By and PPH
-        // overrides. Apply one picker-free configuration first so the card's
-        // public setConfig path clears those overrides before Auto Scale is
-        // restored. Picker visibility then follows the Card Defaults YAML.
+        // overrides. Apply one picker-free configuration first so switching
+        // away from Manual clears them before Auto/Fine settings are restored.
         card.setConfig({
           ...config,
           show_group_by_picker: false,
@@ -694,9 +1217,16 @@ export class GraphMethods {
         });
       }
       card.setConfig(config);
+      const migratedConfig = this._migrateLegacyLegendVisibility(card, config);
+      if (migratedConfig !== config) {
+        config = migratedConfig;
+        card.setConfig(config);
+      }
+      this._applyStateStripLabelStyle(card);
+      this._applyDashboardGraphBackground(card, config);
       card.__advancedHistoryConfig = config;
-      this._setGraphCardHass(card, this._hass);
       shell.append(card, sourceIndicator);
+      this._trackDashboardScaleCard?.(card, this._graphCards?.length || 0);
       // Panel chart overrides belong to the current user's chart state. A
       // bookmark loaded from another user's shared library remains read-only;
       // service defaults and More Info entity overrides retain their separate
@@ -714,11 +1244,16 @@ export class GraphMethods {
         );
         shell.append(editorButton);
       }
-      host.append(shell);
-      this._cards.push(card);
-      this._graphCards.push(card);
+      this._mountConfiguredGraphCard(host, shell, card);
+      this._observeRenderedGraphDataSource(card);
+      this._syncGraphCardsToPeriod?.();
       this._graphLayoutObserveCard?.(card);
       card.updateComplete?.then(() => {
+        this._applyStateStripLabelStyle(card);
+        this._applyDashboardGraphBackground(card, config);
+        if (this._graphCards?.includes(card)) {
+          this._syncGraphCardsToPeriod?.();
+        }
         this._graphLayoutSchedule?.();
       });
     }
@@ -744,9 +1279,27 @@ export class GraphMethods {
     }
   }
 
+  _applyStateStripLabelStyle(card) {
+    const root = card?.shadowRoot;
+    if (!root) return;
+    const selector = "style[data-advanced-history-state-strip-labels]";
+    const existing = root.querySelector?.(selector);
+    const size = card.__advancedHistoryStateStripLabelFontSize;
+    if (!Number.isFinite(size)) {
+      existing?.remove?.();
+      return;
+    }
+    const style = existing || (card.ownerDocument || root.ownerDocument)?.createElement?.("style");
+    if (!style) return;
+    style.dataset.advancedHistoryStateStripLabels = "";
+    const css = `.sgc-strip-label { font-size:${size}px !important; }`;
+    if (style.textContent !== css) style.textContent = css;
+    if (!existing) root.append(style);
+  }
+
   _largeRangePeriod() {
-    const start = this._energyCollection?.start;
-    const end = this._energyCollection?.end;
+    const start = this._periodStore?.start;
+    const end = this._periodStore?.end;
     const startMs = start?.getTime?.();
     const endMs = end?.getTime?.();
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return null;
@@ -762,43 +1315,207 @@ export class GraphMethods {
   }
 
   _largeRangeDetailProfile() {
-    if (this.config.large_range_automatic_detail === false) return null;
-    if (this._hasDetailResolutionOverride()) return null;
+    const mode = this._detailModeValue();
+    if (mode === "manual") return null;
+    const fine = mode === "fine";
+    if (!fine && this.config.large_range_automatic_detail === false) return null;
     const period = this._largeRangePeriod();
     const thresholdDays = Math.max(7, Number(this.config.large_range_detail_threshold_days) || 31);
     if (!period) return null;
-    const nextMonth = new Date(period.start);
-    nextMonth.setMonth(nextMonth.getMonth() + 1);
-    const calendarMonth = period.start.getDate() === 1
-      && period.start.getHours() === 0
-      && period.start.getMinutes() === 0
-      && Math.abs(period.end.getTime() - (nextMonth.getTime() - 1)) < 7_200_000;
-    // The default 31-day threshold represents a calendar month, including
-    // February and 30-day months. The normal duration rule remains exact for
-    // user-configured thresholds and non-calendar ranges.
-    if (
-      period.hours < thresholdDays * 24 - 2
-      && !(thresholdDays === 31 && calendarMonth)
-    ) return null;
-    const groupBy = period.hours > 730 * 24
-      ? "week"
-      : period.hours > 92 * 24
-        ? "date"
-        : "6h";
+    const groupBy = fine
+      ? period.hours <= 28
+        ? "interval"
+        : period.hours <= 192
+          ? "hour"
+          : period.hours <= 768
+            ? "6h"
+            : period.hours <= 730 * 24
+              ? "date"
+              : "week"
+      : period.hours > 730 * 24
+        ? "week"
+        : period.hours > 92 * 24
+          ? "date"
+          : "6h";
     return {
       ...period,
       thresholdDays,
       groupBy,
-      automatic: !this._largeRangeFineDetail,
+      ...(fine && groupBy === "interval" ? { pointsPerHour: 12 } : {}),
+      automatic: !fine,
     };
+  }
+
+  _detailModeValue() {
+    if (["auto", "fine", "manual"].includes(this._detailMode)) return this._detailMode;
+    return this._largeRangeFineDetail ? "fine" : "auto";
+  }
+
+  _detailControlAvailable(series = this._seriesDescriptors(this._resolvedEntityIds())) {
+    return series.some((item) => this._isNumeric(item));
+  }
+
+  _detailModePresentation(mode = this._detailModeValue()) {
+    if (mode === "manual") {
+      return { icon: "mdi:tune-vertical", label: this._customLocalize("detail_mode_manual") };
+    }
+    if (mode === "fine") {
+      return { icon: "mdi:chart-bell-curve", label: this._customLocalize("detail_mode_fine") };
+    }
+    return { icon: "mdi:speedometer", label: this._customLocalize("detail_mode_auto") };
+  }
+
+  _syncDetailModeButton() {
+    const button = this.shadowRoot?.getElementById("toggle-detail-mode");
+    if (!button) return;
+    const available = this._detailControlAvailable();
+    const mode = this._detailModeValue();
+    const presentation = this._detailModePresentation(mode);
+    const title = `${this._customLocalize("detail_control")}: ${presentation.label}`;
+    button.hidden = !available;
+    button.dataset.mode = mode;
+    button.classList.toggle("active", mode !== "auto");
+    button.setAttribute("aria-label", title);
+    button.title = title;
+    button.querySelector("ha-icon")?.setAttribute("icon", presentation.icon);
+  }
+
+  _renderDetailModeMenu() {
+    const menu = this.shadowRoot?.getElementById("detail-mode-menu");
+    if (!menu) return;
+    const selected = this._detailModeValue();
+    const modes = ["auto", "fine", "manual"].map((mode) => {
+      const presentation = this._detailModePresentation(mode);
+      const checked = mode === selected;
+      return `<ha-dropdown-item data-detail-mode="${mode}" role="menuitemradio" aria-checked="${checked}"><ha-icon slot="icon" icon="${checked ? "mdi:radiobox-marked" : "mdi:radiobox-blank"}"></ha-icon>${this._escape(presentation.label)}</ha-dropdown-item>`;
+    }).join("");
+    const showBanner = this._showDetailBanner !== false;
+    menu.innerHTML = `${modes}<ha-dropdown-item data-detail-banner role="menuitemcheckbox" aria-checked="${showBanner}"><ha-icon slot="icon" icon="${showBanner ? "mdi:checkbox-marked-outline" : "mdi:checkbox-blank-outline"}"></ha-icon>${this._escape(this._customLocalize("show_detail_banner"))}</ha-dropdown-item>`;
+    for (const item of menu.querySelectorAll("[data-detail-mode]")) {
+      item.addEventListener("click", (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        this._setDetailMode(item.dataset.detailMode);
+      });
+    }
+    menu.querySelector("[data-detail-banner]")?.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      this._setDetailBannerVisible(!showBanner);
+    });
+  }
+
+  _toggleDetailModeMenu(event) {
+    event?.preventDefault();
+    event?.stopPropagation();
+    const menu = this.shadowRoot?.getElementById("detail-mode-menu");
+    const button = this.shadowRoot?.getElementById("toggle-detail-mode");
+    if (!menu || !button) return;
+    const opening = !menu.open;
+    this._closeDetailModeMenu();
+    if (!opening) return;
+    this._renderDetailModeMenu();
+    menu.anchorElement = button;
+    menu.open = true;
+    button.setAttribute("aria-expanded", "true");
+    menu.addEventListener("wa-hide", () => {
+      button.setAttribute("aria-expanded", "false");
+    }, { once: true });
+  }
+
+  _closeDetailModeMenu() {
+    const menu = this.shadowRoot?.getElementById("detail-mode-menu");
+    const button = this.shadowRoot?.getElementById("toggle-detail-mode");
+    if (menu) menu.open = false;
+    button?.setAttribute("aria-expanded", "false");
+  }
+
+  _setDetailMode(mode) {
+    if (!["auto", "fine", "manual"].includes(mode)) return false;
+    this._closeDetailModeMenu();
+    if (mode === this._detailModeValue()) return false;
+    this._detailMode = mode;
+    this._largeRangeFineDetail = mode === "fine";
+    this._largeRangeDetailStateKey = null;
+    this._largeRangeDetailDismissedKey = null;
+    this._recordChange(null, true);
+    this._syncDetailModeButton();
+    this._renderGraphs();
+    return true;
+  }
+
+  _setDetailBannerVisible(visible) {
+    this._closeDetailModeMenu();
+    const next = visible !== false;
+    if (next === (this._showDetailBanner !== false)) return false;
+    this._showDetailBanner = next;
+    this._largeRangeDetailDismissedKey = null;
+    this._recordChange(null, true);
+    this._renderLargeRangeDetailBanner();
+    return true;
   }
 
   _largeRangeDetailRenderKey() {
     const profile = this._largeRangeDetailProfile();
     if (!profile) return "off";
     return profile.automatic
-      ? `detail|auto|${profile.key}`
-      : `fine|${profile.groupBy}|${profile.key}`;
+      ? "detail|auto"
+      : `fine|${profile.groupBy}`;
+  }
+
+  _largeRangeDetailProfileFromCard(card, profile = this._largeRangeDetailProfile()) {
+    if (!profile || profile.automatic) return profile;
+    const picker = card?.shadowRoot?.querySelector(
+      '[data-qp="gby"] select, select[data-qp="gby"], .sgc-group-by-picker select',
+    );
+    const groupBy = String(picker?.value || "").trim();
+    const resolutionLabel = String(
+      picker?.selectedOptions?.[0]?.textContent
+      || picker?.options?.[picker?.selectedIndex]?.textContent
+      || "",
+    ).trim();
+    if (!groupBy && !resolutionLabel) return profile;
+    return {
+      ...profile,
+      ...(groupBy ? { groupBy } : {}),
+      ...(resolutionLabel ? { resolutionLabel } : {}),
+    };
+  }
+
+  _syncLargeRangeDetailBannerFromCard(card) {
+    const profile = this._largeRangeDetailProfileFromCard(card);
+    if (profile && !profile.automatic) this._renderLargeRangeDetailBanner(profile);
+  }
+
+  _persistFineDetailGroupSelection(card) {
+    const profile = this._largeRangeDetailProfileFromCard(card);
+    if (!profile || profile.automatic || !profile.groupBy) return false;
+    const snapshot = this._activeSnapshot ||= {
+      defaults_mode: "overrides",
+      card_options: {},
+      entity_options: {},
+    };
+    const configured = snapshot.card_options;
+    const typed = configured
+      && typeof configured === "object"
+      && !Array.isArray(configured)
+      && (configured.numeric || configured.state);
+    const numeric = this._clone(
+      typed ? configured.numeric || {} : configured || {},
+    );
+    if (
+      numeric.auto_scale_points === false
+      && numeric.group_by === profile.groupBy
+      && numeric.show_group_by_picker === true
+    ) return false;
+    numeric.auto_scale_points = false;
+    numeric.group_by = profile.groupBy;
+    numeric.show_group_by_picker = true;
+    snapshot.card_options = typed
+      ? { ...this._clone(configured), numeric }
+      : numeric;
+    this._recordChange(null, true);
+    return true;
   }
 
   _renderLargeRangeDetailBanner(profile = this._largeRangeDetailProfile()) {
@@ -810,6 +1527,7 @@ export class GraphMethods {
     if (
       this._periodRestoreLoading
       || !profile
+      || this._showDetailBanner === false
       || dismissalKey === this._largeRangeDetailDismissedKey
     ) {
       banner.hidden = true;
@@ -817,9 +1535,11 @@ export class GraphMethods {
       return;
     }
 
-    const resolution = this._customLocalize(
-      `detail_resolution_${profile.automatic ? "auto" : profile.groupBy}`
-    );
+    const resolutionKey = `detail_resolution_${profile.automatic ? "auto" : profile.groupBy}`;
+    const translatedResolution = this._customLocalize(resolutionKey);
+    const resolution = translatedResolution === resolutionKey
+      ? profile.resolutionLabel || profile.groupBy
+      : translatedResolution;
     const text = profile.automatic
       ? this._customLocalize("automatic_detail_active", { resolution })
       : this._customLocalize("fine_detail_warning", { resolution });
@@ -838,9 +1558,7 @@ export class GraphMethods {
       </button>`;
     banner.hidden = false;
     banner.querySelector("ha-button")?.addEventListener("click", () => {
-      this._largeRangeFineDetail = profile.automatic;
-      this._largeRangeDetailStateKey = this._largeRangeDetailRenderKey();
-      this._renderGraphs();
+      this._setDetailMode(profile.automatic ? "fine" : "auto");
     });
     banner.querySelector(".detail-dismiss")?.addEventListener("click", () => {
       this._largeRangeDetailDismissedKey = dismissalKey;
@@ -850,7 +1568,8 @@ export class GraphMethods {
   }
 
   _canEditPanelChart() {
-    return Boolean(this.config.settings_path) && !this._loadedExternalBookmark;
+    return this._dashboardCardMode
+      || (Boolean(this.config.settings_path) && !this._loadedExternalBookmark);
   }
 
   _createDataSourceTracker(indicator, active = true, sourceKey = null) {
@@ -875,15 +1594,19 @@ export class GraphMethods {
         }
       }
       indicator.className = `data-source-indicator ${source}`;
-      indicator.textContent = this._customLocalize(
+      const label = this._customLocalize(
         source === "pending"
           ? "data_source_pending"
           : source === "mixed"
             ? "data_source_mixed"
             : source === "statistics"
               ? "data_source_statistics"
-              : "data_source_history"
+              : "data_source_history",
       );
+      indicator.textContent = this._dashboardCardMode && source === "statistics"
+        ? "LTS"
+        : label;
+      indicator.setAttribute("aria-label", label);
     };
     const tracker = {
       get source() {
@@ -926,9 +1649,25 @@ export class GraphMethods {
     return tracker;
   }
 
+  _observeRenderedGraphDataSource(card) {
+    const record = () => this._recordRenderedGraphDataSource(card);
+    record();
+    if (typeof MutationObserver === "undefined" || !card?.shadowRoot) return;
+    card.__advancedHistorySourceObserver?.disconnect?.();
+    const observer = new MutationObserver(record);
+    observer.observe(card.shadowRoot, { childList: true, subtree: true });
+    card.__advancedHistorySourceObserver = observer;
+  }
+
+  _recordRenderedGraphDataSource(card) {
+    for (const source of renderedGraphDataSources(card)) {
+      card.__advancedHistorySourceTracker?.record?.(source);
+    }
+  }
+
   _dataSourceCacheKey(mode, series) {
-    const start = this._energyCollection?.start;
-    const end = this._energyCollection?.end;
+    const start = this._periodStore?.start;
+    const end = this._periodStore?.end;
     const startKey = Number.isFinite(start?.getTime?.()) ? start.toISOString() : "";
     const endKey = Number.isFinite(end?.getTime?.()) ? end.toISOString() : "";
     const compare = this._effectiveCompare?.() || "";
@@ -951,7 +1690,7 @@ export class GraphMethods {
         // visible window, which its bucketing turns into a flat series.
         const start = this._panelDayPeriod?.()?.start
           || card._energyStart
-          || this._energyCollection?.start;
+          || this._periodStore?.start;
         const startTime = start instanceof Date
           ? start.getTime()
           : new Date(start).getTime();
@@ -965,62 +1704,21 @@ export class GraphMethods {
     card._bucketSeries = (...args) => {
       let result = bucketSeries.apply(card, args);
       const entity = args[1];
-      const windowStart = Number(args[3]);
-      const windowEnd = Number(args[4]);
-      const offsetHours = Number(entity?.offset);
-      const now = Date.now();
-      const currentWindowExtendsIntoFuture = (
-        Number.isFinite(windowStart)
-        && Number.isFinite(windowEnd)
-        && windowStart <= now
-        && now < windowEnd
-      );
-
+      const entityId = entity?.entity || entity?.statistic_id;
       if (
-        card?._config?.chart_mode === "timeline"
-        && card?._config?.stacked === true
-        && entity?._compareOf == null
-        && (!Number.isFinite(offsetHours) || offsetHours === 0)
-        && currentWindowExtendsIntoFuture
+        card.__advancedHistoryRunningTotalEntities?.has(entityId)
         && Array.isArray(result?.points)
       ) {
-        // TODO: Remove this compatibility workaround once Statistics Graph
-        // Chart Card fixes stacked live endpoints in future-visible periods.
-        // Live states arrive at slightly different times for each entity. If
-        // the visible window continues into the future, stacked fills expose
-        // those different endpoints as diagonal wedges. Carry every current
-        // series to the same minute boundary so the stack ends vertically,
-        // while the remainder of the requested future axis stays empty.
-        const cutoff = Math.floor(now / 60_000) * 60_000;
-        const currentPoints = result.points.filter((point) => point?.t <= now);
-        const lastPoint = currentPoints.at(-1);
-        const points = currentPoints.filter((point) => point?.t < cutoff);
-        if (lastPoint?.v != null) {
-          points.push({ ...lastPoint, t: cutoff });
-        }
-        result = { ...result, points };
+        // SGCC can align lower-resolution comparison data by inserting null
+        // buckets between every real bucket. A running total is unchanged in
+        // those intervals, so carry it across interior nulls; leave leading
+        // and trailing nulls intact so unavailable and future data stay empty.
+        result = cumulativeRunningTotalSeries(result, {
+          carryInteriorNulls: entity?._compareOf != null,
+        });
       }
-
-      if (
-        card?._config?.chart_mode === "state_timeline"
-        && entity?._compareOf == null
-        && (!Number.isFinite(offsetHours) || offsetHours === 0)
-        && Number.isFinite(windowStart)
-        && Number.isFinite(windowEnd)
-      ) {
-        if (windowStart <= now && now < windowEnd && Array.isArray(result?.points)) {
-          const points = result.points.filter((point) => point?.t <= now);
-          const lastPoint = points.at(-1);
-          if (lastPoint?.v != null) {
-            // State-timeline rendering carries its final value to the visible
-            // window end. A null transition at now closes that segment while
-            // leaving the requested future portion of the axis visible.
-            points.push({ ...lastPoint, t: now, v: null });
-          }
-          result = { ...result, points };
-        }
-      }
-
+      const windowEnd = Number(args[4]);
+      const offsetHours = Number(entity?.offset);
       if (
         entity?._compareOf == null
         || !Number.isFinite(offsetHours)
@@ -1053,6 +1751,9 @@ export class GraphMethods {
   _activateGraphDataSourceTracking() {
     for (const card of this._graphCards || []) {
       card.__advancedHistorySourceTracker?.activate?.();
+      // SGCC can satisfy a reconnect entirely from its internal data cache,
+      // producing no request for the hass proxy to observe.
+      this._recordRenderedGraphDataSource(card);
       if (this._hass) {
         // Recreate the instrumented wrapper so reconnecting a cached panel
         // gives the card a genuinely new hass value. This makes the card
@@ -1124,7 +1825,13 @@ export class GraphMethods {
 
     const recordResponse = (message, response) => {
       const source = this._requestDataSource(message);
+      // Modern SGCC handles Home Assistant's compact recorder payload itself.
+      // Rewriting numeric history here changes the payload compared with a
+      // standalone SGCC card and can make it discard recorder data in favour
+      // of long-term statistics. Keep the compatibility conversion confined
+      // to the separate state-timeline card that originally required it.
       const normalized = source === "history"
+        && card.__advancedHistoryChartMode === "state_timeline"
         ? normalizeCompactHistoryResponse(response)
         : response;
       if (source && this._dataSourceResponseHasPoints(normalized)) {
@@ -1232,13 +1939,135 @@ export class GraphMethods {
     return !(hasNumeric && hasState);
   }
 
+  _stateStripsAvailable(series = this._seriesDescriptors(this._resolvedEntityIds())) {
+    const hasNumeric = series.some((item) => this._isNumeric(item));
+    const hasState = series.some((item) => !this._isNumeric(item));
+    const numericMode = this._cardOptions("timeline").chart_mode || "timeline";
+    return hasNumeric && hasState && numericMode === "timeline";
+  }
+
+  _hasMultipleChartGroups(numericGroups, states) {
+    return numericGroups.length + (states.length ? 1 : 0) > 1;
+  }
+
+  _stateStripsEnabled(series = this._seriesDescriptors(this._resolvedEntityIds())) {
+    return this._activeSnapshot?.state_strips === true
+      && this._stateStripsAvailable(series);
+  }
+
+  _syncStateStripsButton() {
+    const button = this.shadowRoot?.getElementById("toggle-state-strips");
+    if (!button) return;
+    const available = this._stateStripsAvailable();
+    const active = available && this._activeSnapshot?.state_strips === true;
+    const label = this._customLocalize(
+      active ? "disable_state_strips" : "enable_state_strips",
+    );
+    button.hidden = !available;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-checked", String(active));
+    button.setAttribute("aria-label", label);
+    button.title = label;
+  }
+
+  _toggleStateStrips() {
+    if (!this._stateStripsAvailable()) return;
+    const chart = this._activeSnapshot
+      ? this._clone(this._activeSnapshot)
+      : this._captureSnapshot().chart;
+    if (chart.state_strips === true) delete chart.state_strips;
+    else chart.state_strips = true;
+    this._activeSnapshot = chart;
+    this._recordChange(null, true);
+    this._syncStateStripsButton();
+    this._renderGraphs();
+  }
+
+  _numericSeriesGroup(value) {
+    const { entity, attribute } = this._seriesDescriptor(value);
+    const state = this._hass.states[entity];
+    const domain = entity.split(".")[0];
+    const nativeAttributeUnit = attribute
+      ? historyAttributeUnit(this._hass, entity)
+      : undefined;
+    const unit = nativeAttributeUnit
+      || state?.attributes?.unit_of_measurement
+      || "";
+    const specialDeviceClasses = {
+      climate: "temperature",
+      humidifier: "humidity",
+      water_heater: "temperature",
+    };
+    const deviceClass = specialDeviceClasses[domain]
+      || state?.attributes?.device_class
+      || "";
+    return {
+      key: `${unit}\u0000${deviceClass}`,
+      unit,
+      deviceClass,
+      domain,
+    };
+  }
+
+  _numericSeriesGroups(series) {
+    if (this._activeSnapshot?.single_graph) {
+      return series.length ? [{ key: "single", unit: "", deviceClass: "", series }] : [];
+    }
+    const groups = new Map();
+    const secondarySeries = [];
+    for (const item of series) {
+      const { entity } = this._seriesDescriptor(item);
+      if (this._y2ResolvedEntityIds?.has(entity)) {
+        secondarySeries.push(item);
+        continue;
+      }
+      const group = this._numericSeriesGroup(item);
+      if (!groups.has(group.key)) groups.set(group.key, { ...group, series: [] });
+      groups.get(group.key).series.push(item);
+    }
+    if (secondarySeries.length) {
+      let primaryGroup = groups.values().next().value;
+      if (!primaryGroup) {
+        const group = this._numericSeriesGroup(secondarySeries[0]);
+        primaryGroup = { ...group, series: [] };
+        groups.set(group.key, primaryGroup);
+      }
+      // Y2 is explicitly chosen to overlay a second scale on the chart. It
+      // must not become a separate unit/device-class graph of its own.
+      primaryGroup.series.push(...secondarySeries);
+    }
+    return [...groups.values()];
+  }
+
+  _numericSeriesGroupTitle(group) {
+    const unit = String(group.unit || "").trim();
+    const deviceClass = String(group.deviceClass || "").trim();
+    if (!deviceClass) return unit || this._customLocalize("numeric_history");
+    const fallback = deviceClass
+      .replaceAll("_", " ")
+      .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    const className = this._localize(
+      `component.sensor.entity_component.${deviceClass}.name`,
+      fallback,
+    );
+    return unit ? `${className} (${unit})` : className;
+  }
+
   _nativeHistorySeries(entity) {
     const state = this._hass.states[entity];
-    return nativeHistoryAttributes(entity, state).map((attribute) => ({
+    const attributeSeries = nativeHistoryAttributes(entity, state).map((attribute) => ({
       entity,
       attribute,
       key: this._seriesKey(entity, attribute),
     }));
+    // Home Assistant's multi-value domains are both numeric and categorical:
+    // their measurement attributes form a line chart while their operating
+    // state remains useful history in its own right. Keep the base state so
+    // AHP can render a state timeline alongside the native attribute series.
+    const domain = entity.split(".", 1)[0];
+    return ["climate", "humidifier", "water_heater"].includes(domain)
+      ? [{ entity, attribute: null, key: this._seriesKey(entity) }, ...attributeSeries]
+      : attributeSeries;
   }
 
   _seriesDescriptors(
@@ -1301,6 +2130,7 @@ export class GraphMethods {
     if (attribute) {
       if (NATIVE_HISTORY_ATTRIBUTES[domain]?.includes(attribute)) return true;
       const attributeValue = this._attributeValue(state, attribute);
+      if (typeof attributeValue === "boolean") return false;
       return attributeValue !== "" && Number.isFinite(Number(attributeValue));
     }
     if (["counter", "input_number", "number"].includes(domain)) return true;
@@ -1361,25 +2191,42 @@ export class GraphMethods {
       }
       const unit = historyAttributeUnit(this._hass, entity);
       if (entityOptions.unit == null && unit != null) entityOptions.unit = unit;
+      if (!Object.prototype.hasOwnProperty.call(entityOptions, "color")) {
+        const color = nativeHistoryAttributeColor(
+          this,
+          entity,
+          this._hass.states[entity],
+          attribute,
+        );
+        if (color) entityOptions.color = color;
+      }
     }
     const enabled = this._enabledResolvedEntityIds?.has(entity) !== false;
     const { compare: compareDefaults, ...options } = entityOptions;
     const activeCompare = this._effectiveCompare();
+    const secondaryAxis = mode !== "state_timeline"
+      && this._y2ResolvedEntityIds?.has(entity);
+    const axisCompare = secondaryAxis && !this._excludeY2Comparison
+      ? this._y2ComparisonValue(activeCompare)
+      : activeCompare;
     let compare = this._withTimeRangeComparisonLayout(
-      this._mergeCompareOptions(activeCompare, compareDefaults),
+      this._mergeCompareOptions(axisCompare, compareDefaults),
     );
     if (mode !== "state_timeline") {
       delete options.state_map;
-      const secondaryAxis = this._y2ResolvedEntityIds?.has(entity);
       options.y_axis = secondaryAxis ? "secondary" : "primary";
       if (secondaryAxis && this._excludeY2Comparison) compare = null;
       return compare == null
         ? { ...options, entity, enabled }
         : { ...options, entity, enabled, compare };
     }
+    const configuredStateMap = attribute
+      && typeof this._attributeValue(this._hass.states[entity], attribute) === "boolean"
+      ? withBooleanStateColors(entityOptions.state_map, entityOptions.color)
+      : entityOptions.state_map;
     const stateMap = mergeStateMaps(
       nativeStateMap(this._hass, entity),
-      entityOptions.state_map
+      configuredStateMap
     );
     const generated = {
       entity,
@@ -1389,6 +2236,45 @@ export class GraphMethods {
     return compare == null
       ? { ...options, ...generated, entity, enabled }
       : { ...options, ...generated, entity, enabled, compare };
+  }
+
+  _y2ComparisonValue(activeCompare = this._effectiveCompare()) {
+    if (!this._comparisonIsActive(activeCompare)) return activeCompare;
+    const configuredPeriod = Array.isArray(activeCompare)
+      ? activeCompare[0]?.period
+      : activeCompare && typeof activeCompare === "object"
+        ? activeCompare.period
+        : activeCompare;
+    const nativeChoice = this._comparisonChoiceFromMode?.(this._periodStore?.compare);
+    const choice = this._comparisonChoice
+      || nativeChoice
+      || ([
+        "previous_period",
+        "yesterday",
+        "last_week",
+        "last_month",
+        "last_year",
+      ].includes(configuredPeriod) ? configuredPeriod : "previous_period");
+    const count = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._y2ComparisonCount)) || 1),
+    );
+    const configuredRows = Array.isArray(activeCompare) ? activeCompare : [activeCompare];
+    const comparison = (index) => {
+      const template = configuredRows[index] || configuredRows[0];
+      if (!template || typeof template !== "object") {
+        return { period: choice, periods_back: index + 1 };
+      }
+      return { ...this._clone(template), period: choice, periods_back: index + 1 };
+    };
+    if (count === 1) {
+      const first = configuredRows[0];
+      if (!first || typeof first !== "object") return choice;
+      const result = comparison(0);
+      delete result.periods_back;
+      return result;
+    }
+    return Array.from({ length: count }, (_, index) => comparison(index));
   }
 
   _mergeCompareOptions(activeCompare, defaults) {
@@ -1461,8 +2347,8 @@ export class GraphMethods {
 
   _colorAutomaticComparisons(configured, palette, usedColors = new Set()) {
     if (
-      !Array.isArray(this._energyCompare)
-      || this._effectiveCompare() !== this._energyCompare
+      !Array.isArray(this._comparisonState)
+      || this._effectiveCompare() !== this._comparisonState
       || !Array.isArray(configured?.compare)
       || !Array.isArray(palette)
       || palette.length < 2
@@ -1577,10 +2463,10 @@ export class GraphMethods {
         ? "state_timeline"
         : (cardOptions.chart_mode ?? editorMode),
       entities,
-      energy_date_sync: true,
-      ...(this._panelEnergyCollectionKey()
-        ? { energy_collection_key: this._panelEnergyCollectionKey() }
-        : {}),
+      ...(!this._dashboardCardMode ? {
+        show_date_picker: false,
+        date_picker_group: this._periodSyncGroup?.(),
+      } : {}),
     };
   }
 
@@ -1860,6 +2746,10 @@ export class GraphMethods {
     const compare = this._activeSnapshot?.compare;
     const singleGraph = Boolean(this._activeSnapshot?.single_graph);
     const attributeSelection = this._clone(this._activeSnapshot?.attribute_selection);
+    const seriesTransforms = this._clone(this._activeSnapshot?.series_transforms);
+    const runningTotalAxes = this._clone(this._activeSnapshot?.running_total_axes);
+    const stateStrips = this._activeSnapshot?.state_strips === true;
+    const legendHiddenSeries = this._clone(this._activeSnapshot?.legend_hidden_series);
     const currentCardOptions = this._activeSnapshot?.card_options;
     const currentTypedOptions = currentCardOptions
       && typeof currentCardOptions === "object"
@@ -1907,6 +2797,16 @@ export class GraphMethods {
     if (singleGraph) this._activeSnapshot.single_graph = true;
     if (attributeSelection && Object.keys(attributeSelection).length) {
       this._activeSnapshot.attribute_selection = attributeSelection;
+    }
+    if (seriesTransforms && Object.keys(seriesTransforms).length) {
+      this._activeSnapshot.series_transforms = seriesTransforms;
+    }
+    if (runningTotalAxes && Object.keys(runningTotalAxes).length) {
+      this._activeSnapshot.running_total_axes = runningTotalAxes;
+    }
+    if (stateStrips) this._activeSnapshot.state_strips = true;
+    if (legendHiddenSeries && Object.keys(legendHiddenSeries).length) {
+      this._activeSnapshot.legend_hidden_series = legendHiddenSeries;
     }
     if (compare !== undefined) this._activeSnapshot.compare = this._clone(compare);
     if (this._hasDetailResolutionOverride()) this._largeRangeFineDetail = false;

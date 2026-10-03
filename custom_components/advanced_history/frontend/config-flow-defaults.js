@@ -44,6 +44,7 @@ const PANEL_COMMON_DEFAULTS = {
 const MORE_INFO_COMMON_DEFAULTS = {
   card_background_color: "transparent",
   card_border: false,
+  card_border_radius: 0,
   card_padding: 0,
   card_shadow: false,
   date_picker_default_mode: "last_24h",

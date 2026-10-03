@@ -5,15 +5,19 @@ import {
 } from "./config-flow-defaults.js";
 import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { installCardHandoffApi } from "./card-handoff.js";
+import { withClimateActionAnnotations } from "./climate.js";
 import { CARD_TAG } from "./constants.js";
 import { automaticEntityOptions } from "./entity-defaults.js";
 import {
   historyAttributeDisplayName,
   historyAttributeUnit,
+  nativeHistoryAttributeColor,
   nativeHistoryAttributes,
 } from "./history-series.js";
 import { mergeStateMaps, nativeStateMap } from "./state-colors.js";
 import { customLocalize, loadTranslations } from "./translations.js";
+import { installMoreInfoHistoryUpdateGuard } from "./more-info-history-guard.js";
+import "./advanced-history-sgcc-card.js";
 
 // Keep the legacy global value so an update cannot install duplicate listeners
 // in a browser session that still has the previous module loaded.
@@ -321,9 +325,11 @@ function moreInfoCardConfig(
         if (row.compare === undefined) delete row.compare;
       }
       if (!Object.prototype.hasOwnProperty.call(row, "color")) {
-        const color = nativeGraphColor(
+        const color = nativeHistoryAttributeColor(
           historyView,
-          Math.max(0, availableNativeAttributes.indexOf(attribute)),
+          entityId,
+          historyView.hass?.states?.[entityId],
+          attribute,
         );
         if (color) row.color = color;
       }
@@ -363,7 +369,7 @@ function moreInfoCardConfig(
     : (Number(cardOptions.height) || 240);
   const datePickerGroup = cardOptions.date_picker_group
     || `advanced-history-more-info:${entityId}`;
-  return {
+  const config = {
     ...cardOptions,
     type: `custom:${CARD_TAG}`,
     card_header: "",
@@ -389,6 +395,9 @@ function moreInfoCardConfig(
     ...(cardOptions.show_date_picker ? { date_picker_group: datePickerGroup } : {}),
     entities: entityRows,
   };
+  return entityId.startsWith("climate.")
+    ? withClimateActionAnnotations(config, entityId)
+    : config;
 }
 
 function pickerMode(historyView, config, preferredMode = null) {
@@ -1215,6 +1224,7 @@ async function replaceMoreInfoChart(historyView) {
     }
     host.dataset.activityStateColors = activityStateColorSignature;
     applyMoreInfoHostLayout(historyView, host);
+    installMoreInfoHistoryUpdateGuard(card);
     card.hass = historyView.hass;
     installMoreInfoPickerSync(historyView, card, config);
     nativeChart.style.display = "none";

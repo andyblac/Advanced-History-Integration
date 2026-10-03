@@ -1,29 +1,29 @@
+import { climateHistoryAttributes } from "./climate.js";
+
 export const NATIVE_HISTORY_ATTRIBUTES = {
-  climate: ["current_temperature", "temperature", "target_temp_low", "target_temp_high"],
   humidifier: ["current_humidity", "humidity"],
   water_heater: ["current_temperature", "temperature"],
 };
 
 export function nativeHistoryAttributes(entityId, stateObj) {
   const domain = entityId?.split(".")[0];
+  if (domain === "climate") return climateHistoryAttributes(stateObj);
   const supported = NATIVE_HISTORY_ATTRIBUTES[domain];
   if (!stateObj || !supported) return [];
   const attributes = stateObj.attributes || {};
-  let names = supported.filter((attribute) =>
+  return supported.filter((attribute) =>
     Object.prototype.hasOwnProperty.call(attributes, attribute)
   );
+}
 
-  // Native History uses either the single target temperature or the
-  // high/low target range. Do not render all three at the same time.
-  if (domain === "climate") {
-    const hasRange = names.includes("target_temp_low") || names.includes("target_temp_high");
-    names = hasRange
-      ? names.filter((attribute) => attribute !== "temperature")
-      : names.filter((attribute) =>
-        attribute !== "target_temp_low" && attribute !== "target_temp_high"
-      );
-  }
-  return names;
+export function nativeHistoryAttributeColor(host, entityId, stateObj, attribute) {
+  const index = nativeHistoryAttributes(entityId, stateObj).indexOf(attribute);
+  if (index < 0 || typeof getComputedStyle !== "function") return undefined;
+  const style = getComputedStyle(host);
+  const position = index + 1;
+  return style.getPropertyValue(`--graph-color-${position}`).trim()
+    || style.getPropertyValue(`--color-${position}`).trim()
+    || undefined;
 }
 
 export function historyAttributeDisplayName(hass, entityId, attribute) {

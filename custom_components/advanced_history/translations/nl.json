@@ -13,6 +13,7 @@
           "large_range_detail_threshold_days": "Drempel automatisch detail (dagen)",
           "graph_height": "Grafiekhoogte",
           "include_hidden": "Verborgen entiteiten opnemen",
+          "use_legacy_target_picker": "Oude ingebouwde doelkiezers gebruiken",
           "require_admin": "Alleen beheerders",
           "card_module_url": "Module-URL van grafiekkaart",
           "numeric_card_options": "Opties voor numerieke grafieken",
@@ -21,6 +22,7 @@
         "data_description": {
           "large_range_automatic_detail": "Stelt automatische puntschaal in als standaard voor numerieke grafieken; grafiekopties kunnen dit overschrijven. Voor grote datumbereiken biedt het Geschiedenispaneel ook fijn detail.",
           "large_range_detail_threshold_days": "Gebruikt automatisch detail wanneer het geselecteerde bereik ten minste dit aantal dagen beslaat.",
+          "use_legacy_target_picker": "Gebruikt de vorige ingebouwde Y1/Y2-indeling in plaats van de doelzijbalken van Home Assistant 2026.9.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
           "numeric_card_options": "Standaardwaarden die alleen voor numerieke grafieken worden gebruikt. Open de visuele editor of bewerk de code rechtstreeks.",
           "state_card_options": "Standaardwaarden die alleen voor statustijdlijngrafieken worden gebruikt. Open de visuele editor of bewerk de code rechtstreeks."
@@ -37,6 +39,7 @@
           "large_range_detail_threshold_days": "Drempel automatisch detail (dagen)",
           "graph_height": "Grafiekhoogte",
           "include_hidden": "Verborgen entiteiten opnemen",
+          "use_legacy_target_picker": "Oude ingebouwde doelkiezers gebruiken",
           "card_module_url": "Module-URL van grafiekkaart",
           "require_admin": "Alleen beheerders",
           "numeric_card_options": "Opties voor numerieke grafieken",
@@ -45,6 +48,7 @@
         "data_description": {
           "large_range_automatic_detail": "Stelt automatische puntschaal in als standaard voor numerieke grafieken; grafiekopties kunnen dit overschrijven. Voor grote datumbereiken biedt het Geschiedenispaneel ook fijn detail.",
           "large_range_detail_threshold_days": "Gebruikt automatisch detail wanneer het geselecteerde bereik ten minste dit aantal dagen beslaat.",
+          "use_legacy_target_picker": "Gebruikt de vorige ingebouwde Y1/Y2-indeling in plaats van de doelzijbalken van Home Assistant 2026.9.",
           "card_module_url": "Laat leeg om de HACS-bron van Statistics Graph Chart Card automatisch te detecteren.",
           "numeric_card_options": "Standaardwaarden die alleen voor numerieke grafieken worden gebruikt. Open de visuele editor of bewerk de code rechtstreeks.",
           "state_card_options": "Standaardwaarden die alleen voor statustijdlijngrafieken worden gebruikt. Open de visuele editor of bewerk de code rechtstreeks."
@@ -113,6 +117,7 @@
           "large_range_detail_threshold_days": "Drempel automatisch detail (dagen)",
           "graph_height": "Grafiekhoogte",
           "include_hidden": "Verborgen entiteiten opnemen",
+          "use_legacy_target_picker": "Oude ingebouwde doelkiezers gebruiken",
           "redirect_show_more": "Meer weergeven openen in Advanced History",
           "replace_more_info_history": "Statistics Graph gebruiken in Meer informatie",
           "more_info_show_date_picker": "Grafiekkalender tonen",
@@ -124,6 +129,7 @@
         "data_description": {
           "large_range_automatic_detail": "Stelt automatische puntschaal in als standaard voor numerieke grafieken; grafiekopties kunnen dit overschrijven. Voor grote datumbereiken biedt het Geschiedenispaneel ook fijn detail.",
           "large_range_detail_threshold_days": "Gebruikt automatisch detail wanneer het geselecteerde bereik ten minste dit aantal dagen beslaat.",
+          "use_legacy_target_picker": "Gebruikt de vorige ingebouwde Y1/Y2-indeling in plaats van de doelzijbalken van Home Assistant 2026.9.",
           "redirect_show_more": "Opent de link Meer weergeven in de sectie Geschiedenis van entiteitsvensters als een nieuw paneel in Advanced History, met behoud van de bestaande paneeltabbladen.",
           "replace_more_info_history": "Vervang de ingebouwde geschiedenisgrafiek in entiteitsvensters door Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Toon de ingebouwde datumkiezer van Statistics Graph Chart Card in entiteitsvensters.",

@@ -74,6 +74,35 @@ function graphPaletteColor(index) {
   return `var(--graph-color-${position}, var(--color-${position}))`;
 }
 
+const BOOLEAN_STATE_COLORS = Object.freeze({
+  false: "var(--state-inactive-color, var(--disabled-text-color, #9e9e9e))",
+  true: "var(--state-active-color, var(--success-color, #43a047))",
+});
+
+export function withBooleanStateColors(
+  stateMap,
+  activeColor = null,
+  replaceGeneratedActive = false,
+) {
+  if (!Array.isArray(stateMap)) return stateMap;
+  return stateMap.map((entry) => {
+    const value = String(entry?.value).toLowerCase();
+    const generatedColor = BOOLEAN_STATE_COLORS[value];
+    if (
+      !entry
+      || !generatedColor
+    ) return entry;
+    const hasColor = Object.prototype.hasOwnProperty.call(entry, "color");
+    if (hasColor && !(replaceGeneratedActive && value === "true" && entry.color === generatedColor)) {
+      return entry;
+    }
+    return {
+      ...entry,
+      color: value === "true" && activeColor ? activeColor : generatedColor,
+    };
+  });
+}
+
 function stateIsActive(domain, state) {
   if (state === "unavailable" || state === "unknown") return false;
   if (state === "off" && domain !== "alert") return false;

@@ -75,6 +75,8 @@ export class ShareMethods {
     snapshot.hidden_targets = hiddenTargets;
     snapshot.y2_targets = y2Targets;
     snapshot.hidden_y2_targets = hiddenY2Targets;
+    snapshot.target_filters = this._normalizeTargetSourceFilters(value.target_filters);
+    snapshot.y2_target_filters = this._normalizeTargetSourceFilters(value.y2_target_filters);
     snapshot.source_bookmark_id = null;
     snapshot.id = this._newSnapshotId();
     snapshot.name = this._snapshotLabel(snapshot);

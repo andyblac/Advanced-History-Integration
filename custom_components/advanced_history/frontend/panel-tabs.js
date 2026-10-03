@@ -32,49 +32,24 @@ export class PanelTabsMethods {
       || `panel-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
-  _panelEnergyCollectionKeyForId(id) {
-    const safeId = String(id || "panel")
-      .toLowerCase()
-      .replace(/[^a-z0-9_]+/g, "_")
-      .replace(/^_+|_+$/g, "") || "panel";
-    return `energy_advanced_history_${safeId}`;
-  }
-
-  _validPanelEnergyCollectionKey(value) {
-    return typeof value === "string"
-      && /^energy_[a-z0-9_]+$/.test(value)
-      && value.length <= 255;
-  }
-
   _migratePersistedPanelTabs(stored) {
-    // 2.0-beta.1 already stored complete per-panel snapshots. Preserve those
-    // verbatim and add only the stable Energy collection key needed by beta.2.
+    // Older tab records may contain the retired per-panel Energy collection
+    // key. The local period store now uses the stable tab id directly.
     if (!stored || ![1, PANEL_TABS_SCHEMA].includes(stored.schema)) return null;
     if (!Array.isArray(stored.tabs)) return null;
     const migrated = this._clone(stored);
     migrated.schema = PANEL_TABS_SCHEMA;
-    migrated.tabs = migrated.tabs.map((tab) => ({
-      ...tab,
-      energy_collection_key: this._validPanelEnergyCollectionKey(tab?.energy_collection_key)
-        ? tab.energy_collection_key
-        : this._panelEnergyCollectionKeyForId(tab?.id),
-    }));
+    migrated.tabs = migrated.tabs.map((tab) => {
+      const next = { ...tab };
+      delete next.energy_collection_key;
+      return next;
+    });
     return migrated;
   }
 
   _desktopPanelTabsEnabled() {
     return this._desktopPanelLayoutAvailable()
       && this._panelTabsDependencySupported();
-  }
-
-  _panelEnergyCollectionKey() {
-    if (!this._panelTabsDependencySupported()) return null;
-    const tab = this._panelTabs?.find((item) => item.id === this._activePanelTabId);
-    if (tab && !this._validPanelEnergyCollectionKey(tab.energy_collection_key)) {
-      tab.energy_collection_key = this._panelEnergyCollectionKeyForId(tab.id);
-    }
-    return tab?.energy_collection_key
-      || this._panelEnergyCollectionKeyForId(this._activePanelTabId);
   }
 
   _panelTabLabel(index) {
@@ -100,8 +75,10 @@ export class PanelTabsMethods {
       loaded_bookmark_dirty: Boolean(this._loadedBookmarkDirty),
       fresh_snapshot_fingerprint: this._freshSnapshotSessionFingerprint || null,
       notice: this._notice || "",
+      detail_mode: this._detailModeValue?.() || "auto",
       large_range_fine_detail: Boolean(this._largeRangeFineDetail),
       large_range_detail_dismissed_key: this._largeRangeDetailDismissedKey || null,
+      target_sidebar_state: this._captureTargetSidebarPanelState(),
     };
   }
 
@@ -197,6 +174,9 @@ export class PanelTabsMethods {
     end.setHours(23, 59, 59, 999);
     const chart = {
       defaults_mode: "overrides",
+      detail_mode: "auto",
+      show_detail_banner: true,
+      y2_compare_count: 1,
       card_options: { numeric: {}, state: {} },
       entity_options: {},
     };
@@ -209,6 +189,8 @@ export class PanelTabsMethods {
       hidden_targets: { area_id: [], device_id: [], entity_id: [] },
       y2_targets: { area_id: [], device_id: [], entity_id: [] },
       hidden_y2_targets: { area_id: [], device_id: [], entity_id: [] },
+      target_filters: {},
+      y2_target_filters: {},
       chart,
       period: {
         start: start.toISOString(),
@@ -232,14 +214,27 @@ export class PanelTabsMethods {
       loaded_bookmark_dirty: false,
       fresh_snapshot_fingerprint: null,
       notice: "",
+      detail_mode: "auto",
       large_range_fine_detail: false,
       large_range_detail_dismissed_key: null,
+      target_sidebar_state: this._captureTargetSidebarPanelState(),
     };
   }
 
   _restorePanelTab(tab) {
     const state = tab?.state || this._blankPanelTabState();
     tab.state = state;
+    const stateDetailMode = ["auto", "fine", "manual"].includes(state.detail_mode)
+      ? state.detail_mode
+      : state.large_range_fine_detail ? "fine" : "auto";
+    for (const snapshot of [state.snapshot, state.current_snapshot]) {
+      if (
+        snapshot?.chart
+        && !["auto", "fine", "manual"].includes(snapshot.chart.detail_mode)
+      ) {
+        snapshot.chart.detail_mode = stateDetailMode;
+      }
+    }
     this._loadedBookmarkId = state.loaded_bookmark_id || null;
     this._loadedExternalBookmark = Boolean(
       state.loaded_external_bookmark
@@ -255,17 +250,19 @@ export class PanelTabsMethods {
     this._loadedBookmarkDirty = Boolean(state.loaded_bookmark_dirty);
     this._freshSnapshotSessionFingerprint = state.fresh_snapshot_fingerprint || null;
     this._notice = state.notice || "";
-    this._largeRangeFineDetail = Boolean(state.large_range_fine_detail);
+    this._detailMode = stateDetailMode;
+    this._largeRangeFineDetail = this._detailMode === "fine";
     this._largeRangeDetailDismissedKey = state.large_range_detail_dismissed_key || null;
+    this._restoreTargetSidebarPanelState(state.target_sidebar_state);
     this._largeRangeDetailStateKey = null;
-    this._energyCompare = null;
-    this._energyCompareChoice = state.snapshot?.period?.compare_choice || null;
-    this._energyCompareCount = Math.max(
+    this._comparisonState = null;
+    this._comparisonChoice = state.snapshot?.period?.compare_choice || null;
+    this._comparisonCount = Math.max(
       1,
       Math.min(10, Math.trunc(Number(state.snapshot?.period?.compare_count)) || 1),
     );
-    this._energyComparePeriodKind = null;
-    this._energyResetPending = false;
+    this._comparisonPeriodKind = null;
+    this._periodResetPending = false;
     this._saveLibrary(UNDO_STORAGE_KEY, this._clone(state.undo || []));
     this._saveLibrary(REDO_STORAGE_KEY, this._clone(state.redo || []));
     this._currentSnapshot = this._clone(state.current_snapshot || state.snapshot);
@@ -280,7 +277,6 @@ export class PanelTabsMethods {
     const id = this._panelTabId();
     const tab = {
       id,
-      energy_collection_key: this._panelEnergyCollectionKeyForId(id),
       state: this._blankPanelTabState(),
     };
     this._panelTabs.push(tab);
@@ -317,7 +313,6 @@ export class PanelTabsMethods {
     const tab = {
       id,
       name: String(pending.name || "").trim().slice(0, 40),
-      energy_collection_key: this._panelEnergyCollectionKeyForId(id),
       state,
     };
     this._panelTabs.push(tab);
@@ -365,14 +360,14 @@ export class PanelTabsMethods {
     const next = this._localize("ui.common.next", "Next");
     const tabHelp = this._customLocalize("panel_tab_help");
     return `<div class="panel-tabs-shell">
-      <button class="panel-tabs-scroll" data-scroll-panels="-1" title="${this._escape(previous)}" aria-label="${this._escape(previous)}" hidden><ha-icon icon="mdi:chevron-left"></ha-icon></button>
+      <button type="button" class="panel-tabs-scroll" data-scroll-panels="-1" title="${this._escape(previous)}" aria-label="${this._escape(previous)}" hidden><ha-icon icon="mdi:chevron-left"></ha-icon></button>
       <nav class="panel-tabs" aria-label="${this._escape(this._customLocalize("panels"))}">
         ${this._panelTabs.map((tab, index) => `<span class="panel-tab${tab.id === this._activePanelTabId ? " active" : ""}" draggable="true" data-panel-tab-item="${this._escape(tab.id)}">
           <button class="panel-tab-select" data-panel-tab="${this._escape(tab.id)}" title="${this._escape(tabHelp)}" ${tab.id === this._activePanelTabId ? 'aria-current="page"' : ""}>${this._escape(this._panelTabDisplayLabel(tab, index))}</button>
           <button class="panel-tab-close" data-close-panel="${this._escape(tab.id)}" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button>
         </span>`).join("")}
       </nav>
-      <button class="panel-tabs-scroll" data-scroll-panels="1" title="${this._escape(next)}" aria-label="${this._escape(next)}" hidden><ha-icon icon="mdi:chevron-right"></ha-icon></button>
+      <button type="button" class="panel-tabs-scroll" data-scroll-panels="1" title="${this._escape(next)}" aria-label="${this._escape(next)}" hidden><ha-icon icon="mdi:chevron-right"></ha-icon></button>
     </div>`;
   }
 
@@ -402,12 +397,19 @@ export class PanelTabsMethods {
     if (direction > 0) {
       const visibleRight = tabs.scrollLeft + tabs.clientWidth;
       const target = bounds.find((item) => item.right > visibleRight + 1);
-      destination = target ? target.right - tabs.clientWidth : tabs.scrollWidth;
+      // Scroll to the tab's snap point. Revealing only its trailing edge can
+      // leave the destination between snap points, allowing the browser to
+      // snap straight back to the current tab.
+      destination = target ? target.left : tabs.scrollWidth;
     } else {
       const target = [...bounds].reverse().find((item) => item.left < tabs.scrollLeft - 1);
       destination = target ? target.left : 0;
     }
-    tabs.scrollTo({ left: Math.max(0, destination), behavior: "smooth" });
+    const maxScroll = Math.max(0, tabs.scrollWidth - tabs.clientWidth);
+    tabs.scrollTo({
+      left: Math.min(maxScroll, Math.max(0, destination)),
+      behavior: "smooth",
+    });
   }
 
   _renamePanelTab(id, button) {

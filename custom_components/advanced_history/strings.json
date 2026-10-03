@@ -13,6 +13,7 @@
           "large_range_detail_threshold_days": "Automatic detail threshold (days)",
           "graph_height": "Graph height",
           "include_hidden": "Include hidden entities",
+          "use_legacy_target_picker": "Use legacy inline target pickers",
           "card_module_url": "Graph card module URL",
           "require_admin": "Administrators only",
           "numeric_card_options": "Numeric chart options",
@@ -21,6 +22,7 @@
         "data_description": {
           "large_range_automatic_detail": "Sets the default automatic point scaling for numeric charts; chart options can override it. For large date ranges, it also offers Fine detail in the History panel.",
           "large_range_detail_threshold_days": "Use automatic detail when the selected range is at least this many days.",
+          "use_legacy_target_picker": "Use the previous inline Y1/Y2 target picker layout instead of Home Assistant 2026.9's target sidebars.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
           "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
@@ -37,6 +39,7 @@
           "large_range_detail_threshold_days": "Automatic detail threshold (days)",
           "graph_height": "Graph height",
           "include_hidden": "Include hidden entities",
+          "use_legacy_target_picker": "Use legacy inline target pickers",
           "card_module_url": "Graph card module URL",
           "require_admin": "Administrators only",
           "numeric_card_options": "Numeric chart options",
@@ -45,6 +48,7 @@
         "data_description": {
           "large_range_automatic_detail": "Sets the default automatic point scaling for numeric charts; chart options can override it. For large date ranges, it also offers Fine detail in the History panel.",
           "large_range_detail_threshold_days": "Use automatic detail when the selected range is at least this many days.",
+          "use_legacy_target_picker": "Use the previous inline Y1/Y2 target picker layout instead of Home Assistant 2026.9's target sidebars.",
           "card_module_url": "Leave empty to auto-detect the Statistics Graph Chart Card HACS resource.",
           "numeric_card_options": "Defaults used only by numeric charts. Open its visual editor or edit its code directly.",
           "state_card_options": "Defaults used only by state-timeline charts. Open its visual editor or edit its code directly."
@@ -113,6 +117,7 @@
           "large_range_detail_threshold_days": "Automatic detail threshold (days)",
           "graph_height": "Graph height",
           "include_hidden": "Include hidden entities",
+          "use_legacy_target_picker": "Use legacy inline target pickers",
           "redirect_show_more": "Open Show more in Advanced History",
           "replace_more_info_history": "Use Statistics Graph in More Info",
           "more_info_show_date_picker": "Show chart calendar",
@@ -124,6 +129,7 @@
         "data_description": {
           "large_range_automatic_detail": "Sets the default automatic point scaling for numeric charts; chart options can override it. For large date ranges, it also offers Fine detail in the History panel.",
           "large_range_detail_threshold_days": "Use automatic detail when the selected range is at least this many days.",
+          "use_legacy_target_picker": "Use the previous inline Y1/Y2 target picker layout instead of Home Assistant 2026.9's target sidebars.",
           "redirect_show_more": "Open the History section's Show more link in Advanced History as a new panel, preserving the existing panel tabs.",
           "replace_more_info_history": "Replace the native History graph in entity dialogs with Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Show the Statistics Graph Chart Card's built-in date picker in entity dialogs.",

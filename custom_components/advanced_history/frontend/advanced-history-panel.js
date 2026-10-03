@@ -2,8 +2,9 @@ import {
   CARD_DEFAULT_MODULE_URLS,
   CARD_RESOURCE_MATCH,
   CARD_TAG,
+  DATE_PICKER_AUTO_HIDE_STORAGE_KEY,
 } from "./constants.js";
-import { EnergyMethods } from "./energy.js";
+import { PeriodSelectorMethods } from "./period-selector.js";
 import { DiagnosticsMethods } from "./diagnostics.js";
 import { GraphMethods } from "./graphs.js";
 import { ShareMethods } from "./share.js";
@@ -14,10 +15,12 @@ import { TargetPickerMethods } from "./target-picker.js";
 import { customLocalize, loadTranslations } from "./translations.js";
 import {
   addCardsToDashboard,
+  advancedHistoryDashboardCard,
+  dashboardCardConfigs,
   dashboardCardSnapshots,
 } from "./panel-export.js";
 
-class AdvancedHistoryPanel extends HTMLElement {
+export class AdvancedHistoryPanel extends HTMLElement {
   constructor() {
     super();
     this.attachShadow({ mode: "open" });
@@ -31,23 +34,30 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._excludeY2Comparison = false;
+    this._comparisonBannerVisible = true;
     this._loaded = false;
     this._initialized = false;
     this._cards = [];
     this._graphCards = [];
     this._cardLoadError = "";
     this._notice = "";
-    this._energyRenderToken = null;
-    this._energyCompare = null;
-    this._energyCompareChoice = null;
-    this._energyCompareCount = 1;
-    this._energyComparePeriodKind = null;
-    this._energyUnsubscribe = null;
+    this._periodRenderToken = null;
+    this._comparisonState = null;
+    this._comparisonChoice = null;
+    this._comparisonCount = 1;
+    this._y2ComparisonCount = 1;
+    this._comparisonPeriodKind = null;
+    this._periodUnsubscribe = null;
     this._nativeTargetPicker = null;
     this._nativeY2TargetPicker = null;
+    this._targetPrimarySourcesShown = undefined;
+    this._targetSecondarySourcesShown = undefined;
+    this._restoreTargetSidebarState?.();
+    this._targetPrimarySourceFilters = {};
+    this._targetSecondarySourceFilters = {};
     this._editorAutoColors = new Map();
     this._activeSnapshot = null;
-    this._energyCollection = null;
+    this._periodStore = null;
     this._panelTimeRange = null;
     this._panelRollingHours = null;
     this._panelRollingResumeHours = null;
@@ -74,8 +84,18 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._periodRestoreLoading = false;
     this._periodRestoreExpected = null;
     this._periodRestoreTimer = null;
-    this._energyInteractionLoading = false;
-    this._energyResetPending = false;
+    this._periodInteractionLoading = false;
+    this._dashboardCardLayoutLock = null;
+    this._periodResetPending = false;
+    try {
+      this._datePickerAutoHide = localStorage.getItem(DATE_PICKER_AUTO_HIDE_STORAGE_KEY) === "true";
+    } catch (_) {
+      this._datePickerAutoHide = false;
+    }
+    this._datePickerAutoHideTimer = null;
+    this._panelTimeRangeDialogOpen = false;
+    this._detailMode = "auto";
+    this._showDetailBanner = true;
     this._largeRangeFineDetail = false;
     this._largeRangeDetailStateKey = null;
     this._largeRangeDetailDismissedKey = null;
@@ -112,7 +132,9 @@ class AdvancedHistoryPanel extends HTMLElement {
   set panel(value) {
     this._panel = value;
     if (!this._versionLogged && this.config.integration_version) {
-      console.info(`%c ADVANCED-HISTORY-PANEL %c v${this.config.integration_version} `, "color:white;background:#03a9f4;font-weight:700", "color:#03a9f4;background:white");
+      const version = this.config.integration_display_version
+        || this.config.integration_version;
+      console.info(`%c ADVANCED-HISTORY-PANEL %c v${version} `, "color:white;background:#03a9f4;font-weight:700", "color:#03a9f4;background:white");
       this._versionLogged = true;
     }
     if (!this._loaded && this._hass) this._initialize();
@@ -143,36 +165,63 @@ class AdvancedHistoryPanel extends HTMLElement {
     if (!button) return;
     const excluded = Boolean(this._excludeY2Comparison);
     button.hidden = !compareActive || !this._targetCount(this._y2Targets);
+    if (!compareActive) this._closeY2ComparisonMenu?.();
     button.classList.toggle("active", !excluded);
     button.setAttribute("aria-pressed", String(!excluded));
-    const label = this._customLocalize(
-      excluded ? "include_y2_comparison" : "exclude_y2_comparison",
-    );
+    const label = this._customLocalize("comparison_settings");
     button.title = label;
     button.setAttribute("aria-label", label);
     button.querySelector("ha-icon")?.setAttribute("icon", "mdi:compare-horizontal");
+    const enabled = this.shadowRoot?.getElementById("y2-comparison-enabled");
+    this._setComparisonMenuCheckboxState?.(enabled, compareActive && !excluded);
+    const showBanner = this.shadowRoot?.getElementById("y2-comparison-show-banner");
+    this._setComparisonMenuCheckboxState?.(showBanner, this._comparisonBannerVisible);
+    const period = this.shadowRoot?.getElementById("y2-comparison-period");
+    if (period) {
+      period.value = this._comparisonChoice
+        || this._comparisonChoiceFromMode?.(this._periodStore?.compare)
+        || "previous_period";
+    }
+    const count = this.shadowRoot?.getElementById("y2-comparison-count");
+    if (count) count.value = String(this._y2ComparisonCount || 1);
   }
 
-  _toggleY2Comparison() {
-    this._excludeY2Comparison = !this._excludeY2Comparison;
-    this._syncY2ComparisonToggle(true);
-    this._recordChange(null, true);
-    this._renderGraphs();
+  _syncY1ComparisonToggle(compareActive = this._comparisonIsActive()) {
+    const button = this.shadowRoot?.getElementById("toggle-y1-comparison");
+    if (!button) return;
+    button.hidden = !this._targetCount(this._targets);
+    button.classList.toggle("active", Boolean(compareActive));
+    button.setAttribute("aria-pressed", String(Boolean(compareActive)));
+    const label = this._customLocalize("comparison_settings");
+    button.title = label;
+    button.setAttribute("aria-label", label);
+    const enabled = this.shadowRoot?.getElementById("comparison-enabled");
+    this._setComparisonMenuCheckboxState?.(enabled, Boolean(compareActive));
+    const showBanner = this.shadowRoot?.getElementById("comparison-show-banner");
+    this._setComparisonMenuCheckboxState?.(showBanner, this._comparisonBannerVisible);
   }
 
   async _addCurrentPanelToDashboard(button) {
-    const cards = dashboardCardSnapshots(this._graphCards, {
-      start: this._energyCollection?.start,
-      end: this._energyCollection?.end,
-      rollingHours: this._panelRollingHours,
-    });
-    if (!cards.length) return;
+    const activeTab = this._panelTabs?.find((tab) => tab.id === this._activePanelTabId);
+    const activeTabIndex = Math.max(0, this._panelTabs?.indexOf(activeTab));
+    const title = activeTab
+      ? this._panelTabDisplayLabel(activeTab, activeTabIndex)
+      : "";
+    const configuredPanelName = String(activeTab?.name || "").trim();
+    const card = advancedHistoryDashboardCard(
+      this._captureSnapshot(title),
+      this.config,
+      title,
+      dashboardCardConfigs(this._graphCards),
+      configuredPanelName,
+    );
+    if (!card) return;
     if (button) button.disabled = true;
     try {
       await addCardsToDashboard({
         hass: this._hass,
         container: this,
-        cards,
+        cards: [card],
         ensureNativeHistory: () => this._loadNativeHistoryPicker(true),
         labels: {
           dialogTitle: this._customLocalize("add_current_panel_to_dashboard"),
@@ -182,6 +231,45 @@ class AdvancedHistoryPanel extends HTMLElement {
           copyFailed: this._customLocalize("dashboard_yaml_copy_error"),
           hideEntitiesOnLoad: this._customLocalize("hide_entities_on_load"),
           hideEntitiesOnLoadNote: this._customLocalize("hide_entities_on_load_note"),
+          exportWarning: "",
+          close: this._localize("ui.common.close", "Close"),
+        },
+      });
+    } finally {
+      if (button?.isConnected) button.disabled = false;
+    }
+  }
+
+  async _addCurrentPanelAsNativeCard(button) {
+    const cards = dashboardCardSnapshots(this._graphCards, {
+      start: this._periodStore?.start,
+      end: this._periodStore?.end,
+      rollingHours: this._panelRollingHours,
+    });
+    if (!cards.length) return;
+    const runningTotalEnabled = Object.values(
+      this._activeSnapshot?.series_transforms || {}
+    ).includes("running_total") || Object.values(
+      this._activeSnapshot?.running_total_axes || {}
+    ).includes(true);
+    if (button) button.disabled = true;
+    try {
+      await addCardsToDashboard({
+        hass: this._hass,
+        container: this,
+        cards,
+        ensureNativeHistory: () => this._loadNativeHistoryPicker(true),
+        labels: {
+          dialogTitle: this._customLocalize("add_current_chart_to_dashboard"),
+          fallbackTitle: this._customLocalize("dashboard_yaml_fallback_title"),
+          copyYaml: this._customLocalize("copy_dashboard_yaml"),
+          copied: this._customLocalize("dashboard_yaml_copied"),
+          copyFailed: this._customLocalize("dashboard_yaml_copy_error"),
+          hideEntitiesOnLoad: this._customLocalize("hide_entities_on_load"),
+          hideEntitiesOnLoadNote: this._customLocalize("hide_entities_on_load_note"),
+          exportWarning: runningTotalEnabled
+            ? this._customLocalize("running_total_export_warning")
+            : "",
           close: this._localize("ui.common.close", "Close"),
         },
       });
@@ -205,7 +293,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     if (!this._initialized || !this._hass) return;
     queueMicrotask(() => {
       if (!this.isConnected) return;
-      if (!this._energyUnsubscribe) this._render();
+      if (!this._periodUnsubscribe) this._render();
       if (this._panelRollingHours) this._refreshPanelRollingRange();
       this._scheduleExternalBookmarkRefresh?.();
     });
@@ -218,14 +306,21 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._panelTabsResizeObserver?.disconnect();
     this._panelTabsResizeObserver = null;
     this._disconnectDynamicGraphLayout?.();
-    this._energyRenderToken = null;
-    this._energyUnsubscribe?.();
-    this._energyUnsubscribe = null;
-    this._energyCollection = null;
+    for (const card of this._graphCards || []) {
+      card.__advancedHistorySourceObserver?.disconnect?.();
+    }
+    this._releaseDashboardCardLayout?.();
+    this._periodRenderToken = null;
+    this._periodUnsubscribe?.();
+    this._periodUnsubscribe = null;
+    this._periodStore = null;
     if (this._panelRollingTimer) window.clearTimeout(this._panelRollingTimer);
     this._panelRollingTimer = null;
     if (this._periodRestoreTimer) window.clearTimeout(this._periodRestoreTimer);
     this._periodRestoreTimer = null;
+    if (this._datePickerAutoHideTimer) window.clearTimeout(this._datePickerAutoHideTimer);
+    this._datePickerAutoHideTimer = null;
+    this._removePeriodSelectorMenuDismissHandlers?.();
   }
 
   async _initialize() {
@@ -244,7 +339,7 @@ class AdvancedHistoryPanel extends HTMLElement {
       this._entities = Object.keys(this._hass.states).map((entity_id) => ({ entity_id }));
     }
     await Promise.all([
-      this._loadEnergyTranslations(),
+      this._loadPeriodSelectorTranslations(),
       this._ensureCardLoaded(),
       this._loadSyncedBookmarks(),
       this._loadNativeHistoryPicker().catch((error) => {
@@ -258,7 +353,7 @@ class AdvancedHistoryPanel extends HTMLElement {
     this._scheduleExternalBookmarkRefresh?.();
   }
 
-  async _loadEnergyTranslations() {
+  async _loadPeriodSelectorTranslations() {
     if (typeof this._hass?.loadFragmentTranslation !== "function") return;
     try {
       const results = await Promise.allSettled([
@@ -270,7 +365,7 @@ class AdvancedHistoryPanel extends HTMLElement {
         if (result.status === "rejected") console.debug("Advanced History: optional translation fragment unavailable", result.reason);
       }
     } catch (error) {
-      console.warn("Advanced History: Energy translations could not be loaded", error);
+      console.warn("Advanced History: period-selector translations could not be loaded", error);
     }
   }
 
@@ -318,13 +413,19 @@ class AdvancedHistoryPanel extends HTMLElement {
   }
 
   _loadingView() {
-    const history = this._localize("panel.history", "History");
+    const title = this.config.title || this._localize("panel.history", "History");
+    const displayVersion = this.config.integration_display_version
+      || this.config.integration_version
+      || "";
     const loading = this._localize("ui.common.loading", "Loading");
-    this.shadowRoot.innerHTML = `<style>${css}</style><div class="appbar"><h1>${this._escape(history)}</h1></div><main class="content"><div class="start"><p>${this._escape(loading)}…</p></div></main>`;
+    this.shadowRoot.innerHTML = `<style>${css}</style><div class="appbar"><div class="app-title"><h1>${this._escape(title)}</h1>${displayVersion ? `<span class="app-version">v${this._escape(displayVersion)}</span>` : ""}</div></div><main class="content"><div class="start"><p>${this._escape(loading)}…</p></div></main>`;
   }
 
   _render() {
     const title = this.config.title || this._localize("panel.history", "History");
+    const displayVersion = this.config.integration_display_version
+      || this.config.integration_version
+      || "";
     const removeAll = this._localize("ui.panel.history.remove_all", "Remove all selections");
     const bookmarks = this._customLocalize("bookmarks");
     const chartHistory = this._customLocalize("chart_history");
@@ -332,18 +433,64 @@ class AdvancedHistoryPanel extends HTMLElement {
     const redo = this._localize("ui.common.redo", "Redo");
     const addPanel = this._customLocalize("add_panel");
     const addPanelRequiresVersion = this._customLocalize("add_panel_requires_version");
+    const showDatePicker = this._localize(
+      "ui.components.date-range-picker.select_date_range",
+      "Select time period",
+    );
     const dependencyMissing = Boolean(this._cardLoadError);
     const secondaryAxisEditable = this._secondaryAxisEditable();
     const hasY1Targets = Boolean(this._targetCount(this._targets));
     const hasY2Targets = secondaryAxisEditable && Boolean(this._targetCount(this._y2Targets));
     const y1TargetClass = !hasY1Targets && hasY2Targets ? " axis-target-compact" : "";
     const y2TargetClass = !hasY2Targets && hasY1Targets ? " axis-target-compact" : "";
+    const useTargetSidebar = !dependencyMissing && this._useTargetSidebar();
+    const primaryTargetControls = `<div class="axis-target-group axis-target-primary${y1TargetClass}">
+      <div class="axis-target-label">
+        <button id="toggle-y1-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("primary_axis"))}" aria-label="${this._escape(this._customLocalize("primary_axis"))}" aria-pressed="true">Y1</button>${useTargetSidebar ? "" : `<span>${this._escape(this._customLocalize("primary_axis"))}</span>`}
+        <div class="axis-comparison-menu-shell">
+          <button id="toggle-y1-comparison" class="axis-compare-toggle axis-compare-primary" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-pressed="false"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+          <ha-dropdown id="y1-comparison-menu" class="axis-comparison-menu" placement="bottom-start" distance="7"></ha-dropdown>
+        </div>
+        <button id="toggle-y1-running-total" class="axis-running-total-toggle axis-running-total-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
+        <button id="toggle-state-strips" class="axis-state-strips-toggle axis-state-strips-primary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:view-sequential-outline"></ha-icon></button>
+        <div class="axis-detail-menu-shell">
+          <button id="toggle-detail-mode" class="axis-detail-toggle axis-detail-primary" type="button" hidden aria-haspopup="menu" aria-expanded="false"><ha-icon icon="mdi:speedometer"></ha-icon></button>
+          <ha-dropdown id="detail-mode-menu" class="axis-detail-menu" placement="bottom-start" distance="7"></ha-dropdown>
+        </div>
+      </div>
+      <div id="target-picker-host" class="native-target-picker">
+        <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+      </div>
+    </div>`;
+    const secondaryTargetControls = secondaryAxisEditable ? `<div class="axis-target-group axis-target-secondary${y2TargetClass}">
+      <div class="axis-target-label">
+        <button id="toggle-y2-running-total" class="axis-running-total-toggle axis-running-total-secondary" type="button" hidden role="switch" aria-checked="false"><ha-icon icon="mdi:sigma"></ha-icon></button>
+        <div class="axis-comparison-menu-shell">
+          <button id="toggle-y2-comparison" class="axis-compare-toggle${this._excludeY2Comparison ? "" : " active"}" type="button" hidden aria-haspopup="menu" aria-expanded="false" aria-pressed="${this._excludeY2Comparison ? "false" : "true"}"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
+          <ha-dropdown id="y2-comparison-menu" class="axis-comparison-menu" placement="bottom-end" distance="7"></ha-dropdown>
+        </div>
+        <button id="toggle-y2-visibility" class="axis-badge axis-visibility-toggle" type="button" title="${this._escape(this._customLocalize("secondary_axis"))}" aria-label="${this._escape(this._customLocalize("secondary_axis"))}" aria-pressed="true">Y2</button>${useTargetSidebar ? "" : `<span>${this._escape(this._customLocalize("secondary_axis"))}</span>`}
+      </div>
+      <div id="y2-target-picker-host" class="native-target-picker">
+        <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+      </div>
+    </div>` : "";
+    const centerContent = `
+      <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
+        <ha-circular-progress active size="small"></ha-circular-progress>
+        <span id="period-loading-text">${this._escape(this._customLocalize("loading_requested_range"))}</span>
+      </section>
+      ${dependencyMissing ? "" : `<section id="compare-banner" class="compare-banner" hidden></section>`}
+      <section id="detail-banner" class="detail-banner" hidden></section>
+      ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
+      <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>`;
+    this._removePeriodSelectorMenuDismissHandlers?.();
     this._nativeTargetPicker = null;
     this._nativeY2TargetPicker = null;
     this.shadowRoot.innerHTML = `
       <style>${css}</style>
       <header class="appbar">
-        <ha-menu-button id="menu"></ha-menu-button><h1>${this._escape(title)}</h1>
+        <ha-menu-button id="menu"></ha-menu-button><div class="app-title"><h1>${this._escape(title)}</h1>${displayVersion ? `<span class="app-version">v${this._escape(displayVersion)}</span>` : ""}</div>
         ${this._renderPanelTabs()}
         <span class="spacer"></span>
         ${this._desktopPanelLayoutAvailable() ? `<button id="add-panel" class="icon-button desktop-panel-only" title="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" aria-label="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" ${this._panelTabs.length >= this.maxTabs ? "disabled" : ""}><ha-icon icon="mdi:plus"></ha-icon></button>` : ""}
@@ -353,52 +500,96 @@ class AdvancedHistoryPanel extends HTMLElement {
         <button id="redo" class="icon-button" title="${this._escape(redo)}"><ha-icon icon="mdi:redo"></ha-icon></button>
         <button id="remove-all" class="icon-button" title="${this._escape(removeAll)}" ${this._targetCount() ? "" : "hidden"}><ha-icon icon="mdi:filter-remove-outline"></ha-icon></button>
       </header>
-      <main class="content">
-        ${dependencyMissing ? "" : `<section class="filters axis-targets">
-          <div class="axis-target-group axis-target-primary${y1TargetClass}">
-            <div class="axis-target-label"><span class="axis-badge">Y1</span><span>${this._escape(this._customLocalize("primary_axis"))}</span></div>
-            <div id="target-picker-host" class="native-target-picker">
-              <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
+      <main class="content${useTargetSidebar ? " target-sidebar-layout" : ""}${this._datePickerAutoHide ? " date-picker-auto-hide" : ""}">
+        ${useTargetSidebar ? `
+          <ha-filter-pane id="target-sources-pane-primary" class="target-sources-pane target-sources-primary" ${this._targetSidebarShown("primary") ? "" : "hidden"}>
+            <section class="target-sidebar-targets">${primaryTargetControls}</section>
+          </ha-filter-pane>
+          <div class="target-sidebar-content">
+            <div class="target-sidebar-toolbar">
+              <ha-filter-pane-chip id="target-sources-chip-primary"></ha-filter-pane-chip>
+              <span class="spacer"></span>
+              ${secondaryAxisEditable ? `<ha-filter-pane-chip id="target-sources-chip-secondary"></ha-filter-pane-chip>` : ""}
             </div>
+            ${centerContent}
           </div>
-          ${secondaryAxisEditable ? `<div class="axis-target-divider" aria-hidden="true"></div>
-          <div class="axis-target-group axis-target-secondary${y2TargetClass}">
-            <div class="axis-target-label">
-              <button id="toggle-y2-comparison" class="axis-compare-toggle${this._excludeY2Comparison ? "" : " active"}" type="button" hidden aria-pressed="${this._excludeY2Comparison ? "false" : "true"}"><ha-icon icon="mdi:compare-horizontal"></ha-icon></button>
-              <span class="axis-badge">Y2</span><span>${this._escape(this._customLocalize("secondary_axis"))}</span>
-            </div>
-            <div id="y2-target-picker-host" class="native-target-picker">
-              <div class="native-picker-status">${this._escape(this._localize("ui.common.loading", "Loading"))}…</div>
-            </div>
-          </div>` : ""}
-        </section>`}
-        <section id="period-loading-banner" class="loading-banner" ${this._periodRestoreLoading ? "" : "hidden"}>
-          <ha-circular-progress active size="small"></ha-circular-progress>
-          <span id="period-loading-text">${this._escape(this._customLocalize("loading_requested_range"))}</span>
-        </section>
-        ${dependencyMissing ? "" : `<section id="compare-banner" class="compare-banner" hidden></section>`}
-        <section id="detail-banner" class="detail-banner" hidden></section>
-        ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
-        <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>
+          ${secondaryAxisEditable ? `<ha-filter-pane id="target-sources-pane-secondary" class="target-sources-pane target-sources-secondary" ${this._targetSidebarShown("secondary") ? "" : "hidden"}>
+            <section class="target-sidebar-targets">${secondaryTargetControls}</section>
+          </ha-filter-pane>` : ""}` : `
+          ${dependencyMissing ? "" : `<section class="filters axis-targets">
+            ${primaryTargetControls}
+            ${secondaryAxisEditable ? `<div class="axis-target-divider" aria-hidden="true"></div>${secondaryTargetControls}` : ""}
+          </section>`}
+          ${centerContent}`}
       </main>
-      ${dependencyMissing ? "" : `<div id="date-controller" class="energy-nav-floating"></div>`}`;
+      ${dependencyMissing ? "" : `<button id="date-controller-reveal" class="period-selector-reveal-zone" type="button" title="${this._escape(showDatePicker)}" aria-label="${this._escape(showDatePicker)}" ${this._datePickerAutoHide ? "" : "hidden"}></button>
+      <div id="date-controller" class="period-selector-floating${this._datePickerAutoHide ? " auto-hide" : ""}"></div>`}`;
     const menu = this.shadowRoot.getElementById("menu");
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
     this.shadowRoot.getElementById("remove-all")?.addEventListener(
       "click",
       () => this._requestClearCurrentChart(),
     );
-    this.shadowRoot.getElementById("bookmarks")?.addEventListener("click", () => this._openLibrary());
+    this.shadowRoot.getElementById("bookmarks")?.addEventListener("click", () => {
+      this._collapseTargetSidebars();
+      this._openLibrary();
+    });
     this.shadowRoot.getElementById("chart-history")?.addEventListener("click", () => this._openLibrary("history"));
     this.shadowRoot.getElementById("undo")?.addEventListener("click", () => this._undo());
     this.shadowRoot.getElementById("redo")?.addEventListener("click", () => this._redo());
     this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
       "click",
-      () => this._toggleY2Comparison(),
+      (event) => this._toggleY2ComparisonMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-y2-comparison")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
+    );
+    this.shadowRoot.getElementById("toggle-y1-visibility")?.addEventListener(
+      "click",
+      () => this._toggleAxisLegendVisibility("primary"),
+    );
+    this.shadowRoot.getElementById("toggle-y2-visibility")?.addEventListener(
+      "click",
+      () => this._toggleAxisLegendVisibility("secondary"),
+    );
+    this.shadowRoot.getElementById("toggle-y1-comparison")?.addEventListener(
+      "click",
+      (event) => this._toggleY1ComparisonMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-y1-comparison")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
+    );
+    this.shadowRoot.getElementById("toggle-y1-running-total")?.addEventListener(
+      "click",
+      () => this._toggleAxisRunningTotal("primary"),
+    );
+    this.shadowRoot.getElementById("toggle-y2-running-total")?.addEventListener(
+      "click",
+      () => this._toggleAxisRunningTotal("secondary"),
+    );
+    this.shadowRoot.getElementById("toggle-state-strips")?.addEventListener(
+      "click",
+      () => this._toggleStateStrips(),
+    );
+    this.shadowRoot.getElementById("toggle-detail-mode")?.addEventListener(
+      "click",
+      (event) => this._toggleDetailModeMenu(event),
+    );
+    this.shadowRoot.getElementById("toggle-detail-mode")?.addEventListener(
+      "pointerdown",
+      (event) => event.stopPropagation(),
     );
     this._syncY2ComparisonToggle();
+    this._syncY1ComparisonToggle();
+    this._syncRunningTotalAxisButtons();
+    this._syncStateStripsButton();
+    this._syncDetailModeButton();
+    this._bindPeriodSelectorAutoHide?.();
     this._bindPanelTabs();
     this._updateUndoRedoButtons();
+    this._syncTargetSidebars();
     if (!dependencyMissing) {
       void this._renderNativeTargetPicker("primary").then(() => {
         if (secondaryAxisEditable) return this._renderNativeTargetPicker("secondary");
@@ -409,19 +600,17 @@ class AdvancedHistoryPanel extends HTMLElement {
   }
 
   _renderContent() {
-    this._energyUnsubscribe?.();
-    this._energyUnsubscribe = null;
+    this._periodUnsubscribe?.();
+    this._periodUnsubscribe = null;
     this._cards = [];
     this._graphCards = [];
     if (this._cardLoadError) {
       this._renderGraphs();
       return;
     }
-    this._renderEnergyController();
-    // A newly mounted Energy collection first exposes its previous cached
-    // result. Do not create graph cards from that stale range while a saved
-    // period is being restored; the collection subscriber renders them once
-    // Home Assistant confirms the requested period.
+    this._renderPeriodController();
+    // Saved periods are restored before graph cards are recreated so they do
+    // not briefly query the previously selected range.
     if (!this._periodRestoreLoading) this._renderGraphs();
   }
 
@@ -433,7 +622,7 @@ for (const methods of [
   ShareMethods,
   TargetPickerMethods,
   GraphMethods,
-  EnergyMethods,
+  PeriodSelectorMethods,
   DiagnosticsMethods,
   PanelTabsMethods,
 ]) {

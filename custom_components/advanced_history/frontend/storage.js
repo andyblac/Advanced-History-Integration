@@ -60,8 +60,12 @@ export class StorageMethods {
       this._hiddenTargets = this._normalizeTargets(incomingSnapshot.hidden_targets || {});
       this._y2Targets = this._normalizeTargets(incomingSnapshot.y2_targets || {});
       this._hiddenY2Targets = this._normalizeTargets(incomingSnapshot.hidden_y2_targets || {});
+      this._restoreTargetSourceFilters(incomingSnapshot);
       incomingSnapshot.chart = this._normalizeSnapshotChart(incomingSnapshot.chart);
+      this._restoreSnapshotDetailSettings(incomingSnapshot.chart);
+      this._restoreSnapshotY2ComparisonCount(incomingSnapshot);
       this._excludeY2Comparison = Boolean(incomingSnapshot.chart.exclude_y2_comparison);
+      this._comparisonBannerVisible = incomingSnapshot.chart.show_comparison_banner !== false;
       this._activeSnapshot = this._clone(incomingSnapshot.chart);
       this._prepareSnapshotRangeRestore(incomingSnapshot);
       this._currentSnapshot = this._clone(incomingSnapshot);
@@ -124,7 +128,10 @@ export class StorageMethods {
         this._snapshotFingerprint(previous) !== this._loadedBookmarkBaselineFingerprint
       );
       previous.chart = this._normalizeSnapshotChart(previous.chart);
+      this._restoreSnapshotDetailSettings(previous.chart);
+      this._restoreSnapshotY2ComparisonCount(previous);
       this._excludeY2Comparison = Boolean(previous.chart.exclude_y2_comparison);
+      this._comparisonBannerVisible = previous.chart.show_comparison_banner !== false;
       this._activeSnapshot = this._clone(previous.chart);
       this._currentSnapshot.chart = this._clone(previous.chart);
       this._saveCurrentSnapshot(this._currentSnapshot);
@@ -132,6 +139,7 @@ export class StorageMethods {
       this._hiddenTargets = this._normalizeTargets(previous.hidden_targets || {});
       this._y2Targets = this._normalizeTargets(previous.y2_targets || {});
       this._hiddenY2Targets = this._normalizeTargets(previous.hidden_y2_targets || {});
+      this._restoreTargetSourceFilters(previous);
       this._pruneHiddenTargets();
     }
   }
@@ -424,7 +432,7 @@ export class StorageMethods {
   }
 
   _capturePeriodSnapshot() {
-    const collection = this._energyCollection;
+    const collection = this._periodStore;
     const validDate = (value) => {
       const date = value instanceof Date ? value : value ? new Date(value) : null;
       return date && !Number.isNaN(date.getTime()) ? date : null;
@@ -451,7 +459,7 @@ export class StorageMethods {
       compare: collection
         ? collection.compare ?? ""
         : rollingCompare?.compare ?? fallback?.compare ?? "",
-      compare_choice: this._energyCompareChoice
+      compare_choice: this._comparisonChoice
         || rollingCompare?.choice
         || fallback?.compare_choice
         || null,
@@ -460,7 +468,7 @@ export class StorageMethods {
         Math.min(
           10,
           Math.trunc(Number(
-            this._energyCompareCount
+            this._comparisonCount
             || rollingCompare?.count
             || fallback?.compare_count
           )) || 1,
@@ -474,6 +482,8 @@ export class StorageMethods {
     const activeChart = this._normalizeSnapshotChart(this._activeSnapshot || {});
     const chart = {
       defaults_mode: "overrides",
+      detail_mode: this._detailModeValue?.() || "auto",
+      show_detail_banner: this._showDetailBanner !== false,
       card_options: this._clone(activeChart.card_options || {}),
       entity_options: this._clone(activeChart.entity_options || {}),
     };
@@ -486,8 +496,12 @@ export class StorageMethods {
       "source_graph_height",
       "single_graph",
       "attribute_selection",
+      "series_transforms",
+      "running_total_axes",
+      "state_strips",
       "compare",
       "remove_card_options",
+      "legend_hidden_series",
     ].forEach(copyChartValue);
     if (this._panelTimeRange) chart.time_range = this._clone(this._panelTimeRange);
     if (this._panelRollingHours) chart.rolling_hours = this._panelRollingHours;
@@ -495,6 +509,11 @@ export class StorageMethods {
       chart.rolling_resume_hours = this._panelRollingResumeHours;
     }
     if (this._excludeY2Comparison) chart.exclude_y2_comparison = true;
+    chart.y2_compare_count = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(this._y2ComparisonCount)) || 1),
+    );
+    if (!this._comparisonBannerVisible) chart.show_comparison_banner = false;
     return {
       schema: 1,
       id: this._newSnapshotId(),
@@ -504,6 +523,8 @@ export class StorageMethods {
       hidden_targets: this._clone(this._hiddenTargets),
       y2_targets: this._clone(this._y2Targets),
       hidden_y2_targets: this._clone(this._hiddenY2Targets),
+      target_filters: this._clone(this._targetPrimarySourceFilters),
+      y2_target_filters: this._clone(this._targetSecondarySourceFilters),
       chart,
       period,
       source_bookmark_id: this._loadedBookmarkId || null,
@@ -517,12 +538,25 @@ export class StorageMethods {
     const period = snapshot.chart?.rolling_hours
       ? { ...snapshot.period, start: null, end: null }
       : snapshot.period;
+    const chart = this._clone(snapshot.chart || {});
+    if (!["auto", "fine", "manual"].includes(chart.detail_mode)) {
+      chart.detail_mode = "auto";
+    }
+    if (chart.show_detail_banner !== false) chart.show_detail_banner = true;
+    if (!Object.prototype.hasOwnProperty.call(chart, "y2_compare_count")) {
+      chart.y2_compare_count = Math.max(
+        1,
+        Math.min(10, Math.trunc(Number(snapshot.period?.compare_count)) || 1),
+      );
+    }
     return JSON.stringify({
       targets: snapshot.targets,
       hidden_targets: snapshot.hidden_targets,
       y2_targets: snapshot.y2_targets,
       hidden_y2_targets: snapshot.hidden_y2_targets,
-      chart: snapshot.chart,
+      target_filters: snapshot.target_filters,
+      y2_target_filters: snapshot.y2_target_filters,
+      chart,
       period,
     });
   }
@@ -667,7 +701,7 @@ export class StorageMethods {
     this._y2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._hiddenY2Targets = { area_id: [], device_id: [], entity_id: [] };
     this._excludeY2Comparison = false;
-    this._resetEnergySelection();
+    this._resetPeriodSelection();
     this._saveTargets();
     this._recordChange();
     this._clearChartSessionHistory();
@@ -888,6 +922,21 @@ export class StorageMethods {
     return true;
   }
 
+  _renameBookmark(id, name) {
+    const nextName = String(name || "").trim();
+    if (!nextName) return false;
+    const items = this._loadLibrary(BOOKMARKS_STORAGE_KEY);
+    const index = items.findIndex((item) => item.id === id);
+    if (index === -1 || items[index].name === nextName) return false;
+    items[index] = { ...items[index], name: nextName };
+    if (!this._saveLibrary(BOOKMARKS_STORAGE_KEY, items)) return false;
+    if (this._loadedBookmarkId === id && this._currentSnapshot) {
+      this._currentSnapshot.name = nextName;
+      this._saveCurrentSnapshot(this._currentSnapshot);
+    }
+    return true;
+  }
+
   _clearLoadedBookmark(id = null) {
     if (id && this._loadedBookmarkId !== id) return;
     this._loadedBookmarkId = null;
@@ -916,7 +965,7 @@ export class StorageMethods {
     this._panelTimeRange = this._clone(chart.time_range) || null;
 
     // Rolling presets restore their duration and comparison settings, but
-    // never their captured timestamps. The active Energy collection rebases
+    // never their captured timestamps. The active period store rebases
     // the window to the current clock when it mounts. Fixed and deliberately
     // paused ranges continue to restore their saved period verbatim.
     this._pendingRollingCompareRestore = rollingHours ? {
@@ -947,22 +996,22 @@ export class StorageMethods {
     }
     snapshot = this._clone(snapshot);
     snapshot.chart = this._normalizeSnapshotChart(snapshot.chart);
+    this._restoreSnapshotDetailSettings(snapshot.chart);
+    this._restoreSnapshotY2ComparisonCount(snapshot);
     this._excludeY2Comparison = Boolean(snapshot.chart.exclude_y2_comparison);
+    this._comparisonBannerVisible = snapshot.chart.show_comparison_banner !== false;
     this._activeSnapshot = this._clone(snapshot.chart);
     const rollingHours = this._prepareSnapshotRangeRestore(snapshot, loadingSavedRange);
     if (this._activeSnapshot?.compare === undefined) delete this._activeSnapshot.compare;
-    this._energyUnsubscribe?.();
-    this._energyUnsubscribe = null;
-    // Do not let a rolling-range restore update the Energy collection that
-    // belonged to the panel being replaced. _refreshPanelRollingRange() will
-    // wait for _bindEnergyCollection() to attach the new panel collection.
-    if (rollingHours) this._energyCollection = null;
-    if (this._energyCollection && this._pendingPeriodRestore?.start) {
-      // Update the selector synchronously, but leave the refresh to
-      // _bindEnergyCollection(). Starting it here can publish the restored
-      // data before the replacement graph cards have subscribed to Energy.
+    this._periodUnsubscribe?.();
+    this._periodUnsubscribe = null;
+    // A rolling restore is rebased after the replacement panel store mounts.
+    if (rollingHours) this._periodStore = null;
+    if (this._periodStore && this._pendingPeriodRestore?.start) {
+      // Update the selector synchronously; the replacement render publishes
+      // the restored range after its graph cards mount.
       this._applyStoredPeriod(
-        this._energyCollection,
+        this._periodStore,
         this._pendingPeriodRestore,
         false,
         false
@@ -972,8 +1021,9 @@ export class StorageMethods {
     this._hiddenTargets = this._normalizeTargets(snapshot.hidden_targets || {});
     this._y2Targets = this._normalizeTargets(snapshot.y2_targets || {});
     this._hiddenY2Targets = this._normalizeTargets(snapshot.hidden_y2_targets || {});
+    this._restoreTargetSourceFilters(snapshot);
     this._pruneHiddenTargets();
-    if (!this._targetCount()) this._resetEnergySelection(this._energyCollection, true);
+    if (!this._targetCount()) this._resetPeriodSelection(this._periodStore, true);
     this._saveTargets();
     this._notice = "";
     if (recordChange) this._recordChange(snapshot);
@@ -993,9 +1043,8 @@ export class StorageMethods {
     current.source_external_bookmark_id = this._loadedExternalBookmarkId || null;
     this._applySnapshot(current, false, true);
     // Keep the saved snapshot itself as the baseline. Recapturing here can
-    // read the previous Energy collection before the restored period has
-    // finished mounting, replacing the bookmark's date, time and comparison
-    // state with stale picker values.
+    // read the previous store before the restored period has finished
+    // mounting and replace the bookmark range with stale picker values.
     this._freshSnapshotSessionFingerprint = this._snapshotFingerprint(current);
     this._loadedBookmarkBaselineFingerprint = this._freshSnapshotSessionFingerprint;
     this._loadedBookmarkDirty = false;
@@ -1032,6 +1081,10 @@ export class StorageMethods {
     const source = this._clone(
       chart && typeof chart === "object" && !Array.isArray(chart) ? chart : {}
     );
+    if (!["auto", "fine", "manual"].includes(source.detail_mode)) {
+      source.detail_mode = "auto";
+    }
+    if (source.show_detail_banner !== false) source.show_detail_banner = true;
     if (source.defaults_mode === "overrides") return source;
 
     // Legacy snapshots contain the fully merged configuration. Values that
@@ -1061,6 +1114,23 @@ export class StorageMethods {
     if (this._sameSnapshotOption(source.compare, this.config.compare)) delete source.compare;
     source.defaults_mode = "overrides";
     return source;
+  }
+
+  _restoreSnapshotDetailSettings(chart) {
+    this._detailMode = ["auto", "fine", "manual"].includes(chart?.detail_mode)
+      ? chart.detail_mode
+      : "auto";
+    this._showDetailBanner = chart?.show_detail_banner !== false;
+    this._largeRangeFineDetail = this._detailMode === "fine";
+  }
+
+  _restoreSnapshotY2ComparisonCount(snapshot) {
+    this._y2ComparisonCount = Math.max(
+      1,
+      Math.min(10, Math.trunc(Number(
+        snapshot?.chart?.y2_compare_count ?? snapshot?.period?.compare_count,
+      )) || 1),
+    );
   }
 
   _configuredCardOptions(mode = "timeline") {
@@ -1141,7 +1211,7 @@ export class StorageMethods {
     if (this._activeSnapshot?.compare !== undefined) {
       return this._activeSnapshot.compare;
     }
-    return this.config.compare !== undefined ? this.config.compare : this._energyCompare;
+    return this.config.compare !== undefined ? this.config.compare : this._comparisonState;
   }
 
   _applyStoredPeriod(collection, period, clearPending = true, refresh = true) {
@@ -1187,8 +1257,8 @@ export class StorageMethods {
     const periodChanged = currentStart !== start.getTime()
       || currentEnd !== end?.getTime();
     const compare = period.compare || "";
-    this._energyCompareChoice = period.compare_choice || null;
-    this._energyCompareCount = Math.max(
+    this._comparisonChoice = period.compare_choice || null;
+    this._comparisonCount = Math.max(
       1,
       Math.min(10, Math.trunc(Number(period.compare_count)) || 1),
     );
@@ -1247,7 +1317,7 @@ export class StorageMethods {
     }
     this._periodRestoreExpected = expected;
     this._periodRestoreLoading = true;
-    this._energyInteractionLoading = false;
+    this._periodInteractionLoading = false;
     const banner = this.shadowRoot?.getElementById("period-loading-banner");
     if (banner) banner.hidden = false;
     const loadingText = this.shadowRoot?.getElementById("period-loading-text");
@@ -1286,60 +1356,6 @@ export class StorageMethods {
     if (charts) charts.hidden = false;
   }
 
-  _restoredPeriodMatches(expected, actualStart, actualEnd) {
-    const expectedStart = new Date(expected?.start).getTime();
-    const expectedEnd = expected?.end == null
-      ? undefined
-      : new Date(expected.end).getTime();
-    const start = actualStart instanceof Date
-      ? actualStart.getTime()
-      : new Date(actualStart).getTime();
-    const end = actualEnd == null
-      ? undefined
-      : actualEnd instanceof Date
-        ? actualEnd.getTime()
-        : new Date(actualEnd).getTime();
-    if (!Number.isFinite(expectedStart) || !Number.isFinite(start)) return false;
-    if (start !== expectedStart) return false;
-    if (end === expectedEnd) return true;
-
-    // HA Energy data can describe a full local day using either the final
-    // millisecond of that day or midnight at the start of the next day. Both
-    // boundaries refer to the same selected day and must complete a restore.
-    const dayStart = new Date(expectedStart);
-    dayStart.setHours(0, 0, 0, 0);
-    if (expectedStart !== dayStart.getTime()) return false;
-    const nextDay = new Date(dayStart);
-    nextDay.setDate(nextDay.getDate() + 1);
-    const nextDayTime = nextDay.getTime();
-    const isFullDayEnd = (value) => Number.isFinite(value)
-      && value >= nextDayTime - 60_000
-      && value <= nextDayTime;
-    return isFullDayEnd(expectedEnd) && isFullDayEnd(end);
-  }
-
-  _completePeriodRestoreFromData(data, collection) {
-    const expected = this._periodRestoreExpected;
-    if (!this._periodRestoreLoading || !expected?.start) return false;
-    // setPeriod() updates the collection properties synchronously, while the
-    // native picker updates only from the refreshed EnergyData payload. Use
-    // that payload as the confirmation so stale cached data cannot complete
-    // the restore early.
-    // EnergyData carries the range used for the completed request. Never
-    // substitute the collection properties here: setPeriod() changes those
-    // synchronously before the refreshed data has arrived.
-    const actualStart = data?.start;
-    const actualEnd = data?.end;
-    const expectedCompare = expected.compare || "";
-    const actualCompare = data?.compareMode ?? collection?.compare ?? "";
-    if (
-      !this._restoredPeriodMatches(expected, actualStart, actualEnd)
-      || actualCompare !== expectedCompare
-    ) return false;
-    this._finishPeriodRestore();
-    return true;
-  }
-
   _formatSnapshotTime(value) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
@@ -1352,7 +1368,12 @@ export class StorageMethods {
   _snapshotSummary(snapshot) {
     const count = this._snapshotTargetCount(snapshot);
     const hours = Number(snapshot.chart?.default_hours ?? this.config.default_hours) || 24;
-    const height = Number(snapshot.chart?.graph_height ?? this.config.graph_height) || 300;
+    const savedCompare = snapshot.chart?.compare !== undefined
+      ? snapshot.chart.compare
+      : snapshot.period?.compare;
+    const comparison = this._customLocalize(
+      this._comparisonIsActive(savedCompare) ? "comparison_on" : "comparison_off",
+    );
     const periodStart = snapshot.period?.start ? new Date(snapshot.period.start) : null;
     const periodEnd = snapshot.period?.end ? new Date(snapshot.period.end) : null;
     const dateFormatter = new Intl.DateTimeFormat(this._hass.locale?.language, { dateStyle: "medium" });
@@ -1368,26 +1389,114 @@ export class StorageMethods {
       `${count} ${count === 1 ? "target" : "targets"}`,
       { count }
     );
-    return `${targetCount} · ${period} · ${height}px · ${this._formatSnapshotTime(snapshot.saved_at)}`;
+    return `${targetCount} · ${period} · ${comparison} · ${this._formatSnapshotTime(snapshot.saved_at)}`;
   }
 
   _libraryRows(items, isBookmarks = false, options = {}) {
     if (!items.length) return `<div class="library-empty">${this._escape(this._localize("ui.components.media-browser.no_items", "No items"))}</div>`;
     const { readOnly = false, ownerUserId = null, showOwner = false } = options;
     const deleteLabel = this._localize("ui.common.delete", "Delete");
+    const renameLabel = this._localize("ui.common.rename", "Rename");
+    const saveLabel = this._localize("ui.common.save", "Save");
+    const cancelLabel = this._localize("ui.common.cancel", "Cancel");
     const updateLabel = this._customLocalize("update_bookmark");
+    const reorderLabel = this._customLocalize("reorder_bookmark");
     const visibleLabel = this._customLocalize("visible_to_everyone");
     const canPublish = isBookmarks && Boolean(this._hass?.user?.is_admin);
-    return items.map((item) => `
-      <div class="library-row">
+    return items.map((item) => {
+      const name = item.name || this._snapshotLabel(item);
+      return `
+      <div class="library-row"${!readOnly && isBookmarks ? ` data-bookmark-row="${this._escape(item.id)}"` : ""}>
+        ${!readOnly && isBookmarks ? `<button class="bookmark-drag-handle" type="button" draggable="true" data-drag-bookmark="${this._escape(item.id)}" title="${this._escape(reorderLabel)}" aria-label="${this._escape(`${reorderLabel}: ${name}`)}"><ha-icon icon="mdi:drag-vertical"></ha-icon></button>` : ""}
         <button class="library-main" data-open-snapshot="${this._escape(item.id)}" data-owner-user-id="${this._escape(item._owner_user_id || ownerUserId || "")}">
-          <span class="library-name">${this._escape(item.name || this._snapshotLabel(item))}</span>
+          <span class="library-name">${this._escape(name)}</span>
           <span class="library-summary">${showOwner && item._owner_name ? `${this._escape(item._owner_name)} · ` : ""}${this._escape(this._snapshotSummary(item))}</span>
         </button>
+        ${!readOnly && isBookmarks ? `<form class="bookmark-rename-editor" data-rename-form="${this._escape(item.id)}" hidden><input maxlength="80" value="${this._escape(name)}" aria-label="${this._escape(renameLabel)}"><button type="submit" title="${this._escape(saveLabel)}" aria-label="${this._escape(saveLabel)}"><ha-icon icon="mdi:check"></ha-icon></button><button type="button" data-cancel-rename title="${this._escape(cancelLabel)}" aria-label="${this._escape(cancelLabel)}"><ha-icon icon="mdi:close"></ha-icon></button></form>` : ""}
         ${!readOnly && isBookmarks && this._bookmarkHasChanges(item) ? `<button class="update" data-update-snapshot="${this._escape(item.id)}" title="${this._escape(updateLabel)}"><ha-icon icon="mdi:update"></ha-icon></button>` : ""}
+        ${!readOnly && isBookmarks ? `<button class="rename" data-rename-snapshot="${this._escape(item.id)}" title="${this._escape(renameLabel)}" aria-label="${this._escape(`${renameLabel}: ${name}`)}"><ha-icon icon="mdi:pencil-outline"></ha-icon></button>` : ""}
         ${canPublish ? `<button class="visibility ${item.visible_everyone ? "active" : ""}" data-toggle-visible="${this._escape(item.id)}" data-owner-user-id="${this._escape(item._owner_user_id || ownerUserId || this._hass.user.id)}" aria-pressed="${item.visible_everyone ? "true" : "false"}" title="${this._escape(visibleLabel)}"><ha-icon icon="${item.visible_everyone ? "mdi:account-multiple" : "mdi:account-multiple-outline"}"></ha-icon></button>` : ""}
         ${readOnly ? "" : `<button class="delete" data-delete-snapshot="${this._escape(item.id)}" title="${this._escape(deleteLabel)}"><ha-icon icon="mdi:delete-outline"></ha-icon></button>`}
-      </div>`).join("");
+      </div>`;
+    }).join("");
+  }
+
+  _saveBookmarkOrder(ids) {
+    const bookmarks = this._loadLibrary(BOOKMARKS_STORAGE_KEY);
+    if (!Array.isArray(ids) || ids.length !== bookmarks.length) return false;
+    const byId = new Map(bookmarks.map((bookmark) => [bookmark.id, bookmark]));
+    const reordered = ids.map((id) => byId.get(id));
+    if (reordered.some((bookmark) => !bookmark) || new Set(ids).size !== ids.length) return false;
+    if (reordered.every((bookmark, index) => bookmark === bookmarks[index])) return false;
+    return this._saveLibrary(BOOKMARKS_STORAGE_KEY, reordered);
+  }
+
+  _bindBookmarkReordering(backdrop, kind, bookmarkState) {
+    if (kind !== "bookmarks" || bookmarkState?.readOnly) return;
+    const list = backdrop.querySelector(".library-list");
+    if (!list) return;
+    let dragging = null;
+
+    const persistDomOrder = () => this._saveBookmarkOrder(
+      Array.from(list.querySelectorAll("[data-bookmark-row]"), (row) => row.dataset.bookmarkRow)
+    );
+    const finishDrag = () => {
+      if (!dragging) return;
+      dragging.classList.remove("dragging");
+      dragging = null;
+      persistDomOrder();
+    };
+
+    list.addEventListener("dragstart", (event) => {
+      const handle = event.target.closest("[data-drag-bookmark]");
+      if (!handle) {
+        event.preventDefault();
+        return;
+      }
+      dragging = handle.closest("[data-bookmark-row]");
+      if (!dragging) return;
+      dragging.classList.add("dragging");
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", dragging.dataset.bookmarkRow);
+      event.dataTransfer.setDragImage?.(dragging, 24, dragging.offsetHeight / 2);
+    });
+    list.addEventListener("dragover", (event) => {
+      if (!dragging) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = "move";
+      const target = event.target.closest("[data-bookmark-row]");
+      if (!target || target === dragging) return;
+      const rect = target.getBoundingClientRect();
+      const after = event.clientY > rect.top + rect.height / 2;
+      list.insertBefore(dragging, after ? target.nextSibling : target);
+    });
+    list.addEventListener("drop", (event) => {
+      if (!dragging) return;
+      event.preventDefault();
+      finishDrag();
+    });
+    list.addEventListener("dragend", finishDrag);
+    list.querySelectorAll("[data-drag-bookmark]").forEach((handle) => {
+      handle.addEventListener("keydown", (event) => {
+        if (!["ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+        const row = handle.closest("[data-bookmark-row]");
+        if (!row) return;
+        event.preventDefault();
+        if (event.key === "ArrowUp" && row.previousElementSibling) {
+          list.insertBefore(row, row.previousElementSibling);
+        } else if (event.key === "ArrowDown" && row.nextElementSibling) {
+          list.insertBefore(row.nextElementSibling, row);
+        } else if (event.key === "Home") {
+          list.prepend(row);
+        } else if (event.key === "End") {
+          list.append(row);
+        } else {
+          return;
+        }
+        persistDomOrder();
+        handle.focus();
+      });
+    });
   }
 
   _bookmarkLibraryState() {
@@ -1433,9 +1542,21 @@ export class StorageMethods {
   }
 
   async _openLibrary(kind = "bookmarks") {
-    if (this.shadowRoot.querySelector(".backdrop") || this._libraryOpening) return;
+    if (
+      this.shadowRoot.querySelector(".backdrop, .library-dialog-host")
+      || this._libraryOpening
+    ) return;
     this._libraryOpening = true;
     try {
+      if (
+        this._narrow
+        && !customElements.get("ha-adaptive-dialog")
+        && this._homeAssistantVersionAtLeast?.(2026, 9)
+      ) {
+        try {
+          await this._loadNativeHistoryPicker?.(true);
+        } catch (_) { /* Retain the existing full-screen mobile fallback. */ }
+      }
       if (kind === "bookmarks") {
         await this._refreshSyncedBookmarks();
         if (this._bookmarkLibraryView !== "mine" && this._bookmarkLibraryView !== "shared") {
@@ -1449,7 +1570,7 @@ export class StorageMethods {
   }
 
   _renderLibrary(kind) {
-    this.shadowRoot.querySelector(".backdrop")?.remove();
+    this.shadowRoot.querySelector(".library-dialog-host")?.remove();
     const isBookmarks = kind === "bookmarks";
     const key = isBookmarks ? BOOKMARKS_STORAGE_KEY : HISTORY_STORAGE_KEY;
     const bookmarkState = isBookmarks ? this._bookmarkLibraryState() : null;
@@ -1458,18 +1579,41 @@ export class StorageMethods {
     const clearLabel = this._customLocalize(isBookmarks ? "clear_bookmarks" : "clear_history");
     const copyShareLink = this._customLocalize("copy_share_link");
     const close = this._localize("ui.common.close", "Close");
-    const backdrop = document.createElement("div");
-    backdrop.className = "backdrop";
-    backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${title}">
-      <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${title}</h2><span class="count">${items.length}${isBookmarks ? "" : ` / ${HISTORY_LIMIT}`}</span></header>
+    const itemCount = `${items.length}${isBookmarks ? "" : ` / ${HISTORY_LIMIT}`}`;
+    const body = `
       ${isBookmarks ? this._bookmarkTabs() : ""}
       ${isBookmarks && !bookmarkState.readOnly ? `<div class="library-save"><input id="bookmark-name" maxlength="80" placeholder="${this._escape(this._customLocalize("bookmark_name"))}" value="${this._escape(this._snapshotLabel())}"><button data-action="save-current">${this._escape(this._customLocalize("save_current"))}</button></div>` : ""}
-      <div class="library-list">${this._libraryRows(items, isBookmarks, bookmarkState || {})}</div>
-      <footer class="dialog-actions">${!isBookmarks || !bookmarkState.readOnly ? `<button data-action="clear" style="margin-right:auto" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</button>` : `<span style="margin-right:auto"></span>`}${isBookmarks ? `<button data-action="share" ${this._targetCount() ? "" : "disabled"}>${this._escape(copyShareLink)}</button>` : ""}<button data-action="close">${this._escape(close)}</button></footer>
-    </section>`;
-    backdrop.addEventListener("click", (event) => { if (event.target === backdrop) backdrop.remove(); });
-    backdrop.querySelector('[data-action="close"]').addEventListener("click", () => backdrop.remove());
-    backdrop.querySelector('[data-action="close-dialog"]').addEventListener("click", () => backdrop.remove());
+      <div class="library-list">${this._libraryRows(items, isBookmarks, bookmarkState || {})}</div>`;
+    const useAdaptiveDialog = Boolean(
+      this._narrow && customElements.get("ha-adaptive-dialog")
+    );
+    const backdrop = document.createElement(useAdaptiveDialog ? "ha-adaptive-dialog" : "div");
+    backdrop.className = useAdaptiveDialog
+      ? "library-dialog-host library-adaptive-dialog"
+      : "library-dialog-host backdrop";
+    if (useAdaptiveDialog) {
+      backdrop.open = true;
+      backdrop.setAttribute("flexcontent", "");
+      backdrop.headerTitle = `${title}: ${itemCount}`;
+      backdrop.innerHTML = `<section class="library-mobile-content">${body}</section>
+        <ha-dialog-footer slot="footer">
+          ${!isBookmarks || !bookmarkState.readOnly ? `<ha-button slot="secondaryAction" data-action="clear" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</ha-button>` : ""}
+          ${isBookmarks ? `<ha-button slot="secondaryAction" data-action="share" ${this._targetCount() ? "" : "disabled"}>${this._escape(copyShareLink)}</ha-button>` : ""}
+          <ha-button slot="primaryAction" data-action="close" data-dialog="close">${this._escape(close)}</ha-button>
+        </ha-dialog-footer>`;
+      backdrop.addEventListener("closed", () => backdrop.remove());
+    } else {
+      backdrop.innerHTML = `<section class="dialog" role="dialog" aria-modal="true" aria-label="${title}">
+        <header class="dialog-title"><button class="dialog-close" data-action="close-dialog" title="${this._escape(close)}" aria-label="${this._escape(close)}"><ha-icon icon="mdi:close"></ha-icon></button><h2>${title}</h2><span class="count">${itemCount}</span></header>
+        ${body}
+        <footer class="dialog-actions">${!isBookmarks || !bookmarkState.readOnly ? `<button data-action="clear" style="margin-right:auto" ${items.length ? "" : "disabled"}>${this._escape(clearLabel)}</button>` : `<span style="margin-right:auto"></span>`}${isBookmarks ? `<button data-action="share" ${this._targetCount() ? "" : "disabled"}>${this._escape(copyShareLink)}</button>` : ""}<button data-action="close">${this._escape(close)}</button></footer>
+      </section>`;
+      backdrop.addEventListener("click", (event) => {
+        if (event.target === backdrop) backdrop.remove();
+      });
+    }
+    backdrop.querySelector('[data-action="close"]')?.addEventListener("click", () => backdrop.remove());
+    backdrop.querySelector('[data-action="close-dialog"]')?.addEventListener("click", () => backdrop.remove());
     backdrop.querySelector('[data-action="save-current"]')?.addEventListener("click", () => {
       const input = backdrop.querySelector("#bookmark-name");
       if (this._saveCurrentBookmark(input.value)) backdrop.remove();
@@ -1584,6 +1728,55 @@ export class StorageMethods {
     backdrop.querySelectorAll("[data-update-snapshot]").forEach((button) => button.addEventListener("click", () => {
       if (this._updateBookmark(button.dataset.updateSnapshot)) this._renderLibrary(kind);
     }));
+    backdrop.querySelectorAll("[data-rename-snapshot]").forEach((button) => button.addEventListener("click", () => {
+      const row = button.closest("[data-bookmark-row]");
+      const editor = row?.querySelector("[data-rename-form]");
+      const input = editor?.querySelector("input");
+      if (!row || !editor || !input) return;
+      row.classList.add("renaming");
+      row.querySelector(".library-main").hidden = true;
+      editor.hidden = false;
+      button.hidden = true;
+      input.focus();
+      input.select();
+    }));
+    backdrop.querySelectorAll("[data-rename-form]").forEach((form) => {
+      const finishRename = (savedName = null) => {
+        const row = form.closest("[data-bookmark-row]");
+        const main = row?.querySelector(".library-main");
+        const rename = row?.querySelector("[data-rename-snapshot]");
+        const input = form.querySelector("input");
+        const label = main?.querySelector(".library-name");
+        if (savedName !== null) {
+          if (label) label.textContent = savedName;
+        }
+        if (input && label) input.value = label.textContent;
+        row?.classList.remove("renaming");
+        if (main) main.hidden = false;
+        form.hidden = true;
+        if (rename) rename.hidden = false;
+      };
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+        const input = form.querySelector("input");
+        const name = input?.value.trim();
+        if (!name) {
+          input?.focus();
+          return;
+        }
+        const currentName = form.closest("[data-bookmark-row]")
+          ?.querySelector(".library-name")?.textContent;
+        if (name !== currentName && !this._renameBookmark(form.dataset.renameForm, name)) {
+          input?.focus();
+          return;
+        }
+        finishRename(name);
+      });
+      form.querySelector("[data-cancel-rename]")?.addEventListener("click", () => finishRename());
+      form.querySelector("input")?.addEventListener("keydown", (event) => {
+        if (event.key === "Escape") finishRename();
+      });
+    });
     backdrop.querySelectorAll("[data-delete-snapshot]").forEach((button) => button.addEventListener("click", async () => {
       if (isBookmarks) {
         const bookmark = items.find((item) => item.id === button.dataset.deleteSnapshot);
@@ -1603,6 +1796,7 @@ export class StorageMethods {
         this._notice = this._customLocalize("bookmark_sync_error");
       }
     }));
+    this._bindBookmarkReordering(backdrop, kind, bookmarkState);
     this.shadowRoot.append(backdrop);
     backdrop.querySelector("#bookmark-name")?.select();
   }

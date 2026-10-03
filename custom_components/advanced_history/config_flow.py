@@ -30,6 +30,7 @@ from .const import (
     CONF_SIDEBAR_ICON,
     CONF_STATE_CARD_OPTIONS,
     CONF_TITLE,
+    CONF_USE_LEGACY_TARGET_PICKER,
     DEFAULT_MORE_INFO_OPTIONS,
     DEFAULT_OPTIONS,
     DOMAIN,
@@ -81,6 +82,10 @@ def _panel_schema(values: dict[str, Any]) -> vol.Schema:
             ),
             vol.Optional(
                 CONF_INCLUDE_HIDDEN, default=values[CONF_INCLUDE_HIDDEN]
+            ): selector.BooleanSelector(),
+            vol.Optional(
+                CONF_USE_LEGACY_TARGET_PICKER,
+                default=values[CONF_USE_LEGACY_TARGET_PICKER],
             ): selector.BooleanSelector(),
             vol.Optional(
                 CONF_NUMERIC_CARD_OPTIONS,

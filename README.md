@@ -55,7 +55,7 @@ Advanced History brings those two ideas together: select targets as you would in
 
 - Home Assistant with support for custom integrations.
 - [HACS](https://www.hacs.xyz/) is recommended.
-- [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) **v3.32 or newer** is a separate required dependency. Multiple panels require **v4.02 or newer** so each panel can use an independent Energy Date Sync collection.
+- [Statistics Graph Chart Card](https://github.com/cataseven/Statistics-Graph-Chart-Card) **v3.32 or newer** is a separate required dependency. Multiple panels require **v4.02 or newer** so each panel can use an independent Energy Date Sync collection; embedded state-history strips require **v4.03 or newer**.
 
 If the graph card is missing, Advanced History displays an **Install using HACS** link and a **Retry** button.
 
@@ -79,6 +79,14 @@ New installations create both services automatically. The More Info graph replac
 2. Copy `custom_components/advanced_history` into `/config/custom_components/advanced_history`.
 3. Restart Home Assistant.
 4. Add **Advanced History** from **Settings → Devices & services**.
+
+### Development builds
+
+Run `python3 scripts/build_dev.py` from the repository root before uploading a local development build. Each run increments a local build counter, writes `build.json`, stamps the integration manifest with the full development version, and creates `dist/advanced_history-dev-<build>.zip`. This makes Home Assistant display the build number whether you install the ZIP or copy the updated `custom_components/advanced_history` folder. The builder retains the underlying release version when incrementing subsequent development builds, and resets the counter to `1` when that release version changes.
+
+Local development builds display versions such as `v2.1.0-dev.42` beneath the Advanced History title, making it easy to confirm which build is installed. The version-aware counter in `dev-build.json` is tracked so numbering survives a fresh clone. The generated integration metadata and ZIP files are ignored by Git. Stable installations display the manifest version only.
+
+The repository development instructions make this the automatic final step whenever Advanced History code is changed through Codex, so a manual build-number reminder is not required.
 
 ### Existing installations from before 0.6.0
 

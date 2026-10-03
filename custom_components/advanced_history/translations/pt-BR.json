@@ -13,6 +13,7 @@
           "large_range_detail_threshold_days": "Limite do detalhe automático (dias)",
           "graph_height": "Altura do gráfico",
           "include_hidden": "Incluir entidades ocultas",
+          "use_legacy_target_picker": "Usar seletores de destino integrados anteriores",
           "require_admin": "Somente administradores",
           "card_module_url": "URL do módulo do cartão de gráfico",
           "numeric_card_options": "Opções de gráficos numéricos",
@@ -21,6 +22,7 @@
         "data_description": {
           "large_range_automatic_detail": "Define o dimensionamento automático de pontos padrão para gráficos numéricos; as opções do gráfico podem substituí-lo. Para períodos longos, também oferece detalhes finos no painel Histórico.",
           "large_range_detail_threshold_days": "Usa o detalhe automático quando o período selecionado tiver pelo menos este número de dias.",
+          "use_legacy_target_picker": "Usa o layout integrado anterior de Y1/Y2 em vez das barras laterais de destino do Home Assistant 2026.9.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
           "numeric_card_options": "Padrões usados somente por gráficos numéricos. Abra o editor visual ou edite o código diretamente.",
           "state_card_options": "Padrões usados somente por gráficos de linha do tempo de estados. Abra o editor visual ou edite o código diretamente."
@@ -37,6 +39,7 @@
           "large_range_detail_threshold_days": "Limite do detalhe automático (dias)",
           "graph_height": "Altura do gráfico",
           "include_hidden": "Incluir entidades ocultas",
+          "use_legacy_target_picker": "Usar seletores de destino integrados anteriores",
           "card_module_url": "URL do módulo do cartão de gráfico",
           "require_admin": "Somente administradores",
           "numeric_card_options": "Opções de gráficos numéricos",
@@ -45,6 +48,7 @@
         "data_description": {
           "large_range_automatic_detail": "Define o dimensionamento automático de pontos padrão para gráficos numéricos; as opções do gráfico podem substituí-lo. Para períodos longos, também oferece detalhes finos no painel Histórico.",
           "large_range_detail_threshold_days": "Usa o detalhe automático quando o período selecionado tiver pelo menos este número de dias.",
+          "use_legacy_target_picker": "Usa o layout integrado anterior de Y1/Y2 em vez das barras laterais de destino do Home Assistant 2026.9.",
           "card_module_url": "Deixe vazio para detectar automaticamente o recurso HACS do Statistics Graph Chart Card.",
           "numeric_card_options": "Padrões usados somente por gráficos numéricos. Abra o editor visual ou edite o código diretamente.",
           "state_card_options": "Padrões usados somente por gráficos de linha do tempo de estados. Abra o editor visual ou edite o código diretamente."
@@ -113,6 +117,7 @@
           "large_range_detail_threshold_days": "Limite do detalhe automático (dias)",
           "graph_height": "Altura do gráfico",
           "include_hidden": "Incluir entidades ocultas",
+          "use_legacy_target_picker": "Usar seletores de destino integrados anteriores",
           "redirect_show_more": "Abrir Mostrar mais no Advanced History",
           "replace_more_info_history": "Usar Statistics Graph em Mais informações",
           "more_info_show_date_picker": "Mostrar calendário do gráfico",
@@ -124,6 +129,7 @@
         "data_description": {
           "large_range_automatic_detail": "Define o dimensionamento automático de pontos padrão para gráficos numéricos; as opções do gráfico podem substituí-lo. Para períodos longos, também oferece detalhes finos no painel Histórico.",
           "large_range_detail_threshold_days": "Usa o detalhe automático quando o período selecionado tiver pelo menos este número de dias.",
+          "use_legacy_target_picker": "Usa o layout integrado anterior de Y1/Y2 em vez das barras laterais de destino do Home Assistant 2026.9.",
           "redirect_show_more": "Abre o link Mostrar mais da seção Histórico nos diálogos de entidade no Advanced History como um novo painel, preservando as guias de painel existentes.",
           "replace_more_info_history": "Substitui o gráfico de Histórico nativo nos diálogos de entidade pelo Statistics Graph Chart Card.",
           "more_info_show_date_picker": "Mostra o seletor de datas integrado do Statistics Graph Chart Card nos diálogos de entidade.",

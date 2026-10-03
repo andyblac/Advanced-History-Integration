@@ -18,13 +18,11 @@ const OMITTED_CARD_KEYS = new Set([
   "date_picker_position",
   "date_picker_nav_position",
   "date_picker_shortcuts_position",
-  "date_picker_group",
   "date_picker_modes",
   "date_picker_default_mode",
   "date_picker_step",
   "show_interval_picker",
   "interval_picker_position",
-  "interval_picker_group",
   "interval_options",
   "show_y2_axis",
   "show_advanced_history_button",
@@ -85,6 +83,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
   const attributeSelection = {};
   const seriesRows = {};
   const comparisons = [];
+  let hasStateStrips = false;
   for (const row of cardRows(config)) {
     const entityId = typeof row === "string" ? row : row?.entity;
     if (!validEntityId(entityId)) continue;
@@ -98,6 +97,10 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
       const options = clone(row);
       delete options.entity;
       delete options.statistic_id;
+      if (options.graph_type === "state_strip") {
+        hasStateStrips = true;
+        delete options.graph_type;
+      }
       if (options.y_axis === "secondary") secondaryEntityIds.add(entityId);
       delete options.y_axis;
       if (options.compare !== undefined) comparisons.push(options.compare);
@@ -132,6 +135,7 @@ export function cardConfigToSnapshot(config, period = null, singleGraph = false)
     attribute_selection: attributeSelection,
   };
   if (singleGraph) chart.single_graph = true;
+  if (hasStateStrips) chart.state_strips = true;
   if (
     comparisons.length
     && comparisons.every((value) => JSON.stringify(value) === JSON.stringify(comparisons[0]))
