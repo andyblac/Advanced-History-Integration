@@ -483,7 +483,8 @@ export class AdvancedHistoryPanel extends HTMLElement {
       ${dependencyMissing ? "" : `<section id="compare-banner" class="compare-banner" hidden></section>`}
       <section id="detail-banner" class="detail-banner" hidden></section>
       ${this._notice ? `<div class="notice">${this._escape(this._notice)}</div>` : ""}
-      <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>`;
+      <section id="charts" class="charts" ${this._periodRestoreLoading ? "hidden" : ""}></section>
+      ${dependencyMissing ? "" : `<div id="date-controller" class="period-selector-floating${this._datePickerAutoHide ? " auto-hide" : " docked"}"></div>`}`;
     this._removePeriodSelectorMenuDismissHandlers?.();
     this._nativeTargetPicker = null;
     this._nativeY2TargetPicker = null;
@@ -522,8 +523,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
           </section>`}
           ${centerContent}`}
       </main>
-      ${dependencyMissing ? "" : `<button id="date-controller-reveal" class="period-selector-reveal-zone" type="button" title="${this._escape(showDatePicker)}" aria-label="${this._escape(showDatePicker)}" ${this._datePickerAutoHide ? "" : "hidden"}></button>
-      <div id="date-controller" class="period-selector-floating${this._datePickerAutoHide ? " auto-hide" : ""}"></div>`}`;
+      ${dependencyMissing ? "" : `<button id="date-controller-reveal" class="period-selector-reveal-zone" type="button" title="${this._escape(showDatePicker)}" aria-label="${this._escape(showDatePicker)}" ${this._datePickerAutoHide ? "" : "hidden"}></button>`}`;
     const menu = this.shadowRoot.getElementById("menu");
     if (menu) { menu.hass = this._hass; menu.narrow = this._narrow; }
     this.shadowRoot.getElementById("remove-all")?.addEventListener(

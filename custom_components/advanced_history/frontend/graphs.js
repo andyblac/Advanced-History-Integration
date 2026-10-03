@@ -42,6 +42,40 @@ const EXTENDED_ENTITY_COLORS = Object.freeze([
   "#fff176",
 ]);
 
+export function numericGraphLayoutHeight({
+  dashboardCardMode = false,
+  layoutHeight,
+  numericRequirement = 0,
+  hasState = false,
+  stateHeight = 0,
+}) {
+  const remainingHeight = hasState
+    ? layoutHeight - stateHeight - 16
+    : layoutHeight;
+  return Math.max(
+    MIN_NUMERIC_GRAPH_HEIGHT,
+    remainingHeight,
+    dashboardCardMode ? numericRequirement : 0,
+  );
+}
+
+export function usesDynamicNumericGraphHeight({
+  hasNumeric = false,
+  numericChartCount = 0,
+  usesAutomaticHeight = false,
+  dashboardCardMode = false,
+  selectorDocked = false,
+}) {
+  return Boolean(
+    hasNumeric
+    && numericChartCount === 1
+    && (
+      usesAutomaticHeight
+      || (!dashboardCardMode && selectorDocked)
+    )
+  );
+}
+
 export function stateStripPresentationOptions(numericOptions = {}, stateOptions = {}) {
   const options = { ...numericOptions };
   if (
@@ -435,11 +469,11 @@ export class GraphMethods {
     card.setConfig(fittedConfig);
   }
 
-  _fitAutomaticNumericCard(card, cardHeight) {
+  _fitAutomaticNumericCard(card, cardHeight, forcePanelFit = false) {
     const config = card?.__advancedHistoryConfig;
     if (
       !config
-      || (!card.__advancedHistoryAutoHeight && config.height !== "auto")
+      || (!forcePanelFit && !card.__advancedHistoryAutoHeight && config.height !== "auto")
       || !Number.isFinite(cardHeight)
     ) return;
     const root = card.shadowRoot;
@@ -458,7 +492,9 @@ export class GraphMethods {
     const nonPlotHeight = Math.max(0, outerHeight - plotHeight);
     const fittedHeight = Math.max(200, Math.floor(cardHeight - nonPlotHeight));
     if (card.__advancedHistoryAutoPlotHeight === fittedHeight) return;
-    card.__advancedHistoryAutoHeight = true;
+    if (!forcePanelFit || card.__advancedHistoryAutoHeight || config.height === "auto") {
+      card.__advancedHistoryAutoHeight = true;
+    }
     card.__advancedHistoryAutoPlotHeight = fittedHeight;
     const fittedConfig = { ...config, height: fittedHeight };
     card.__advancedHistoryConfig = fittedConfig;
@@ -476,11 +512,21 @@ export class GraphMethods {
     const usesAutomaticNumericHeight = hasNumeric && (
       configuredNumericHeight == null || configuredNumericHeight === "auto"
     );
-    const autoNumericHeight = numericChartCount === 1 && usesAutomaticNumericHeight;
-    host.classList.toggle("auto-numeric-height", usesAutomaticNumericHeight);
-    host.classList.toggle("dynamic-numeric", autoNumericHeight);
-    host.classList.toggle("has-state-graph", autoNumericHeight && hasState);
-    if (!autoNumericHeight) {
+    const selectorDocked = this.shadowRoot
+      ?.getElementById("date-controller")
+      ?.classList?.contains("docked");
+    const dynamicNumericHeight = usesDynamicNumericGraphHeight({
+      hasNumeric,
+      numericChartCount,
+      usesAutomaticHeight: usesAutomaticNumericHeight,
+      dashboardCardMode: this._dashboardCardMode,
+      selectorDocked,
+    });
+    const forceDockedPanelFit = dynamicNumericHeight && !usesAutomaticNumericHeight;
+    host.classList.toggle("auto-numeric-height", dynamicNumericHeight);
+    host.classList.toggle("dynamic-numeric", dynamicNumericHeight);
+    host.classList.toggle("has-state-graph", dynamicNumericHeight && hasState);
+    if (!dynamicNumericHeight) {
       host.style.removeProperty("height");
       host.style.removeProperty("min-height");
       host.style.removeProperty("--numeric-graph-height");
@@ -497,20 +543,13 @@ export class GraphMethods {
           this._fitStateTimelineCard(stateCard);
         }
       }
-      if (!autoNumericHeight) return;
+      if (!dynamicNumericHeight) return;
       const viewportHeight = window.visualViewport?.height || window.innerHeight;
       const controller = this.shadowRoot?.getElementById("date-controller");
       const controllerRect = controller?.getBoundingClientRect?.();
-      const controllerBottom = Number.parseFloat(
-        controller ? getComputedStyle(controller).bottom : "",
-      );
-      const controllerTop = Number.isFinite(controllerBottom) && controllerRect?.height > 0
-        ? viewportHeight - controllerBottom - controllerRect.height
-        : controllerRect?.top;
-      const bottom = this._datePickerAutoHide
-        ? viewportHeight
-        : controllerRect?.height > 0
-          ? Math.min(viewportHeight, controllerTop)
+      const selectorDocked = controller?.classList?.contains("docked");
+      const bottom = selectorDocked && controllerRect?.height > 0
+          ? Math.min(viewportHeight, controllerRect.top)
           : viewportHeight;
       const top = Math.max(0, host.getBoundingClientRect().top);
       const available = Math.max(MIN_NUMERIC_GRAPH_HEIGHT, Math.floor(bottom - top - 16));
@@ -542,23 +581,29 @@ export class GraphMethods {
         host.style.removeProperty("min-height");
         const stateShell = host.querySelector(".graph-shell.state-graph");
         const stateHeight = Math.ceil(stateShell?.getBoundingClientRect().height || 0);
-        const numericHeightValue = Math.max(
-          MIN_NUMERIC_GRAPH_HEIGHT,
-          layoutHeight - stateHeight - 16,
+        const numericHeightValue = numericGraphLayoutHeight({
+          dashboardCardMode: this._dashboardCardMode,
+          layoutHeight,
           numericRequirement,
-        );
+          hasState: true,
+          stateHeight,
+        });
         const numericHeight = `${numericHeightValue}px`;
         if (host.style.getPropertyValue("--numeric-graph-height") !== numericHeight) {
           host.style.setProperty("--numeric-graph-height", numericHeight);
         }
-        this._fitAutomaticNumericCard(numericCard, numericHeightValue);
+        this._fitAutomaticNumericCard(numericCard, numericHeightValue, forceDockedPanelFit);
       } else {
         host.style.removeProperty("min-height");
         host.style.removeProperty("--numeric-graph-height");
-        const numericHeightValue = Math.max(layoutHeight, numericRequirement);
+        const numericHeightValue = numericGraphLayoutHeight({
+          dashboardCardMode: this._dashboardCardMode,
+          layoutHeight,
+          numericRequirement,
+        });
         const next = `${numericHeightValue}px`;
         if (host.style.height !== next) host.style.height = next;
-        this._fitAutomaticNumericCard(numericCard, numericHeightValue);
+        this._fitAutomaticNumericCard(numericCard, numericHeightValue, forceDockedPanelFit);
       }
     };
     const schedule = () => {

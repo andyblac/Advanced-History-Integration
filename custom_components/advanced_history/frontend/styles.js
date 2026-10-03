@@ -217,13 +217,16 @@ export const panelStyles = `
   .axis-target-divider { flex:0 0 1px; align-self:stretch; margin-top:28px; background:var(--divider-color); }
   .period-selector-floating {
     position:fixed; z-index:20; left:16px; right:16px; bottom:max(12px,env(safe-area-inset-bottom));
-    width:max-content; max-width:calc(100vw - 32px); margin-inline:auto;
+    width:max-content; max-width:calc(100vw - 32px); height:56px; margin-inline:auto;
     filter:drop-shadow(0 3px 8px rgba(0,0,0,.28));
     transition:transform .32s ease,opacity .26s ease; will-change:transform;
   }
   .period-selector-floating.auto-hide:not(.revealed) {
     transform:translateY(calc(100% + max(12px,env(safe-area-inset-bottom)) + 8px));
     opacity:0; pointer-events:none;
+  }
+  .period-selector-floating.docked {
+    filter:none; transition:none; will-change:auto;
   }
   .period-selector-reveal-zone {
     position:fixed; z-index:19; right:16px; bottom:0; left:16px;
@@ -232,7 +235,7 @@ export const panelStyles = `
   }
   .period-selector-reveal-zone[hidden] { display:none; }
   .period-selector-floating > .advanced-history-period-selector {
-    box-sizing:border-box; width:max-content; max-width:100%; height:56px; position:relative;
+    box-sizing:border-box; display:block; width:max-content; max-width:100%; height:56px; position:relative;
     color:var(--primary-text-color);
     background:var(--ha-card-background,var(--card-background-color));
     border:1px solid var(--divider-color); border-radius:28px;
