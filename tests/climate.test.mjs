@@ -8,6 +8,7 @@ import {
   withoutClimateActionAnnotations,
 } from "../custom_components/advanced_history/frontend/climate.js";
 import { nativeHistoryAttributeColor } from "../custom_components/advanced_history/frontend/history-series.js";
+import { isNumericMoreInfoHistory } from "../custom_components/advanced_history/frontend/history-series.js";
 import { GraphMethods } from "../custom_components/advanced_history/frontend/graphs.js";
 
 test("uses the current and single target temperature attributes", () => {
@@ -17,6 +18,17 @@ test("uses the current and single target temperature attributes", () => {
       temperature: 21,
     },
   }), ["current_temperature", "temperature"]);
+});
+
+test("uses numeric More Info defaults for climate temperature attributes", () => {
+  assert.equal(isNumericMoreInfoHistory(
+    "climate.lounge",
+    {
+      state: "auto",
+      attributes: { current_temperature: 19, temperature: 21 },
+    },
+    "state-history-charts",
+  ), true);
 });
 
 test("keeps the climate state alongside its native temperature series", () => {

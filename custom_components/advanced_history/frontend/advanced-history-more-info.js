@@ -11,6 +11,7 @@ import { automaticEntityOptions } from "./entity-defaults.js";
 import {
   historyAttributeDisplayName,
   historyAttributeUnit,
+  isNumericMoreInfoHistory as isNumericHistory,
   nativeHistoryAttributeColor,
   nativeHistoryAttributes,
 } from "./history-series.js";
@@ -67,7 +68,7 @@ function invalidateMoreInfoConfig(entityId) {
   moreInfoConfigCache.delete(configCacheKey(entityId));
 }
 
-async function getMoreInfoConfig(hass, entityId) {
+async function getMoreInfoConfig(hass, entityId, numeric) {
   const key = configCacheKey(entityId);
   const now = Date.now();
   const cached = moreInfoConfigCache.get(key);
@@ -76,6 +77,7 @@ async function getMoreInfoConfig(hass, entityId) {
   const request = hass.callWS({
     type: MORE_INFO_CONFIG_TYPE,
     ...(entityId ? { entity_id: entityId } : {}),
+    ...(typeof numeric === "boolean" ? { numeric } : {}),
   })
     .then((config) => {
       const resolved = config || { enabled: false };
@@ -139,13 +141,11 @@ function nativeGraphColor(historyView, index = 0) {
 }
 
 function isNumericMoreInfoHistory(historyView, nativeChart) {
-  if (nativeChart?.localName === "statistics-chart") return true;
-
-  const state = historyView.hass?.states?.[historyView.entityId];
-  const attributes = state?.attributes || {};
-  return attributes.state_class != null
-    || attributes.unit_of_measurement != null
-    || (state?.state !== "" && Number.isFinite(Number(state?.state)));
+  return isNumericHistory(
+    historyView.entityId,
+    historyView.hass?.states?.[historyView.entityId],
+    nativeChart?.localName,
+  );
 }
 
 function nativeMoreInfoAttributes(historyView) {
@@ -1172,7 +1172,11 @@ async function replaceMoreInfoChart(historyView) {
   }
   showMoreInfoLoading(root, nativeChart);
   try {
-    const serviceConfig = await getMoreInfoConfig(historyView.hass, entityId);
+    const serviceConfig = await getMoreInfoConfig(
+      historyView.hass,
+      entityId,
+      isNumericMoreInfoHistory(historyView, nativeChart),
+    );
     historyView.__advancedHistoryMoreInfoServiceConfig = serviceConfig;
     if (
       historyView.__advancedHistoryMoreInfoToken !== token
