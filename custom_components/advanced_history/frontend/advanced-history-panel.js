@@ -63,6 +63,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._panelRollingResumeHours = null;
     this._panelRollingTimer = null;
     this._pendingRollingCompareRestore = null;
+    this._followCurrentPeriod = false;
     this._panelTimeRangePreview = false;
     this._pendingPeriodRestore = null;
     this._currentSnapshot = null;
@@ -110,6 +111,9 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._persistPanelsOnPageHide = () => this._persistPanelTabs();
     this._refreshAliasOnVisibility = () => {
       if (document.visibilityState === "visible") {
+        if (this._followCurrentPeriod && !this._panelRollingHours) {
+          this._selectCurrentPeriod?.();
+        }
         this._scheduleExternalBookmarkRefresh?.();
       }
     };
@@ -295,6 +299,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
       if (!this.isConnected) return;
       if (!this._periodUnsubscribe) this._render();
       if (this._panelRollingHours) this._refreshPanelRollingRange();
+      else if (this._followCurrentPeriod) this._selectCurrentPeriod?.();
       this._scheduleExternalBookmarkRefresh?.();
     });
   }

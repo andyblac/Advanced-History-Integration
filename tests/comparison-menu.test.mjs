@@ -1503,6 +1503,35 @@ test("AHP and AHC Now controls both preserve an active rolling range", () => {
   }
 });
 
+test("Now rebases the matching fixed period and marks it as current", () => {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodStore: {
+      start: new Date(2026, 7, 1, 0, 0, 0, 0),
+      end: new Date(2026, 7, 31, 23, 59, 59, 999),
+    },
+  });
+  const current = context._currentPeriodRange(
+    context._periodStore.start,
+    context._periodStore.end,
+    new Date(2026, 9, 24, 14, 30, 0, 0),
+  );
+  assert.equal(current.start.getFullYear(), 2026);
+  assert.equal(current.start.getMonth(), 9);
+  assert.equal(current.start.getDate(), 1);
+  assert.equal(current.end.getMonth(), 9);
+  assert.equal(current.end.getDate(), 31);
+
+  let selected;
+  context._currentPeriodRange = () => current;
+  context._setPeriodSelectorRange = (start, end, followCurrentPeriod) => {
+    selected = { start, end, followCurrentPeriod };
+  };
+  context._selectCurrentPeriod();
+  assert.equal(selected.followCurrentPeriod, true);
+  assert.equal(selected.start.getTime(), current.start.getTime());
+  assert.equal(selected.end.getTime(), current.end.getTime());
+});
+
 test("AHP and AHC Now controls release focus after selecting the current period", () => {
   for (const dashboardCardMode of [false, true]) {
     const calls = [];

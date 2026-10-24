@@ -29,6 +29,7 @@ const DASHBOARD_RUNTIME_CHART_KEYS = [
   "time_range",
   "rolling_hours",
   "rolling_resume_hours",
+  "follow_current_period",
   "series_transforms",
   "running_total_axes",
   "state_strips",
@@ -1347,6 +1348,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
         end: new Date(store.end),
         timeRange: clone(this._panelTimeRange) || null,
         rollingHours: this._panelRollingHours || null,
+        followCurrentPeriod: Boolean(this._followCurrentPeriod),
         members: new Set(),
       };
       DASHBOARD_PERIOD_GROUP_STORES.set(group, coordinator);
@@ -1354,6 +1356,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       this._applyDashboardSharedTimeRange(
         coordinator.timeRange,
         coordinator.rollingHours,
+        coordinator.followCurrentPeriod,
       );
       originalSetPeriod(coordinator.start, coordinator.end);
     }
@@ -1366,11 +1369,13 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       coordinator.end = new Date(store.end);
       coordinator.timeRange = clone(this._panelTimeRange) || null;
       coordinator.rollingHours = this._panelRollingHours || null;
+      coordinator.followCurrentPeriod = Boolean(this._followCurrentPeriod);
       for (const other of coordinator.members) {
         if (other === member) continue;
         other.owner._applyDashboardSharedTimeRange(
           coordinator.timeRange,
           coordinator.rollingHours,
+          coordinator.followCurrentPeriod,
         );
         other.setPeriod(coordinator.start, coordinator.end);
         other.owner._updateGraphHourOptionsInPlace?.();
@@ -1380,7 +1385,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
     return store;
   }
 
-  _applyDashboardSharedTimeRange(timeRange, rollingHours) {
+  _applyDashboardSharedTimeRange(timeRange, rollingHours, followCurrentPeriod = false) {
     if (this._panelRollingTimer && typeof window !== "undefined") {
       window.clearTimeout(this._panelRollingTimer);
     }
@@ -1391,6 +1396,7 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       : null;
     this._panelRollingHours = rolling;
     this._panelRollingResumeHours = rolling;
+    this._followCurrentPeriod = Boolean(followCurrentPeriod) && !rolling;
   }
 
   _releaseDashboardPeriodStore() {
