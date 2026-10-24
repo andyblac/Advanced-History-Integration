@@ -1345,26 +1345,52 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       coordinator = {
         start: new Date(store.start),
         end: new Date(store.end),
+        timeRange: clone(this._panelTimeRange) || null,
+        rollingHours: this._panelRollingHours || null,
         members: new Set(),
       };
       DASHBOARD_PERIOD_GROUP_STORES.set(group, coordinator);
     } else {
+      this._applyDashboardSharedTimeRange(
+        coordinator.timeRange,
+        coordinator.rollingHours,
+      );
       originalSetPeriod(coordinator.start, coordinator.end);
     }
-    const member = { store, setPeriod: originalSetPeriod };
+    const member = { owner: this, store, setPeriod: originalSetPeriod };
     coordinator.members.add(member);
     this._dashboardPeriodGroupMember = { group, coordinator, member };
     store.setPeriod = (start, end) => {
       originalSetPeriod(start, end);
       coordinator.start = new Date(store.start);
       coordinator.end = new Date(store.end);
+      coordinator.timeRange = clone(this._panelTimeRange) || null;
+      coordinator.rollingHours = this._panelRollingHours || null;
       for (const other of coordinator.members) {
         if (other === member) continue;
+        other.owner._applyDashboardSharedTimeRange(
+          coordinator.timeRange,
+          coordinator.rollingHours,
+        );
         other.setPeriod(coordinator.start, coordinator.end);
+        other.owner._updateGraphHourOptionsInPlace?.();
         other.store.refresh?.();
       }
     };
     return store;
+  }
+
+  _applyDashboardSharedTimeRange(timeRange, rollingHours) {
+    if (this._panelRollingTimer && typeof window !== "undefined") {
+      window.clearTimeout(this._panelRollingTimer);
+    }
+    this._panelRollingTimer = null;
+    this._panelTimeRange = clone(timeRange) || null;
+    const rolling = [1, 2, 4, 8, 12, 24].includes(Number(rollingHours))
+      ? Number(rollingHours)
+      : null;
+    this._panelRollingHours = rolling;
+    this._panelRollingResumeHours = rolling;
   }
 
   _releaseDashboardPeriodStore() {

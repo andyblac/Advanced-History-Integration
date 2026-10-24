@@ -794,10 +794,16 @@ test("SGCC editor changes retain Advanced History options and native height", as
   const firstGroupedCard = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
     _dashboardConfig: { date_picker_group: dateOnlyGroup },
     _dashboardPeriodState: null,
+    _panelTimeRange: null,
+    _panelRollingHours: null,
   });
+  let followerHourUpdates = 0;
   const secondGroupedCard = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
     _dashboardConfig: { date_picker_group: dateOnlyGroup },
     _dashboardPeriodState: null,
+    _panelTimeRange: null,
+    _panelRollingHours: null,
+    _updateGraphHourOptionsInPlace: () => { followerHourUpdates += 1; },
   });
   const firstStore = firstGroupedCard._createPeriodStore();
   const secondStore = secondGroupedCard._createPeriodStore();
@@ -810,6 +816,19 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(secondStore.compare, "");
   assert.equal(secondStore.start.toISOString(), "2026-04-01T00:00:00.000Z");
   assert.equal(secondStore.end.toISOString(), "2026-05-01T00:00:00.000Z");
+  followerHourUpdates = 0;
+  firstGroupedCard._panelTimeRange = { start: 480, end: 720 };
+  firstGroupedCard._panelRollingHours = 4;
+  firstStore.setPeriod(
+    new Date("2026-04-02T08:00:00.000Z"),
+    new Date("2026-04-02T12:00:00.000Z"),
+  );
+  assert.deepEqual(secondGroupedCard._panelTimeRange, { start: 480, end: 720 });
+  assert.equal(secondGroupedCard._panelRollingHours, 4);
+  assert.equal(secondGroupedCard._panelRollingResumeHours, 4);
+  assert.equal(secondStore.start.toISOString(), "2026-04-02T08:00:00.000Z");
+  assert.equal(secondStore.end.toISOString(), "2026-04-02T12:00:00.000Z");
+  assert.equal(followerHourUpdates, 1);
   firstGroupedCard._releaseDashboardPeriodStore();
   secondGroupedCard._releaseDashboardPeriodStore();
 
