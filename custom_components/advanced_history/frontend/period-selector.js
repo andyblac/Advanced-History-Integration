@@ -1643,7 +1643,7 @@ export class PeriodSelectorMethods {
       this._setPanelRollingHours(original.rollingHours);
       this._followCurrentPeriod = original.followCurrentPeriod;
       this._panelTimeRange = original.range ? { ...original.range } : null;
-      this._applyPanelTimeRangePeriod(original.dayStart, true);
+      this._applyPanelTimeRangePeriod(original.dayStart, true, false, false, true);
       this._panelTimeRangePreview = false;
     };
     const remove = () => {
@@ -1726,6 +1726,9 @@ export class PeriodSelectorMethods {
     return this._applyPanelTimeRangePeriod(
       dayStart instanceof Date ? dayStart : period.dayStart,
       Boolean(rolling),
+      false,
+      false,
+      changed || rollingChanged,
     );
   }
 
@@ -1762,7 +1765,13 @@ export class PeriodSelectorMethods {
       start: start.getHours() * 60 + start.getMinutes(),
       end: end.getHours() * 60 + end.getMinutes(),
     };
-    const applied = this._applyPanelTimeRangePeriod(start, true, true, deferRefresh);
+    const applied = this._applyPanelTimeRangePeriod(
+      start,
+      true,
+      true,
+      deferRefresh,
+      true,
+    );
     this._setPanelRollingHours(hours);
     return applied;
   }
@@ -1804,6 +1813,7 @@ export class PeriodSelectorMethods {
     forceRefresh = false,
     quiet = false,
     deferRefresh = false,
+    publishRangeState = false,
   ) {
     const collection = this._periodStore;
     if (!collection || !(dayStart instanceof Date)) return false;
@@ -1823,9 +1833,12 @@ export class PeriodSelectorMethods {
     }
     const changed = collection.start?.getTime?.() !== start.getTime()
       || collection.end?.getTime?.() !== end.getTime();
+    const publishPeriod = changed || publishRangeState;
     if (quiet) {
-      if (changed) {
+      if (publishPeriod) {
         collection.setPeriod(start, end);
+      }
+      if (changed) {
         this._syncGraphCardsToPeriod(collection);
       }
       this._updateGraphHourOptionsInPlace?.();
@@ -1836,7 +1849,11 @@ export class PeriodSelectorMethods {
     this._beginGraphDataSourceCycle();
     if (changed) {
       this._beginPeriodInteractionLoading();
+    }
+    if (publishPeriod) {
       collection.setPeriod(start, end);
+    }
+    if (changed) {
       this._syncGraphCardsToPeriod(collection);
     }
     // Existing SGCC cards already follow this period store, so keep them

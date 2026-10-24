@@ -836,6 +836,28 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(secondStore.start.toISOString(), "2026-04-02T08:00:00.000Z");
   assert.equal(secondStore.end.toISOString(), "2026-04-02T12:00:00.000Z");
   assert.equal(followerHourUpdates, 1);
+  const fullDayStart = new Date("2026-04-02T00:00:00.000Z");
+  const fullDayEnd = new Date("2026-04-02T23:59:59.999Z");
+  firstStore.setPeriod(fullDayStart, fullDayEnd);
+  firstGroupedCard._periodStore = firstStore;
+  firstGroupedCard._panelTimeRange = null;
+  firstGroupedCard._panelRollingHours = null;
+  firstGroupedCard._panelRollingResumeHours = null;
+  firstGroupedCard._graphCards = [];
+  firstGroupedCard._beginGraphDataSourceCycle = () => {};
+  firstGroupedCard._renderGraphs = () => {};
+  firstGroupedCard._syncPanelTimeRangeControl = () => {};
+  firstGroupedCard._recordChange = () => {};
+  firstGroupedCard._applyPanelTimeRangePeriod(
+    fullDayStart,
+    false,
+    false,
+    false,
+    true,
+  );
+  assert.equal(secondGroupedCard._panelTimeRange, null);
+  assert.equal(secondGroupedCard._panelRollingHours, null);
+  assert.equal(secondGroupedCard._panelRollingResumeHours, null);
   firstGroupedCard._panelTimeRange = null;
   firstGroupedCard._panelRollingHours = null;
   firstGroupedCard._followCurrentPeriod = true;
