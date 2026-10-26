@@ -1367,6 +1367,27 @@ test("dashboard date control shifts the complete selected period", () => {
   assert.equal(shifted.end.getDate(), 17);
 });
 
+test("single-day navigation stays on one calendar day across DST changes", () => {
+  let shifted;
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodStore: {
+      start: new Date(2026, 9, 25, 0, 0, 0, 0),
+      end: new Date(2026, 9, 25, 23, 59, 59, 999),
+    },
+    _panelTimeRange: null,
+    _setPeriodSelectorRange: (start, end) => { shifted = { start, end }; },
+  });
+
+  context._shiftPeriodSelectorRange(-1);
+
+  assert.equal(shifted.start.getFullYear(), 2026);
+  assert.equal(shifted.start.getMonth(), 9);
+  assert.equal(shifted.start.getDate(), 24);
+  assert.equal(shifted.end.getFullYear(), 2026);
+  assert.equal(shifted.end.getMonth(), 9);
+  assert.equal(shifted.end.getDate(), 24);
+});
+
 test("panel date arrows release focus so pointer-leave can auto-hide the selector", () => {
   const calls = [];
   const button = { blur: () => calls.push(["blur"]) };

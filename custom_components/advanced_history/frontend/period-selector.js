@@ -1229,6 +1229,10 @@ export class PeriodSelectorMethods {
       start.setFullYear(start.getFullYear() + direction, 0, 1);
       end.setFullYear(start.getFullYear(), 11, 31);
       end.setHours(23, 59, 59, 999);
+    } else if (kind === "day" || kind === "week") {
+      const days = kind === "week" ? 7 : 1;
+      start.setDate(start.getDate() + days * direction);
+      end.setDate(end.getDate() + days * direction);
     } else {
       const duration = end.getTime() - start.getTime() + 1;
       start.setTime(start.getTime() + duration * direction);
