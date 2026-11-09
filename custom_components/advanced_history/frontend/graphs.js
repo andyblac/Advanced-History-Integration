@@ -1613,8 +1613,9 @@ export class GraphMethods {
   }
 
   _canEditPanelChart() {
-    return this._dashboardCardMode
-      || (Boolean(this.config.settings_path) && !this._loadedExternalBookmark);
+    return !this._dashboardCardMode
+      && Boolean(this.config.settings_path)
+      && !this._loadedExternalBookmark;
   }
 
   _createDataSourceTracker(indicator, active = true, sourceKey = null) {

@@ -1280,10 +1280,22 @@ export class PeriodSelectorMethods {
 
   _selectCurrentPeriod() {
     const collection = this._periodStore;
-    if (!collection) return;
+    if (!collection) return false;
     const range = this._currentPeriodRange(collection.start, collection.end);
-    if (!range) return;
+    if (!range) return false;
+    const alreadyCurrent = collection.start?.getTime?.() === range.start.getTime()
+      && collection.end?.getTime?.() === range.end.getTime()
+      && this._followCurrentPeriod
+      && !this._panelTimeRange
+      && !this._panelRollingHours;
+    if (alreadyCurrent) return false;
     this._setPeriodSelectorRange(range.start, range.end, true);
+    return true;
+  }
+
+  _refreshCurrentPeriodIfNeeded() {
+    if (!this._followCurrentPeriod || this._panelRollingHours) return false;
+    return this._selectCurrentPeriod();
   }
 
   _selectCurrentOrRollingPeriod(button = null) {

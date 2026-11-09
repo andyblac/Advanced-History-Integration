@@ -95,7 +95,7 @@ const cardStyles = `
     display:grid; flex:1 1 auto; gap:8px;
   }
   .graph-shell .data-source-indicator {
-    top:8px; right:8px; min-height:20px; padding:0 6px;
+    top:0; right:8px; min-height:20px; padding:0 6px;
     max-width:calc(100% - 16px); border-radius:10px; font-size:10px;
   }
   .period-selector-card { position:relative; z-index:4; width:max-content; max-width:100%; height:46px; }
@@ -1173,6 +1173,12 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
 
   set hass(value) {
     this._hass = value;
+    if (
+      value
+      && (typeof document === "undefined" || document.visibilityState === "visible")
+    ) {
+      this._refreshCurrentPeriodIfNeeded?.();
+    }
     for (const card of this._cards) this._setGraphCardHass(card, value);
     if (value && this._dashboardConfig && !this._loaded) void this._initialize();
   }

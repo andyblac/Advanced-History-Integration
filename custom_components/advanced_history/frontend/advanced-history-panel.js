@@ -121,6 +121,12 @@ export class AdvancedHistoryPanel extends HTMLElement {
 
   set hass(value) {
     this._hass = value;
+    if (
+      value
+      && (typeof document === "undefined" || document.visibilityState === "visible")
+    ) {
+      this._refreshCurrentPeriodIfNeeded?.();
+    }
     if (this._nativeTargetPicker) {
       this._nativeTargetPicker.hass = this._targetPickerHass();
       this._syncNativeTargetVisibility("primary");

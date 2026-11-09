@@ -206,7 +206,7 @@ test("a docked selector enables dynamic height for a fixed-height panel chart", 
   }), false);
 });
 
-test("dashboard cards expose Graph Settings without a panel settings path", () => {
+test("only editable panel charts expose the in-chart Graph Settings button", () => {
   const dashboard = Object.assign(Object.create(GraphMethods.prototype), {
     _dashboardCardMode: true,
     config: {},
@@ -214,11 +214,11 @@ test("dashboard cards expose Graph Settings without a panel settings path", () =
   const panel = Object.assign(Object.create(GraphMethods.prototype), {
     _dashboardCardMode: false,
     _loadedExternalBookmark: false,
-    config: {},
+    config: { settings_path: "/config/integrations/integration/advanced_history" },
   });
 
-  assert.equal(dashboard._canEditPanelChart(), true);
-  assert.equal(panel._canEditPanelChart(), false);
+  assert.equal(dashboard._canEditPanelChart(), false);
+  assert.equal(panel._canEditPanelChart(), true);
 });
 
 test("manual detail forces both SGCC resolution pickers on", () => {
@@ -1551,6 +1551,39 @@ test("Now rebases the matching fixed period and marks it as current", () => {
   assert.equal(selected.followCurrentPeriod, true);
   assert.equal(selected.start.getTime(), current.start.getTime());
   assert.equal(selected.end.getTime(), current.end.getTime());
+});
+
+test("a followed single-day Now range advances after the calendar day changes", () => {
+  const previousDay = new Date(2026, 9, 26, 0, 0, 0, 0);
+  const previousEnd = new Date(2026, 9, 26, 23, 59, 59, 999);
+  const currentDay = new Date(2026, 9, 27, 12, 0, 0, 0);
+  const applied = [];
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodStore: {
+      start: previousDay,
+      end: previousEnd,
+    },
+    _followCurrentPeriod: true,
+    _panelTimeRange: null,
+    _panelRollingHours: null,
+    _currentPeriodRange(start, end) {
+      return PeriodSelectorMethods.prototype._currentPeriodRange.call(
+        this,
+        start,
+        end,
+        currentDay,
+      );
+    },
+    _setPeriodSelectorRange(start, end, follow) {
+      applied.push({ start, end, follow });
+    },
+  });
+
+  assert.equal(context._refreshCurrentPeriodIfNeeded(), true);
+  assert.equal(applied.length, 1);
+  assert.equal(applied[0].start.getDate(), 27);
+  assert.equal(applied[0].end.getDate(), 27);
+  assert.equal(applied[0].follow, true);
 });
 
 test("AHP and AHC Now controls release focus after selecting the current period", () => {
