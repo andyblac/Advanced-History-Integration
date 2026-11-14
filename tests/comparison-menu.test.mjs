@@ -71,6 +71,55 @@ test("fine-detail group picker changes become bookmark overrides", () => {
   assert.equal(recorded, 1);
 });
 
+test("manual detail picker changes preserve PTS/H and Group as bookmark overrides", () => {
+  const groupPicker = { value: "hour" };
+  const pointsPicker = {
+    value: "30",
+    selectedIndex: 0,
+    selectedOptions: [{ textContent: "30/h" }],
+    options: [{ textContent: "30/h" }],
+  };
+  const card = {
+    __advancedHistoryConfig: { line_width: 2 },
+    shadowRoot: {
+      querySelector: (selector) => selector.includes('data-qp="gby"')
+        ? groupPicker
+        : selector.includes('data-qp="pph"')
+          ? pointsPicker
+          : null,
+    },
+  };
+  let recorded = 0;
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _detailMode: "manual",
+    _activeSnapshot: {
+      defaults_mode: "overrides",
+      card_options: { numeric: { show_fill: true }, state: {} },
+      entity_options: {},
+    },
+    _clone: (value) => structuredClone(value),
+    _recordChange: (_snapshot, bookmarkEdit) => {
+      assert.equal(bookmarkEdit, true);
+      recorded += 1;
+    },
+  });
+
+  assert.equal(context._persistDetailResolutionSelection(card), true);
+  assert.deepEqual(context._activeSnapshot.card_options.numeric, {
+    show_fill: true,
+    auto_scale_points: false,
+    show_pph_picker: true,
+    show_group_by_picker: true,
+    group_by: "hour",
+    points_per_hour: 30,
+  });
+  assert.deepEqual(context._activeSnapshot.card_options.state, {});
+  assert.equal(card.__advancedHistoryConfig.points_per_hour, 30);
+  assert.equal(recorded, 1);
+  assert.equal(context._persistDetailResolutionSelection(card), false);
+  assert.equal(recorded, 1);
+});
+
 test("grouped chart downloads retain one separately named CSV per rendered card", () => {
   const first = { _buildCsvText: () => "first", _config: {} };
   const second = { _buildCsvText: () => "second", _config: { card_header: "Native title" } };
@@ -235,6 +284,33 @@ test("manual detail forces both SGCC resolution pickers on", () => {
     show_group_by_picker: true,
     line_width: 2,
     auto_scale_points: false,
+  });
+});
+
+test("manual detail keeps PTS/H effective by using Recorder history", () => {
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _detailMode: "manual",
+  });
+
+  assert.deepEqual(context._manualDetailEntityOptions({
+    entity: "sensor.temperature",
+    color: "red",
+  }, "timeline"), {
+    entity: "sensor.temperature",
+    color: "red",
+    data_source: "history",
+  });
+  assert.deepEqual(context._manualDetailEntityOptions({
+    entity: "sensor.temperature",
+    data_source: "statistics",
+  }, "timeline"), {
+    entity: "sensor.temperature",
+    data_source: "statistics",
+  });
+  assert.deepEqual(context._manualDetailEntityOptions({
+    entity: "sensor.temperature",
+  }, "state_timeline"), {
+    entity: "sensor.temperature",
   });
 });
 
