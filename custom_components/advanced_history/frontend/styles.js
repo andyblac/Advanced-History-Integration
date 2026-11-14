@@ -122,6 +122,7 @@ export const panelStyles = `
     --advanced-history-axis-chip-foreground:#000;
   }
   [data-advanced-history-has-targets] {
+    --ha-assist-chip-label-text-color:var(--advanced-history-axis-chip-foreground);
     --md-assist-chip-label-text-weight:var(--ha-font-weight-bold,700);
     --md-assist-chip-label-text-color:var(--advanced-history-axis-chip-foreground);
     --md-assist-chip-hover-label-text-color:var(--advanced-history-axis-chip-foreground);
