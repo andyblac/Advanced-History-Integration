@@ -314,6 +314,34 @@ test("manual detail keeps PTS/H effective by using Recorder history", () => {
   });
 });
 
+test("Manual PTS/H retains automatic historical comparison sources after every SGCC expansion", () => {
+  const context = Object.create(GraphMethods.prototype);
+  const parents = [
+    { entity: "sensor.implicit", data_source: "history", compare: "year" },
+    { entity: "sensor.explicit", data_source: "history", compare: "year" },
+  ];
+  const card = {
+    _entities: [],
+    _expandCompareGhosts() {
+      this._entities = [
+        ...parents.map((entity) => ({ ...entity })),
+        ...parents.map((entity, index) => ({ ...entity, _compareOf: index })),
+      ];
+      return "expanded";
+    },
+  };
+  context._guardManualDetailComparisonSources(card, new Set([0]));
+  // SGCC expands again when resize/date configuration calls setConfig.
+  for (let cycle = 0; cycle < 2; cycle += 1) {
+    assert.equal(card._expandCompareGhosts(), "expanded");
+    assert.equal(card._entities[0].data_source, "history");
+    assert.equal(card._entities[1].data_source, "history");
+    assert.equal(card._entities[2].data_source, "auto");
+    assert.equal(card._entities[3].data_source, "history");
+  }
+  assert.equal(parents[0].data_source, "history");
+});
+
 test("auto detail clears configured manual resolution overrides", () => {
   const context = Object.assign(Object.create(GraphMethods.prototype), {
     _detailMode: "auto",

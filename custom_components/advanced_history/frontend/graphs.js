@@ -1009,6 +1009,23 @@ export class GraphMethods {
     return { ...configured, data_source: "history" };
   }
 
+  _guardManualDetailComparisonSources(card, manualHistoryIndices) {
+    if (!manualHistoryIndices.size || typeof card?._expandCompareGhosts !== "function") return;
+    const expand = card._expandCompareGhosts;
+    card._expandCompareGhosts = function (...args) {
+      const result = expand.apply(this, args);
+      // SGCC clones the main entity's source into comparison ghosts. Only
+      // undo AHP's implicit Manual override: historical comparisons need
+      // SGCC's automatic fallback to statistics once Recorder data is purged.
+      for (const entity of this._entities || []) {
+        if (manualHistoryIndices.has(entity?._compareOf) && entity.data_source === "history") {
+          entity.data_source = "auto";
+        }
+      }
+      return result;
+    };
+  }
+
   _mountConfiguredGraphCard(host, shell, card) {
     host.append(shell);
     this._cards.push(card);
@@ -1057,7 +1074,8 @@ export class GraphMethods {
       resolvedCardOptions = presentation.options;
       card.__advancedHistoryStateStripLabelFontSize = presentation.labelFontSize;
     }
-    const entities = series.map((item) => {
+    const manualHistoryIndices = new Set();
+    const entities = series.map((item, index) => {
       const descriptor = this._seriesDescriptor(item);
       const stateStrip = stateStripKeys.has(descriptor.key);
       const configured = this._entityCardConfig(
@@ -1065,10 +1083,15 @@ export class GraphMethods {
         stateStrip ? "state_timeline" : mode,
         stateStrip ? this._effectiveCardOptionsConfig("state_timeline") : cardOptionsConfig,
       );
-      if (!stateStrip) return this._manualDetailEntityOptions(configured, mode);
+      if (!stateStrip) {
+        const resolved = this._manualDetailEntityOptions(configured, mode);
+        if (resolved !== configured) manualHistoryIndices.add(index);
+        return resolved;
+      }
       delete configured.y_axis;
       return { ...configured, graph_type: "state_strip" };
     });
+    this._guardManualDetailComparisonSources(card, manualHistoryIndices);
     const runningTotalEntities = new Set();
     const runningTotalExportAggregates = {};
     if (mode !== "state_timeline") {
