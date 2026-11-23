@@ -15,7 +15,7 @@ import {
   nativeHistoryAttributeColor,
   nativeHistoryAttributes,
 } from "./history-series.js";
-import { mergeStateMaps, nativeStateMap } from "./state-colors.js";
+import { mergeStateMaps, nativeStateMap, timelineStateColors } from "./state-colors.js";
 import { customLocalize, loadTranslations } from "./translations.js";
 import { installMoreInfoHistoryUpdateGuard } from "./more-info-history-guard.js";
 import "./advanced-history-sgcc-card.js";
@@ -161,7 +161,6 @@ function nativeTimelineStates(nativeChart, entityId) {
   return [...new Set(
     entityTimeline.data
       .slice()
-      .reverse()
       .map((entry) => entry?.state)
       .filter(Boolean),
   )];
@@ -304,7 +303,7 @@ function moreInfoCardConfig(
         historyView.hass,
         entityId,
         nativeTimelineStates(nativeChart, entityId),
-        nativeActivityStateColors(historyView, entityId),
+        nativeTimelineStateColors(historyView, nativeChart, entityId),
       ),
       template.state_map
     );
@@ -449,34 +448,38 @@ function moreInfoLogbook(historyView) {
   return root.host?.shadowRoot?.querySelector("ha-more-info-logbook") || null;
 }
 
-function nativeActivityStateColors(historyView, entityId) {
-  const logbook = moreInfoLogbook(historyView);
-  if (!logbook) return new Map();
-
-  const entries = [];
-  const roots = [logbook, logbook.shadowRoot].filter(Boolean);
+function nativeTimelineStateColors(historyView, nativeChart, entityId) {
+  const stateObj = historyView.hass?.states?.[entityId];
+  const labels = new Map();
+  for (const state of nativeTimelineStates(nativeChart, entityId)) {
+    labels.set(state, state);
+    labels.set(historyView.hass?.formatEntityState?.(stateObj, state) || state, state);
+  }
+  const timeline = nativeChart?.historyData?.timeline?.find(
+    (entry) => entry.entity_id === entityId,
+  );
+  for (const entry of timeline?.data || []) {
+    if (entry.state_localize) labels.set(entry.state_localize, entry.state);
+  }
+  const colors = new Map();
+  const roots = [nativeChart].filter(Boolean);
+  const visited = new Set();
   while (roots.length) {
     const root = roots.pop();
-    for (const element of root.querySelectorAll?.("*") || []) {
-      if (element.localName === "ha-logbook-entry") entries.push(element);
-      if (element.shadowRoot) roots.push(element.shadowRoot);
+    if (visited.has(root)) continue;
+    visited.add(root);
+    // Read both the timeline's generated series and ha-chart-base's public
+    // bound data. Traverse hosts as well as roots; scoped element registries
+    // need not expose the original timeline tag name.
+    for (const datasets of [root._chartData, root.data]) {
+      for (const [state, color] of timelineStateColors(datasets, entityId, labels)) {
+        colors.set(state, color);
+      }
     }
-  }
-
-  const colors = new Map();
-  for (const entry of entries) {
-    const item = entry.item;
-    const entryEntityId = item?.entity_id || item?.entityId;
-    if (entryEntityId && entryEntityId !== entityId) continue;
-    const state = item?.state;
-    if (typeof state !== "string" || colors.has(state)) continue;
-    const node = entry.shadowRoot?.querySelector(".dot, .node-glyph");
-    if (!node) continue;
-    const style = getComputedStyle(node);
-    const color = node.style.getPropertyValue("--node-color").trim()
-      || style.getPropertyValue("--node-color").trim()
-      || style.backgroundColor;
-    if (color) colors.set(state, color);
+    if (root.shadowRoot) roots.push(root.shadowRoot);
+    for (const element of root.querySelectorAll?.("*") || []) {
+      roots.push(element);
+    }
   }
   return colors;
 }
@@ -505,9 +508,11 @@ function scheduleMoreInfoStateColorRefresh(historyView, host, entityId) {
       || historyView.shadowRoot?.querySelector(`.${MORE_INFO_HOST_CLASS}`) !== host
     ) return;
     const signature = stateColorSignature(
-      nativeActivityStateColors(historyView, entityId),
+      nativeTimelineStateColors(historyView, historyView.shadowRoot?.querySelector(
+        "statistics-chart, state-history-charts",
+      ), entityId),
     );
-    if (signature !== "[]" && signature !== host.dataset.activityStateColors) {
+    if (signature !== "[]" && signature !== host.dataset.timelineStateColors) {
       historyView[MORE_INFO_STATE_COLOR_REFRESH] = null;
       scheduleMoreInfoReplacement(historyView);
       return;
@@ -1209,8 +1214,9 @@ async function replaceMoreInfoChart(historyView) {
       ),
       serviceConfig.picker_mode,
     );
-    const activityStateColors = nativeActivityStateColors(historyView, entityId);
-    const activityStateColorSignature = stateColorSignature(activityStateColors);
+    const timelineStateColorSignature = stateColorSignature(
+      nativeTimelineStateColors(historyView, nativeChart, entityId),
+    );
     ensureMoreInfoActionButtons(historyView, serviceConfig, config);
     const configKey = JSON.stringify({ entityId: historyView.entityId, config });
     let host = root.querySelector(`.${MORE_INFO_HOST_CLASS}`);
@@ -1226,7 +1232,7 @@ async function replaceMoreInfoChart(historyView) {
       host.append(card);
       nativeChart.before(host);
     }
-    host.dataset.activityStateColors = activityStateColorSignature;
+    host.dataset.timelineStateColors = timelineStateColorSignature;
     applyMoreInfoHostLayout(historyView, host);
     installMoreInfoHistoryUpdateGuard(card);
     card.hass = historyView.hass;

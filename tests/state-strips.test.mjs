@@ -6,7 +6,65 @@ import {
   GraphMethods,
   stateStripPresentationOptions,
 } from "../custom_components/advanced_history/frontend/graphs.js";
-import { withBooleanStateColors } from "../custom_components/advanced_history/frontend/state-colors.js";
+import { nativeStateMap, timelineStateColors, withBooleanStateColors } from "../custom_components/advanced_history/frontend/state-colors.js";
+
+test("More Info retains original timeline colours even when Activity uses the opposite mapping", () => {
+  const labels = new Map([["On", "on"], ["Off", "off"]]);
+  const colors = timelineStateColors([{
+    id: "sensor.heating",
+    data: [
+      { value: ["sensor.heating", 0, 1, "On", "#f4bd4a"] },
+      { value: ["sensor.heating", 1, 2, "Off", "#4269d0"] },
+    ],
+  }], "sensor.heating", labels);
+  const map = nativeStateMap({ states: {
+    "sensor.heating": { state: "on", attributes: {} },
+  } }, "sensor.heating", ["on", "off"], colors);
+  assert.equal(map.find(({ value }) => value === "on").color,
+    "#f4bd4a");
+  assert.equal(map.find(({ value }) => value === "off").color,
+    "#4269d0");
+  assert.deepEqual([...timelineStateColors(undefined, "sensor.heating", labels)], []);
+});
+
+test("resolved native colours are authoritative and fallback colours allow theme overrides", () => {
+  const hass = { states: {
+    "sensor.heating": { state: "on", attributes: {} },
+  } };
+  const colors = new Map([["on", "#4269cf"], ["off", "#fac344"]]);
+  const stateMap = nativeStateMap(hass, "sensor.heating", ["off", "on"], colors);
+  const byState = Object.fromEntries(stateMap.map(({ value, color }) => [value, color]));
+  assert.equal(byState.on, "#4269cf");
+  assert.equal(byState.off, "#fac344");
+  assert.equal(byState.unknown, "var(--history-unknown-color, var(--state-inactive-color))");
+  assert.equal(byState.unavailable, "var(--history-unavailable-color, var(--state-unavailable-color))");
+
+  // An enum's declared ordering is a fallback, after exact theme variables.
+  hass.states["sensor.heating"].attributes = { device_class: "enum", options: ["off", "on"] };
+  const enumMap = nativeStateMap(hass, "sensor.heating");
+  assert.equal(enumMap.find(({ value }) => value === "off").color,
+    "var(--state-sensor-enum-off-color, var(--state-sensor-off-color, var(--graph-color-1, var(--color-1))))");
+
+  hass.states["binary_sensor.heating"] = { state: "on", attributes: { device_class: "running" } };
+  const binaryMap = nativeStateMap(hass, "binary_sensor.heating", [], colors);
+  assert.equal(binaryMap.find(({ value }) => value === "on").color, "#4269cf");
+  assert.equal(binaryMap.find(({ value }) => value === "off").color, "#fac344");
+});
+
+test("generic sensor state colours stay stable across current-state changes", () => {
+  const hass = { states: {
+    "sensor.heating": { state: "on", attributes: {} },
+  } };
+  const before = nativeStateMap(hass, "sensor.heating");
+  hass.states["sensor.heating"].state = "off";
+  const after = nativeStateMap(hass, "sensor.heating");
+  for (const state of ["on", "off"]) {
+    assert.equal(before.find(({ value }) => value === state).color,
+      after.find(({ value }) => value === state).color);
+  }
+  assert.notEqual(before.find(({ value }) => value === "on").color,
+    before.find(({ value }) => value === "off").color);
+});
 
 test("boolean state maps receive distinct semantic colours", () => {
   assert.deepEqual(withBooleanStateColors([
