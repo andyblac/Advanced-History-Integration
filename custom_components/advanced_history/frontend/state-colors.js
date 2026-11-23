@@ -216,18 +216,19 @@ export function nativeStateMap(
     "unavailable",
   ].filter(Boolean))];
   const deviceClass = stateObj.attributes?.device_class;
+  const categorical = domain === "sensor" || domain === "select" || domain === "input_select";
   return states.map((state) => {
+    const observedColor = observedColors.get(state);
     const exceptional = state === "unknown" || state === "unavailable";
     const paletteIndex = paletteValues?.indexOf(state) ?? -1;
-    const categorical = domain === "sensor" || domain === "select" || domain === "input_select";
     const fallback = !exceptional && categorical
-      ? observedColors.get(state)
+      ? observedColor
         || (paletteIndex >= 0 ? graphPaletteColor(paletteIndex) : genericStateColor(state))
       : null;
     return {
       value: state,
       label: hass?.formatEntityState?.(stateObj, state) || state,
-      color: observedColors.get(state) || (fallback
+      color: observedColor || (fallback
         ? categoricalStateColor(domain, deviceClass, state, fallback)
         : nativeStateColor(domain, deviceClass, state)),
     };

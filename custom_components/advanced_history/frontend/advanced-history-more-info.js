@@ -160,7 +160,6 @@ function nativeTimelineStates(nativeChart, entityId) {
   if (!Array.isArray(entityTimeline?.data)) return [];
   return [...new Set(
     entityTimeline.data
-      .slice()
       .map((entry) => entry?.state)
       .filter(Boolean),
   )];
@@ -463,11 +462,8 @@ function nativeTimelineStateColors(historyView, nativeChart, entityId) {
   }
   const colors = new Map();
   const roots = [nativeChart].filter(Boolean);
-  const visited = new Set();
   while (roots.length) {
     const root = roots.pop();
-    if (visited.has(root)) continue;
-    visited.add(root);
     // Read both the timeline's generated series and ha-chart-base's public
     // bound data. Traverse hosts as well as roots; scoped element registries
     // need not expose the original timeline tag name.
@@ -477,7 +473,7 @@ function nativeTimelineStateColors(historyView, nativeChart, entityId) {
       }
     }
     if (root.shadowRoot) roots.push(root.shadowRoot);
-    for (const element of root.querySelectorAll?.("*") || []) {
+    for (const element of root.children || []) {
       roots.push(element);
     }
   }
