@@ -146,3 +146,57 @@ test("embedded state strips retain the mixed-chart automatic heading", () => {
     true,
   );
 });
+
+function renderGroups(enabled, { singleGraph = false, strips = false, secondary = [] } = {}) {
+  const target = Object.assign(Object.create(GraphMethods.prototype), context(singleGraph));
+  const ids = ["sensor.room_temperature", "sensor.room_humidity", "climate.room"];
+  const host = { replaceChildren() {} };
+  const charts = [];
+  Object.assign(target, {
+    shadowRoot: { getElementById: () => host, querySelector: () => null },
+    _cards: [],
+    _graphCards: [],
+    _enabledResolvedEntityIds: new Set(enabled),
+    _y2ResolvedEntityIds: new Set(secondary),
+    _disconnectDynamicGraphLayout() {},
+    _largeRangeDetailProfile: () => null,
+    _resolvedEntityIds: () => ids,
+    _seriesDescriptors: () => ids,
+    _syncStateStripsButton() {},
+    _renderLargeRangeDetailBanner() {},
+    _configureDynamicGraphLayout() {},
+    _customLocalize: (key) => key,
+    _localize: (_key, fallback) => fallback,
+    _createGraph: (_host, series, _title, mode) => charts.push({ series, mode }),
+  });
+  target._activeSnapshot.state_strips = strips;
+  target._renderGraphs();
+  return charts;
+}
+
+test("disabled chart types disappear and reappear when their entities are enabled", () => {
+  assert.deepEqual(renderGroups(["sensor.room_temperature"]), [
+    { series: ["sensor.room_temperature"], mode: "timeline" },
+  ]);
+  assert.equal(renderGroups(["sensor.room_temperature", "sensor.room_humidity", "climate.room"]).length, 3);
+  assert.deepEqual(renderGroups([]), []);
+  assert.deepEqual(renderGroups([], { singleGraph: true }), []);
+});
+
+test("state strips become a standalone chart when all numeric groups are disabled", () => {
+  assert.deepEqual(renderGroups(["climate.room"], { strips: true }), [
+    { series: ["climate.room"], mode: "state_timeline" },
+  ]);
+  assert.deepEqual(renderGroups(["sensor.room_temperature"], { strips: true }), [
+    { series: ["sensor.room_temperature"], mode: "timeline" },
+  ]);
+});
+
+test("an enabled secondary axis keeps its shared chart visible", () => {
+  assert.deepEqual(renderGroups(["sensor.room_humidity"], {
+    secondary: ["sensor.room_humidity"],
+  }), [{
+    series: ["sensor.room_temperature", "sensor.room_humidity"],
+    mode: "timeline",
+  }]);
+});

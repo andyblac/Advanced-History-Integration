@@ -306,12 +306,19 @@ export class GraphMethods {
     }
     const entityIds = this._resolvedEntityIds();
     const series = this._seriesDescriptors(entityIds);
+    const hasEnabledSeries = (items) => items.some((item) => (
+      this._enabledResolvedEntityIds?.has(this._seriesDescriptor(item).entity) !== false
+    ));
     this._syncStateStripsButton();
     if (this._notice && !this.shadowRoot.querySelector(".notice")) host.insertAdjacentHTML("beforebegin", `<div class="notice">${this._escape(this._notice)}</div>`);
     if (!entityIds.length) {
       this._renderLargeRangeDetailBanner(null);
       const prompt = this._localize("ui.panel.history.start_search", "Select areas, devices, entities or labels above");
       host.innerHTML = `<div class="start"><ha-icon icon="mdi:chart-timeline-variant"></ha-icon><p>${this._escape(prompt)}</p></div>`;
+      return;
+    }
+    if (!hasEnabledSeries(series)) {
+      this._renderLargeRangeDetailBanner(null);
       return;
     }
     if (this._usesSingleGraph(series)) {
@@ -331,20 +338,22 @@ export class GraphMethods {
       return;
     }
     const numeric = series.filter((item) => this._isNumeric(item));
-    const states = series.filter((item) => !this._isNumeric(item));
-    const numericGroups = this._numericSeriesGroups(numeric);
-    const stateStrips = this._stateStripsEnabled(series);
+    const stateSeries = series.filter((item) => !this._isNumeric(item));
+    const states = hasEnabledSeries(stateSeries) ? stateSeries : [];
+    const numericGroups = this._numericSeriesGroups(numeric)
+      .filter((group) => hasEnabledSeries(group.series));
+    const stateStrips = numericGroups.length > 0 && this._stateStripsEnabled(series);
     const separateStates = states.length && !stateStrips;
     // A state strip changes where the categorical series is rendered, not the
     // logical grouping of the chart. Keep the same automatic numeric heading
     // that is shown when state history uses its own card.
     const multipleCharts = this._hasMultipleChartGroups(numericGroups, states);
-    this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
+    this._renderLargeRangeDetailBanner(numericGroups.length ? detail : null);
     // Establish the available chart region before configuring cards with the
     // card's native height:auto + numeric grid-row contract.
     this._configureDynamicGraphLayout(
       host,
-      Boolean(numeric.length),
+      Boolean(numericGroups.length),
       Boolean(separateStates),
       numericGroups.length,
     );
