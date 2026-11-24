@@ -1322,12 +1322,10 @@ function rewriteShowMoreLink(event) {
       ?.__advancedHistoryCardConfig
       || root?.querySelector(`.${MORE_INFO_HOST_CLASS} ${CARD_TAG}`)?._config;
     const openCard = window.advancedHistory?.openCard;
-    if (cardConfig && typeof openCard === "function") {
-      const state = historyView.hass?.states?.[targetEntityId];
+    if (typeof openCard === "function") {
       const opened = openCard({
-        config: cardConfig,
-        newPanel: true,
-        panelName: state?.attributes?.friendly_name || targetEntityId,
+        ...(cardConfig ? { config: cardConfig } : { entities: [targetEntityId] }),
+        moreInfo: true,
       });
       if (opened) {
         event.preventDefault();

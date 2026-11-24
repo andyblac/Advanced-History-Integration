@@ -20,11 +20,12 @@ export class StorageMethods {
     const handoff = consumeCardHandoff(params);
     const handedOffSnapshot = this._validateSharedSnapshot(handoff?.snapshot);
     const handoffOpensPanel = Boolean(
-      handedOffSnapshot && handoff?.openMode === "new_panel"
+      handedOffSnapshot && ["new_panel", "more_info"].includes(handoff?.openMode)
     );
     this._pendingPanelTabHandoff = handoffOpensPanel ? {
       snapshot: handedOffSnapshot,
       name: handoff.panelName || "",
+      moreInfo: handoff.openMode === "more_info",
     } : null;
     const sharedSnapshot = await this._sharedSnapshotFromUrl(params);
     if (params.has(CARD_HANDOFF_QUERY_PARAM) && !handedOffSnapshot) {

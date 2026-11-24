@@ -210,8 +210,9 @@ export function installCardHandoffApi() {
    *
    * `newPanel` keeps the receiver's persisted panel session and appends this
    * chart as a new active panel. `panelName` supplies its optional tab label.
+   * `moreInfo` instead replaces the dedicated More-Info panel each time.
    */
-  api.openCard = ({ config, entities, period, newPanel = false, panelName = "" } = {}) => {
+  api.openCard = ({ config, entities, period, newPanel = false, panelName = "", moreInfo = false } = {}) => {
     try {
       const hasCardConfig = Boolean(
         config && typeof config === "object" && !Array.isArray(config)
@@ -230,7 +231,7 @@ export function installCardHandoffApi() {
       const payload = JSON.stringify({
         schema_version: CARD_HANDOFF_SCHEMA,
         snapshot,
-        ...(newPanel ? { open_mode: "new_panel" } : {}),
+        ...(moreInfo ? { open_mode: "more_info" } : newPanel ? { open_mode: "new_panel" } : {}),
         ...(panelName ? { panel_name: String(panelName).slice(0, 40) } : {}),
       });
       if (new TextEncoder().encode(payload).length > MAX_HANDOFF_BYTES) {
@@ -259,7 +260,8 @@ export function consumeCardHandoff(params) {
     if (payload?.schema_version !== CARD_HANDOFF_SCHEMA) return null;
     return {
       snapshot: payload.snapshot || null,
-      openMode: payload.open_mode === "new_panel" ? "new_panel" : "replace",
+      openMode: ["new_panel", "more_info"].includes(payload.open_mode)
+        ? payload.open_mode : "replace",
       panelName: typeof payload.panel_name === "string"
         ? payload.panel_name.slice(0, 40)
         : "",

@@ -505,7 +505,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
         <ha-menu-button id="menu"></ha-menu-button><div class="app-title"><h1>${this._escape(title)}</h1>${displayVersion ? `<span class="app-version">v${this._escape(displayVersion)}</span>` : ""}</div>
         ${this._renderPanelTabs()}
         <span class="spacer"></span>
-        ${this._desktopPanelLayoutAvailable() ? `<button id="add-panel" class="icon-button desktop-panel-only" title="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" aria-label="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" ${this._panelTabs.length >= this.maxTabs ? "disabled" : ""}><ha-icon icon="mdi:plus"></ha-icon></button>` : ""}
+        ${this._desktopPanelLayoutAvailable() ? `<button id="add-panel" class="icon-button desktop-panel-only" title="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" aria-label="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" ${this._regularPanelTabCount() >= this.maxTabs ? "disabled" : ""}><ha-icon icon="mdi:plus"></ha-icon></button>` : ""}
         <button id="bookmarks" class="icon-button" title="${this._escape(bookmarks)}"><ha-icon icon="mdi:bookmark-multiple-outline"></ha-icon></button>
         <button id="chart-history" class="icon-button" title="${this._escape(chartHistory)}"><ha-icon icon="mdi:history"></ha-icon></button>
         <button id="undo" class="icon-button" title="${this._escape(undo)}"><ha-icon icon="mdi:undo"></ha-icon></button>
