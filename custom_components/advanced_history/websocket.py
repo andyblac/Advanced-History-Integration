@@ -416,6 +416,7 @@ async def websocket_set_bookmark_visible_everyone(
     {
         vol.Required("type"): f"{DOMAIN}/more_info/config",
         vol.Optional("entity_id"): cv.entity_id,
+        vol.Optional("numeric"): cv.boolean,
     }
 )
 @websocket_api.async_response
@@ -439,15 +440,17 @@ async def websocket_get_more_info_config(
     options = more_info_options_with_defaults(entry.options)
     entity_id = msg.get("entity_id")
     state = hass.states.get(entity_id) if entity_id else None
-    numeric = bool(
-        state
-        and state.state not in {"", "unknown", "unavailable"}
-        and (
-            state.attributes.get("state_class") is not None
-            or state.attributes.get("unit_of_measurement") is not None
-            or _is_float(state.state)
+    numeric = msg.get("numeric")
+    if numeric is None:
+        numeric = bool(
+            state
+            and state.state not in {"", "unknown", "unavailable"}
+            and (
+                state.attributes.get("state_class") is not None
+                or state.attributes.get("unit_of_measurement") is not None
+                or _is_float(state.state)
+            )
         )
-    )
     card_options = deepcopy(
         options[
             CONF_NUMERIC_CARD_OPTIONS if numeric else CONF_STATE_CARD_OPTIONS

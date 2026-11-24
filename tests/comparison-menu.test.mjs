@@ -71,6 +71,55 @@ test("fine-detail group picker changes become bookmark overrides", () => {
   assert.equal(recorded, 1);
 });
 
+test("manual detail picker changes preserve PTS/H and Group as bookmark overrides", () => {
+  const groupPicker = { value: "hour" };
+  const pointsPicker = {
+    value: "30",
+    selectedIndex: 0,
+    selectedOptions: [{ textContent: "30/h" }],
+    options: [{ textContent: "30/h" }],
+  };
+  const card = {
+    __advancedHistoryConfig: { line_width: 2 },
+    shadowRoot: {
+      querySelector: (selector) => selector.includes('data-qp="gby"')
+        ? groupPicker
+        : selector.includes('data-qp="pph"')
+          ? pointsPicker
+          : null,
+    },
+  };
+  let recorded = 0;
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _detailMode: "manual",
+    _activeSnapshot: {
+      defaults_mode: "overrides",
+      card_options: { numeric: { show_fill: true }, state: {} },
+      entity_options: {},
+    },
+    _clone: (value) => structuredClone(value),
+    _recordChange: (_snapshot, bookmarkEdit) => {
+      assert.equal(bookmarkEdit, true);
+      recorded += 1;
+    },
+  });
+
+  assert.equal(context._persistDetailResolutionSelection(card), true);
+  assert.deepEqual(context._activeSnapshot.card_options.numeric, {
+    show_fill: true,
+    auto_scale_points: false,
+    show_pph_picker: true,
+    show_group_by_picker: true,
+    group_by: "hour",
+    points_per_hour: 30,
+  });
+  assert.deepEqual(context._activeSnapshot.card_options.state, {});
+  assert.equal(card.__advancedHistoryConfig.points_per_hour, 30);
+  assert.equal(recorded, 1);
+  assert.equal(context._persistDetailResolutionSelection(card), false);
+  assert.equal(recorded, 1);
+});
+
 test("grouped chart downloads retain one separately named CSV per rendered card", () => {
   const first = { _buildCsvText: () => "first", _config: {} };
   const second = { _buildCsvText: () => "second", _config: { card_header: "Native title" } };
@@ -206,7 +255,7 @@ test("a docked selector enables dynamic height for a fixed-height panel chart", 
   }), false);
 });
 
-test("dashboard cards expose Graph Settings without a panel settings path", () => {
+test("only editable panel charts expose the in-chart Graph Settings button", () => {
   const dashboard = Object.assign(Object.create(GraphMethods.prototype), {
     _dashboardCardMode: true,
     config: {},
@@ -214,11 +263,11 @@ test("dashboard cards expose Graph Settings without a panel settings path", () =
   const panel = Object.assign(Object.create(GraphMethods.prototype), {
     _dashboardCardMode: false,
     _loadedExternalBookmark: false,
-    config: {},
+    config: { settings_path: "/config/integrations/integration/advanced_history" },
   });
 
-  assert.equal(dashboard._canEditPanelChart(), true);
-  assert.equal(panel._canEditPanelChart(), false);
+  assert.equal(dashboard._canEditPanelChart(), false);
+  assert.equal(panel._canEditPanelChart(), true);
 });
 
 test("manual detail forces both SGCC resolution pickers on", () => {
@@ -236,6 +285,61 @@ test("manual detail forces both SGCC resolution pickers on", () => {
     line_width: 2,
     auto_scale_points: false,
   });
+});
+
+test("manual detail keeps PTS/H effective by using Recorder history", () => {
+  const context = Object.assign(Object.create(GraphMethods.prototype), {
+    _detailMode: "manual",
+  });
+
+  assert.deepEqual(context._manualDetailEntityOptions({
+    entity: "sensor.temperature",
+    color: "red",
+  }, "timeline"), {
+    entity: "sensor.temperature",
+    color: "red",
+    data_source: "history",
+  });
+  assert.deepEqual(context._manualDetailEntityOptions({
+    entity: "sensor.temperature",
+    data_source: "statistics",
+  }, "timeline"), {
+    entity: "sensor.temperature",
+    data_source: "statistics",
+  });
+  assert.deepEqual(context._manualDetailEntityOptions({
+    entity: "sensor.temperature",
+  }, "state_timeline"), {
+    entity: "sensor.temperature",
+  });
+});
+
+test("Manual PTS/H retains automatic historical comparison sources after every SGCC expansion", () => {
+  const context = Object.create(GraphMethods.prototype);
+  const parents = [
+    { entity: "sensor.implicit", data_source: "history", compare: "year" },
+    { entity: "sensor.explicit", data_source: "history", compare: "year" },
+  ];
+  const card = {
+    _entities: [],
+    _expandCompareGhosts() {
+      this._entities = [
+        ...parents.map((entity) => ({ ...entity })),
+        ...parents.map((entity, index) => ({ ...entity, _compareOf: index })),
+      ];
+      return "expanded";
+    },
+  };
+  context._guardManualDetailComparisonSources(card, new Set([0]));
+  // SGCC expands again when resize/date configuration calls setConfig.
+  for (let cycle = 0; cycle < 2; cycle += 1) {
+    assert.equal(card._expandCompareGhosts(), "expanded");
+    assert.equal(card._entities[0].data_source, "history");
+    assert.equal(card._entities[1].data_source, "history");
+    assert.equal(card._entities[2].data_source, "auto");
+    assert.equal(card._entities[3].data_source, "history");
+  }
+  assert.equal(parents[0].data_source, "history");
 });
 
 test("auto detail clears configured manual resolution overrides", () => {
@@ -1367,6 +1471,27 @@ test("dashboard date control shifts the complete selected period", () => {
   assert.equal(shifted.end.getDate(), 17);
 });
 
+test("single-day navigation stays on one calendar day across DST changes", () => {
+  let shifted;
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodStore: {
+      start: new Date(2026, 9, 25, 0, 0, 0, 0),
+      end: new Date(2026, 9, 25, 23, 59, 59, 999),
+    },
+    _panelTimeRange: null,
+    _setPeriodSelectorRange: (start, end) => { shifted = { start, end }; },
+  });
+
+  context._shiftPeriodSelectorRange(-1);
+
+  assert.equal(shifted.start.getFullYear(), 2026);
+  assert.equal(shifted.start.getMonth(), 9);
+  assert.equal(shifted.start.getDate(), 24);
+  assert.equal(shifted.end.getFullYear(), 2026);
+  assert.equal(shifted.end.getMonth(), 9);
+  assert.equal(shifted.end.getDate(), 24);
+});
+
 test("panel date arrows release focus so pointer-leave can auto-hide the selector", () => {
   const calls = [];
   const button = { blur: () => calls.push(["blur"]) };
@@ -1501,6 +1626,68 @@ test("AHP and AHC Now controls both preserve an active rolling range", () => {
 
     assert.deepEqual(calls, ["rolling", "blur"]);
   }
+});
+
+test("Now rebases the matching fixed period and marks it as current", () => {
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodStore: {
+      start: new Date(2026, 7, 1, 0, 0, 0, 0),
+      end: new Date(2026, 7, 31, 23, 59, 59, 999),
+    },
+  });
+  const current = context._currentPeriodRange(
+    context._periodStore.start,
+    context._periodStore.end,
+    new Date(2026, 9, 24, 14, 30, 0, 0),
+  );
+  assert.equal(current.start.getFullYear(), 2026);
+  assert.equal(current.start.getMonth(), 9);
+  assert.equal(current.start.getDate(), 1);
+  assert.equal(current.end.getMonth(), 9);
+  assert.equal(current.end.getDate(), 31);
+
+  let selected;
+  context._currentPeriodRange = () => current;
+  context._setPeriodSelectorRange = (start, end, followCurrentPeriod) => {
+    selected = { start, end, followCurrentPeriod };
+  };
+  context._selectCurrentPeriod();
+  assert.equal(selected.followCurrentPeriod, true);
+  assert.equal(selected.start.getTime(), current.start.getTime());
+  assert.equal(selected.end.getTime(), current.end.getTime());
+});
+
+test("a followed single-day Now range advances after the calendar day changes", () => {
+  const previousDay = new Date(2026, 9, 26, 0, 0, 0, 0);
+  const previousEnd = new Date(2026, 9, 26, 23, 59, 59, 999);
+  const currentDay = new Date(2026, 9, 27, 12, 0, 0, 0);
+  const applied = [];
+  const context = Object.assign(Object.create(PeriodSelectorMethods.prototype), {
+    _periodStore: {
+      start: previousDay,
+      end: previousEnd,
+    },
+    _followCurrentPeriod: true,
+    _panelTimeRange: null,
+    _panelRollingHours: null,
+    _currentPeriodRange(start, end) {
+      return PeriodSelectorMethods.prototype._currentPeriodRange.call(
+        this,
+        start,
+        end,
+        currentDay,
+      );
+    },
+    _setPeriodSelectorRange(start, end, follow) {
+      applied.push({ start, end, follow });
+    },
+  });
+
+  assert.equal(context._refreshCurrentPeriodIfNeeded(), true);
+  assert.equal(applied.length, 1);
+  assert.equal(applied[0].start.getDate(), 27);
+  assert.equal(applied[0].end.getDate(), 27);
+  assert.equal(applied[0].follow, true);
 });
 
 test("AHP and AHC Now controls release focus after selecting the current period", () => {

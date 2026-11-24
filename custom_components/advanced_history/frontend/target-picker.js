@@ -320,9 +320,14 @@ export class TargetPickerMethods {
         "--md-assist-chip-label-text-weight",
         "var(--ha-font-weight-bold,700)",
       );
+      assistChip.style.setProperty(
+        "--ha-chip-label-weight",
+        "var(--ha-font-weight-bold,700)",
+      );
       assistChip.requestUpdate?.();
     } else {
       assistChip.style.removeProperty("--md-assist-chip-label-text-weight");
+      assistChip.style.removeProperty("--ha-chip-label-weight");
     }
   }
 

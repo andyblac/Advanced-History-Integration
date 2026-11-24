@@ -29,6 +29,7 @@ const DASHBOARD_RUNTIME_CHART_KEYS = [
   "time_range",
   "rolling_hours",
   "rolling_resume_hours",
+  "follow_current_period",
   "series_transforms",
   "running_total_axes",
   "state_strips",
@@ -94,7 +95,7 @@ const cardStyles = `
     display:grid; flex:1 1 auto; gap:8px;
   }
   .graph-shell .data-source-indicator {
-    top:8px; right:8px; min-height:20px; padding:0 6px;
+    top:0; right:8px; min-height:20px; padding:0 6px;
     max-width:calc(100% - 16px); border-radius:10px; font-size:10px;
   }
   .period-selector-card { position:relative; z-index:4; width:max-content; max-width:100%; height:46px; }
@@ -1172,6 +1173,12 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
 
   set hass(value) {
     this._hass = value;
+    if (
+      value
+      && (typeof document === "undefined" || document.visibilityState === "visible")
+    ) {
+      this._refreshCurrentPeriodIfNeeded?.();
+    }
     for (const card of this._cards) this._setGraphCardHass(card, value);
     if (value && this._dashboardConfig && !this._loaded) void this._initialize();
   }
@@ -1345,26 +1352,57 @@ export class AdvancedHistorySgccCard extends AdvancedHistoryPanel {
       coordinator = {
         start: new Date(store.start),
         end: new Date(store.end),
+        timeRange: clone(this._panelTimeRange) || null,
+        rollingHours: this._panelRollingHours || null,
+        followCurrentPeriod: Boolean(this._followCurrentPeriod),
         members: new Set(),
       };
       DASHBOARD_PERIOD_GROUP_STORES.set(group, coordinator);
     } else {
+      this._applyDashboardSharedTimeRange(
+        coordinator.timeRange,
+        coordinator.rollingHours,
+        coordinator.followCurrentPeriod,
+      );
       originalSetPeriod(coordinator.start, coordinator.end);
     }
-    const member = { store, setPeriod: originalSetPeriod };
+    const member = { owner: this, store, setPeriod: originalSetPeriod };
     coordinator.members.add(member);
     this._dashboardPeriodGroupMember = { group, coordinator, member };
     store.setPeriod = (start, end) => {
       originalSetPeriod(start, end);
       coordinator.start = new Date(store.start);
       coordinator.end = new Date(store.end);
+      coordinator.timeRange = clone(this._panelTimeRange) || null;
+      coordinator.rollingHours = this._panelRollingHours || null;
+      coordinator.followCurrentPeriod = Boolean(this._followCurrentPeriod);
       for (const other of coordinator.members) {
         if (other === member) continue;
+        other.owner._applyDashboardSharedTimeRange(
+          coordinator.timeRange,
+          coordinator.rollingHours,
+          coordinator.followCurrentPeriod,
+        );
         other.setPeriod(coordinator.start, coordinator.end);
+        other.owner._updateGraphHourOptionsInPlace?.();
         other.store.refresh?.();
       }
     };
     return store;
+  }
+
+  _applyDashboardSharedTimeRange(timeRange, rollingHours, followCurrentPeriod = false) {
+    if (this._panelRollingTimer && typeof window !== "undefined") {
+      window.clearTimeout(this._panelRollingTimer);
+    }
+    this._panelRollingTimer = null;
+    this._panelTimeRange = clone(timeRange) || null;
+    const rolling = [1, 2, 4, 8, 12, 24].includes(Number(rollingHours))
+      ? Number(rollingHours)
+      : null;
+    this._panelRollingHours = rolling;
+    this._panelRollingResumeHours = rolling;
+    this._followCurrentPeriod = Boolean(followCurrentPeriod) && !rolling;
   }
 
   _releaseDashboardPeriodStore() {

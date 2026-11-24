@@ -103,6 +103,7 @@ test("bookmark snapshots capture detail mode and banner visibility", () => {
     },
     _detailMode: "manual",
     _showDetailBanner: false,
+    _followCurrentPeriod: true,
     _y2ComparisonCount: 4,
     _detailModeValue: () => "manual",
     _capturePeriodSnapshot: () => null,
@@ -118,10 +119,38 @@ test("bookmark snapshots capture detail mode and banner visibility", () => {
   const chart = context._captureSnapshot().chart;
   assert.equal(chart.detail_mode, "manual");
   assert.equal(chart.show_detail_banner, false);
+  assert.equal(chart.follow_current_period, true);
   assert.equal(chart.y2_compare_count, 4);
   assert.deepEqual(chart.legend_hidden_series, {
     "timeline\u001esensor.power": ["sensor.power__1"],
   });
+});
+
+test("current-period snapshots rebase instead of restoring stale dates", () => {
+  let restoreStarted;
+  const context = Object.assign(Object.create(StorageMethods.prototype), {
+    _setPanelRollingHours: () => {},
+    _currentPeriodRange: () => ({
+      start: new Date("2026-10-24T00:00:00.000Z"),
+      end: new Date("2026-10-24T23:59:59.999Z"),
+    }),
+    _beginPeriodRestore: (period) => { restoreStarted = period; },
+    _finishPeriodRestore: () => assert.fail("valid current period should restore"),
+  });
+
+  context._prepareSnapshotRangeRestore({
+    chart: { follow_current_period: true },
+    period: {
+      start: "2026-10-20T00:00:00.000Z",
+      end: "2026-10-20T23:59:59.999Z",
+      compare: "",
+    },
+  });
+
+  assert.equal(context._followCurrentPeriod, true);
+  assert.equal(context._pendingPeriodRestore.start, "2026-10-24T00:00:00.000Z");
+  assert.equal(context._pendingPeriodRestore.end, "2026-10-24T23:59:59.999Z");
+  assert.equal(restoreStarted, context._pendingPeriodRestore);
 });
 
 test("legacy bookmark detail mode is treated as Auto", () => {

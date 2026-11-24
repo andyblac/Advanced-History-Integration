@@ -306,12 +306,19 @@ export class GraphMethods {
     }
     const entityIds = this._resolvedEntityIds();
     const series = this._seriesDescriptors(entityIds);
+    const hasEnabledSeries = (items) => items.some((item) => (
+      this._enabledResolvedEntityIds?.has(this._seriesDescriptor(item).entity) !== false
+    ));
     this._syncStateStripsButton();
     if (this._notice && !this.shadowRoot.querySelector(".notice")) host.insertAdjacentHTML("beforebegin", `<div class="notice">${this._escape(this._notice)}</div>`);
     if (!entityIds.length) {
       this._renderLargeRangeDetailBanner(null);
       const prompt = this._localize("ui.panel.history.start_search", "Select areas, devices, entities or labels above");
       host.innerHTML = `<div class="start"><ha-icon icon="mdi:chart-timeline-variant"></ha-icon><p>${this._escape(prompt)}</p></div>`;
+      return;
+    }
+    if (!hasEnabledSeries(series)) {
+      this._renderLargeRangeDetailBanner(null);
       return;
     }
     if (this._usesSingleGraph(series)) {
@@ -331,20 +338,22 @@ export class GraphMethods {
       return;
     }
     const numeric = series.filter((item) => this._isNumeric(item));
-    const states = series.filter((item) => !this._isNumeric(item));
-    const numericGroups = this._numericSeriesGroups(numeric);
-    const stateStrips = this._stateStripsEnabled(series);
+    const stateSeries = series.filter((item) => !this._isNumeric(item));
+    const states = hasEnabledSeries(stateSeries) ? stateSeries : [];
+    const numericGroups = this._numericSeriesGroups(numeric)
+      .filter((group) => hasEnabledSeries(group.series));
+    const stateStrips = numericGroups.length > 0 && this._stateStripsEnabled(series);
     const separateStates = states.length && !stateStrips;
     // A state strip changes where the categorical series is rendered, not the
     // logical grouping of the chart. Keep the same automatic numeric heading
     // that is shown when state history uses its own card.
     const multipleCharts = this._hasMultipleChartGroups(numericGroups, states);
-    this._renderLargeRangeDetailBanner(numeric.length ? detail : null);
+    this._renderLargeRangeDetailBanner(numericGroups.length ? detail : null);
     // Establish the available chart region before configuring cards with the
     // card's native height:auto + numeric grid-row contract.
     this._configureDynamicGraphLayout(
       host,
-      Boolean(numeric.length),
+      Boolean(numericGroups.length),
       Boolean(separateStates),
       numericGroups.length,
     );
@@ -651,9 +660,12 @@ export class GraphMethods {
         this._guardPanelLegendVisibility(card);
         this._restorePanelLegendVisibility(card);
         root.addEventListener("change", (event) => {
-          if (!event.target?.closest?.('[data-qp="gby"], .sgc-group-by-picker')) return;
+          const target = event.target;
+          const groupPicker = this._detailGroupByPicker(card);
+          const pointsPicker = this._detailPointsPerHourPicker(card);
+          if (target !== groupPicker && target !== pointsPicker) return;
           this._syncLargeRangeDetailBannerFromCard(card);
-          this._persistFineDetailGroupSelection(card);
+          this._persistDetailResolutionSelection(card);
         });
         this._graphLayoutMutationObserver?.observe(root, {
           childList: true,
@@ -993,6 +1005,36 @@ export class GraphMethods {
     return { ...resolved, ...detailOptions };
   }
 
+  _manualDetailEntityOptions(configured, mode) {
+    if (
+      mode === "state_timeline"
+      || this._detailModeValue() !== "manual"
+      || configured?.data_source != null
+    ) return configured;
+    // SGCC may move high-rate sensors to long-term statistics automatically.
+    // Its PTS/H picker controls Recorder-history bucketing, so Manual mode
+    // must keep numeric entities on that source for the picker to affect the
+    // rendered data. Preserve an explicit per-entity source choice.
+    return { ...configured, data_source: "history" };
+  }
+
+  _guardManualDetailComparisonSources(card, manualHistoryIndices) {
+    if (!manualHistoryIndices.size || typeof card?._expandCompareGhosts !== "function") return;
+    const expand = card._expandCompareGhosts;
+    card._expandCompareGhosts = function (...args) {
+      const result = expand.apply(this, args);
+      // SGCC clones the main entity's source into comparison ghosts. Only
+      // undo AHP's implicit Manual override: historical comparisons need
+      // SGCC's automatic fallback to statistics once Recorder data is purged.
+      for (const entity of this._entities || []) {
+        if (manualHistoryIndices.has(entity?._compareOf) && entity.data_source === "history") {
+          entity.data_source = "auto";
+        }
+      }
+      return result;
+    };
+  }
+
   _mountConfiguredGraphCard(host, shell, card) {
     host.append(shell);
     this._cards.push(card);
@@ -1041,7 +1083,8 @@ export class GraphMethods {
       resolvedCardOptions = presentation.options;
       card.__advancedHistoryStateStripLabelFontSize = presentation.labelFontSize;
     }
-    const entities = series.map((item) => {
+    const manualHistoryIndices = new Set();
+    const entities = series.map((item, index) => {
       const descriptor = this._seriesDescriptor(item);
       const stateStrip = stateStripKeys.has(descriptor.key);
       const configured = this._entityCardConfig(
@@ -1049,10 +1092,15 @@ export class GraphMethods {
         stateStrip ? "state_timeline" : mode,
         stateStrip ? this._effectiveCardOptionsConfig("state_timeline") : cardOptionsConfig,
       );
-      if (!stateStrip) return configured;
+      if (!stateStrip) {
+        const resolved = this._manualDetailEntityOptions(configured, mode);
+        if (resolved !== configured) manualHistoryIndices.add(index);
+        return resolved;
+      }
       delete configured.y_axis;
       return { ...configured, graph_type: "state_strip" };
     });
+    this._guardManualDetailComparisonSources(card, manualHistoryIndices);
     const runningTotalEntities = new Set();
     const runningTotalExportAggregates = {};
     if (mode !== "state_timeline") {
@@ -1510,9 +1558,7 @@ export class GraphMethods {
 
   _largeRangeDetailProfileFromCard(card, profile = this._largeRangeDetailProfile()) {
     if (!profile || profile.automatic) return profile;
-    const picker = card?.shadowRoot?.querySelector(
-      '[data-qp="gby"] select, select[data-qp="gby"], .sgc-group-by-picker select',
-    );
+    const picker = this._detailGroupByPicker(card);
     const groupBy = String(picker?.value || "").trim();
     const resolutionLabel = String(
       picker?.selectedOptions?.[0]?.textContent
@@ -1530,6 +1576,66 @@ export class GraphMethods {
   _syncLargeRangeDetailBannerFromCard(card) {
     const profile = this._largeRangeDetailProfileFromCard(card);
     if (profile && !profile.automatic) this._renderLargeRangeDetailBanner(profile);
+  }
+
+  _detailGroupByPicker(card) {
+    return card?.shadowRoot?.querySelector?.(
+      '[data-qp="gby"] select, select[data-qp="gby"], .sgc-group-by-picker select',
+    ) || null;
+  }
+
+  _detailPointsPerHourPicker(card) {
+    return card?.shadowRoot?.querySelector?.(
+      '[data-qp="pph"] select, select[data-qp="pph"], .sgc-pph-picker select',
+    ) || null;
+  }
+
+  _persistDetailResolutionSelection(card) {
+    if (this._detailModeValue() !== "manual") {
+      return this._persistFineDetailGroupSelection(card);
+    }
+    const groupPicker = this._detailGroupByPicker(card);
+    const pointsPicker = this._detailPointsPerHourPicker(card);
+    const groupBy = String(groupPicker?.value || "").trim();
+    const pointsLabel = String(
+      pointsPicker?.selectedOptions?.[0]?.textContent
+      || pointsPicker?.options?.[pointsPicker?.selectedIndex]?.textContent
+      || "",
+    ).trim();
+    const pointsPerHour = Number(pointsPicker?.value)
+      || Number(pointsLabel.match(/(\d+(?:\.\d+)?)\/h/i)?.[1]);
+    if (!groupBy && !Number.isFinite(pointsPerHour)) return false;
+    const snapshot = this._activeSnapshot ||= {
+      defaults_mode: "overrides",
+      card_options: {},
+      entity_options: {},
+    };
+    const configured = snapshot.card_options;
+    const typed = configured
+      && typeof configured === "object"
+      && !Array.isArray(configured)
+      && (configured.numeric || configured.state);
+    const numeric = this._clone(
+      typed ? configured.numeric || {} : configured || {},
+    );
+    const next = {
+      ...numeric,
+      auto_scale_points: false,
+      show_pph_picker: true,
+      show_group_by_picker: true,
+      ...(groupBy ? { group_by: groupBy } : {}),
+      ...(Number.isFinite(pointsPerHour) ? { points_per_hour: pointsPerHour } : {}),
+    };
+    if (JSON.stringify(next) === JSON.stringify(numeric)) return false;
+    snapshot.card_options = typed
+      ? { ...this._clone(configured), numeric: next }
+      : next;
+    card.__advancedHistoryConfig = {
+      ...(card.__advancedHistoryConfig || {}),
+      ...next,
+    };
+    this._recordChange(null, true);
+    return true;
   }
 
   _persistFineDetailGroupSelection(card) {
@@ -1613,8 +1719,9 @@ export class GraphMethods {
   }
 
   _canEditPanelChart() {
-    return this._dashboardCardMode
-      || (Boolean(this.config.settings_path) && !this._loadedExternalBookmark);
+    return !this._dashboardCardMode
+      && Boolean(this.config.settings_path)
+      && !this._loadedExternalBookmark;
   }
 
   _createDataSourceTracker(indicator, active = true, sourceKey = null) {

@@ -16,6 +16,16 @@ export function nativeHistoryAttributes(entityId, stateObj) {
   );
 }
 
+export function isNumericMoreInfoHistory(entityId, stateObj, nativeChartTag) {
+  if (nativeChartTag === "statistics-chart") return true;
+  if (nativeHistoryAttributes(entityId, stateObj).length > 0) return true;
+
+  const attributes = stateObj?.attributes || {};
+  return attributes.state_class != null
+    || attributes.unit_of_measurement != null
+    || (stateObj?.state !== "" && Number.isFinite(Number(stateObj?.state)));
+}
+
 export function nativeHistoryAttributeColor(host, entityId, stateObj, attribute) {
   const index = nativeHistoryAttributes(entityId, stateObj).indexOf(attribute);
   if (index < 0 || typeof getComputedStyle !== "function") return undefined;

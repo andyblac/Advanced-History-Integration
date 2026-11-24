@@ -74,6 +74,44 @@ function graphPaletteColor(index) {
   return `var(--graph-color-${position}, var(--color-${position}))`;
 }
 
+// HA assigns otherwise uncoloured states a shared graph-palette colour when
+// first encountered. Keep assignments stable across entities and renders.
+const genericStateColors = new Map();
+
+export function timelineStateColors(datasets, entityId, labels) {
+  const colors = new Map();
+  for (const dataset of Array.isArray(datasets) ? datasets : []) {
+    if (dataset.id && dataset.id !== entityId) continue;
+    for (const segment of dataset.data || []) {
+      const value = segment?.value;
+      if (!Array.isArray(value) || value[0] !== entityId) continue;
+      const state = labels.get(value[3]);
+      const color = value[4] || segment.itemStyle?.color;
+      if (state && typeof color === "string" && color) colors.set(state, color);
+    }
+  }
+  return colors;
+}
+
+function genericStateColor(state) {
+  if (!genericStateColors.has(state)) {
+    genericStateColors.set(state, graphPaletteColor(genericStateColors.size));
+  }
+  return genericStateColors.get(state);
+}
+
+function categoricalStateColor(domain, deviceClass, state, fallback) {
+  const key = stateKey(state);
+  const properties = deviceClass
+    ? [`--state-${domain}-${stateKey(deviceClass)}-${key}-color`]
+    : [];
+  properties.push(`--state-${domain}-${key}-color`);
+  return properties.reduceRight(
+    (color, property) => `var(${property}, ${color})`,
+    fallback,
+  );
+}
+
 const BOOLEAN_STATE_COLORS = Object.freeze({
   false: "var(--state-inactive-color, var(--disabled-text-color, #9e9e9e))",
   true: "var(--state-active-color, var(--success-color, #43a047))",
@@ -162,18 +200,12 @@ export function nativeStateMap(
   ) {
     values = stateObj.attributes?.options;
     paletteValues = values;
-  } else if (
-    domain === "sensor"
-    && (stateObj.state === "off" || stateObj.state === "on")
-  ) {
-    values = ["off", "on"];
-    paletteValues = values;
-  } else if (domain === "sensor" && observedStates.length) {
-    // Activity assigns arbitrary sensor states graph colours in the order it
-    // encounters them. More Info supplies its native timeline newest-first so
-    // the replacement chart can use the same categorical ordering.
-    values = [...new Set([stateObj.state, ...observedStates].filter(Boolean))];
-    paletteValues = values;
+  } else if (domain === "sensor") {
+    values = [...new Set([
+      ...observedStates,
+      stateObj.state,
+      ...(["on", "off"].includes(stateObj.state) ? ["on", "off"] : []),
+    ].filter(Boolean))];
   }
   if (!Array.isArray(values)) return undefined;
 
@@ -184,18 +216,21 @@ export function nativeStateMap(
     "unavailable",
   ].filter(Boolean))];
   const deviceClass = stateObj.attributes?.device_class;
+  const categorical = domain === "sensor" || domain === "select" || domain === "input_select";
   return states.map((state) => {
+    const observedColor = observedColors.get(state);
+    const exceptional = state === "unknown" || state === "unavailable";
     const paletteIndex = paletteValues?.indexOf(state) ?? -1;
-    const observedColor = domain === "sensor" && paletteValues
-      ? observedColors.get(state)
-      : undefined;
+    const fallback = !exceptional && categorical
+      ? observedColor
+        || (paletteIndex >= 0 ? graphPaletteColor(paletteIndex) : genericStateColor(state))
+      : null;
     return {
       value: state,
       label: hass?.formatEntityState?.(stateObj, state) || state,
-      color: observedColor
-        || (paletteIndex >= 0
-          ? graphPaletteColor(paletteIndex)
-          : nativeStateColor(domain, deviceClass, state)),
+      color: observedColor || (fallback
+        ? categoricalStateColor(domain, deviceClass, state, fallback)
+        : nativeStateColor(domain, deviceClass, state)),
     };
   });
 }

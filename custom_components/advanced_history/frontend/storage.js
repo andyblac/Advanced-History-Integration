@@ -20,11 +20,12 @@ export class StorageMethods {
     const handoff = consumeCardHandoff(params);
     const handedOffSnapshot = this._validateSharedSnapshot(handoff?.snapshot);
     const handoffOpensPanel = Boolean(
-      handedOffSnapshot && handoff?.openMode === "new_panel"
+      handedOffSnapshot && ["new_panel", "more_info"].includes(handoff?.openMode)
     );
     this._pendingPanelTabHandoff = handoffOpensPanel ? {
       snapshot: handedOffSnapshot,
       name: handoff.panelName || "",
+      moreInfo: handoff.openMode === "more_info",
     } : null;
     const sharedSnapshot = await this._sharedSnapshotFromUrl(params);
     if (params.has(CARD_HANDOFF_QUERY_PARAM) && !handedOffSnapshot) {
@@ -508,6 +509,7 @@ export class StorageMethods {
     else if (this._panelRollingResumeHours) {
       chart.rolling_resume_hours = this._panelRollingResumeHours;
     }
+    if (this._followCurrentPeriod) chart.follow_current_period = true;
     if (this._excludeY2Comparison) chart.exclude_y2_comparison = true;
     chart.y2_compare_count = Math.max(
       1,
@@ -535,7 +537,7 @@ export class StorageMethods {
   }
 
   _snapshotFingerprint(snapshot) {
-    const period = snapshot.chart?.rolling_hours
+    const period = snapshot.chart?.rolling_hours || snapshot.chart?.follow_current_period
       ? { ...snapshot.period, start: null, end: null }
       : snapshot.period;
     const chart = this._clone(snapshot.chart || {});
@@ -963,11 +965,12 @@ export class StorageMethods {
     this._setPanelRollingHours?.(rollingHours);
     this._panelRollingResumeHours = rollingResumeHours;
     this._panelTimeRange = this._clone(chart.time_range) || null;
+    this._followCurrentPeriod = Boolean(chart.follow_current_period) && !rollingHours;
 
     // Rolling presets restore their duration and comparison settings, but
-    // never their captured timestamps. The active period store rebases
-    // the window to the current clock when it mounts. Fixed and deliberately
-    // paused ranges continue to restore their saved period verbatim.
+    // never their captured timestamps. A fixed range selected with Now is
+    // likewise rebased to the matching current day/week/month/year. Other
+    // fixed and deliberately paused ranges restore their saved period verbatim.
     this._pendingRollingCompareRestore = rollingHours ? {
       compare: snapshot?.period?.compare || "",
       choice: snapshot?.period?.compare_choice || null,
@@ -977,6 +980,16 @@ export class StorageMethods {
       ),
     } : null;
     this._pendingPeriodRestore = rollingHours ? null : this._clone(snapshot?.period);
+    if (this._followCurrentPeriod && this._pendingPeriodRestore?.start) {
+      const current = this._currentPeriodRange?.(
+        this._pendingPeriodRestore.start,
+        this._pendingPeriodRestore.end,
+      );
+      if (current) {
+        this._pendingPeriodRestore.start = current.start.toISOString();
+        this._pendingPeriodRestore.end = current.end.toISOString();
+      }
+    }
     if (this._pendingPeriodRestore?.start) {
       this._beginPeriodRestore(this._pendingPeriodRestore, loadingSavedRange);
     } else {

@@ -730,6 +730,7 @@ test("SGCC editor changes retain Advanced History options and native height", as
       show_comparison_banner: false,
       detail_mode: "manual",
       show_detail_banner: false,
+      follow_current_period: true,
     },
     period: {
       start: "2026-08-01T00:00:00.000Z",
@@ -759,8 +760,10 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(restored.chart.show_comparison_banner, false);
   assert.equal(runtime.chart.detail_mode, "manual");
   assert.equal(runtime.chart.show_detail_banner, false);
+  assert.equal(runtime.chart.follow_current_period, true);
   assert.equal(restored.chart.detail_mode, "manual");
   assert.equal(restored.chart.show_detail_banner, false);
+  assert.equal(restored.chart.follow_current_period, true);
   assert.deepEqual(restored.chart.card_options, original.chart.card_options);
 
   const controller = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
@@ -794,10 +797,18 @@ test("SGCC editor changes retain Advanced History options and native height", as
   const firstGroupedCard = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
     _dashboardConfig: { date_picker_group: dateOnlyGroup },
     _dashboardPeriodState: null,
+    _panelTimeRange: null,
+    _panelRollingHours: null,
+    _followCurrentPeriod: false,
   });
+  let followerHourUpdates = 0;
   const secondGroupedCard = Object.assign(Object.create(AdvancedHistorySgccCard.prototype), {
     _dashboardConfig: { date_picker_group: dateOnlyGroup },
     _dashboardPeriodState: null,
+    _panelTimeRange: null,
+    _panelRollingHours: null,
+    _followCurrentPeriod: false,
+    _updateGraphHourOptionsInPlace: () => { followerHourUpdates += 1; },
   });
   const firstStore = firstGroupedCard._createPeriodStore();
   const secondStore = secondGroupedCard._createPeriodStore();
@@ -810,6 +821,51 @@ test("SGCC editor changes retain Advanced History options and native height", as
   assert.equal(secondStore.compare, "");
   assert.equal(secondStore.start.toISOString(), "2026-04-01T00:00:00.000Z");
   assert.equal(secondStore.end.toISOString(), "2026-05-01T00:00:00.000Z");
+  followerHourUpdates = 0;
+  firstGroupedCard._panelTimeRange = { start: 480, end: 720 };
+  firstGroupedCard._panelRollingHours = 4;
+  firstGroupedCard._followCurrentPeriod = false;
+  firstStore.setPeriod(
+    new Date("2026-04-02T08:00:00.000Z"),
+    new Date("2026-04-02T12:00:00.000Z"),
+  );
+  assert.deepEqual(secondGroupedCard._panelTimeRange, { start: 480, end: 720 });
+  assert.equal(secondGroupedCard._panelRollingHours, 4);
+  assert.equal(secondGroupedCard._panelRollingResumeHours, 4);
+  assert.equal(secondGroupedCard._followCurrentPeriod, false);
+  assert.equal(secondStore.start.toISOString(), "2026-04-02T08:00:00.000Z");
+  assert.equal(secondStore.end.toISOString(), "2026-04-02T12:00:00.000Z");
+  assert.equal(followerHourUpdates, 1);
+  const fullDayStart = new Date("2026-04-02T00:00:00.000Z");
+  const fullDayEnd = new Date("2026-04-02T23:59:59.999Z");
+  firstStore.setPeriod(fullDayStart, fullDayEnd);
+  firstGroupedCard._periodStore = firstStore;
+  firstGroupedCard._panelTimeRange = null;
+  firstGroupedCard._panelRollingHours = null;
+  firstGroupedCard._panelRollingResumeHours = null;
+  firstGroupedCard._graphCards = [];
+  firstGroupedCard._beginGraphDataSourceCycle = () => {};
+  firstGroupedCard._renderGraphs = () => {};
+  firstGroupedCard._syncPanelTimeRangeControl = () => {};
+  firstGroupedCard._recordChange = () => {};
+  firstGroupedCard._applyPanelTimeRangePeriod(
+    fullDayStart,
+    false,
+    false,
+    false,
+    true,
+  );
+  assert.equal(secondGroupedCard._panelTimeRange, null);
+  assert.equal(secondGroupedCard._panelRollingHours, null);
+  assert.equal(secondGroupedCard._panelRollingResumeHours, null);
+  firstGroupedCard._panelTimeRange = null;
+  firstGroupedCard._panelRollingHours = null;
+  firstGroupedCard._followCurrentPeriod = true;
+  firstStore.setPeriod(
+    new Date("2026-04-03T00:00:00.000Z"),
+    new Date("2026-04-03T23:59:59.999Z"),
+  );
+  assert.equal(secondGroupedCard._followCurrentPeriod, true);
   firstGroupedCard._releaseDashboardPeriodStore();
   secondGroupedCard._releaseDashboardPeriodStore();
 

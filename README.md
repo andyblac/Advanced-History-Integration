@@ -47,7 +47,7 @@ Advanced History brings those two ideas together: select targets as you would in
 - Define integration-wide Card Defaults through YAML or the visual editor.
 - Save complete charts as user-scoped bookmarks synchronized across devices.
 - Restore recently cleared charts and use Undo/Redo for incremental changes.
-- Optionally open entity-dialog **Show more** links in Advanced History.
+- Optionally open entity-dialog **Show more** links in a reusable **More-Info** tab in Advanced History, outside the normal panel limit. Each link replaces that tab's chart; save any chart you want to keep as a bookmark.
 - Optionally replace native entity More Info History graphs with independently configured Statistics Graph Chart Card graphs.
 - Match Home Assistant's numeric, state, axis, grid, theme, and timezone behavior in More Info dialogs.
 

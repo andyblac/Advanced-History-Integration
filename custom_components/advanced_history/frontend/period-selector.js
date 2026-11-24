@@ -1180,7 +1180,7 @@ export class PeriodSelectorMethods {
     this._recordChange();
   }
 
-  _setPeriodSelectorRange(startValue, endValue) {
+  _setPeriodSelectorRange(startValue, endValue, followCurrentPeriod = false) {
     const collection = this._periodStore;
     if (!collection) return;
     const start = new Date(startValue);
@@ -1188,11 +1188,14 @@ export class PeriodSelectorMethods {
     if (!Number.isFinite(start.getTime()) || !Number.isFinite(end.getTime())) return;
     start.setHours(0, 0, 0, 0);
     end.setHours(23, 59, 59, 999);
+    const followChanged = this._followCurrentPeriod !== Boolean(followCurrentPeriod);
+    this._followCurrentPeriod = Boolean(followCurrentPeriod);
     if (
       collection.start?.getTime?.() === start.getTime()
       && collection.end?.getTime?.() === end.getTime()
       && !this._panelTimeRange
       && !this._panelRollingHours
+      && !followChanged
     ) return;
     this._setPanelRollingHours(null);
     this._panelTimeRange = null;
@@ -1226,6 +1229,10 @@ export class PeriodSelectorMethods {
       start.setFullYear(start.getFullYear() + direction, 0, 1);
       end.setFullYear(start.getFullYear(), 11, 31);
       end.setHours(23, 59, 59, 999);
+    } else if (kind === "day" || kind === "week") {
+      const days = kind === "week" ? 7 : 1;
+      start.setDate(start.getDate() + days * direction);
+      end.setDate(end.getDate() + days * direction);
     } else {
       const duration = end.getTime() - start.getTime() + 1;
       start.setTime(start.getTime() + duration * direction);
@@ -1241,11 +1248,16 @@ export class PeriodSelectorMethods {
     button?.blur?.();
   }
 
-  _selectCurrentPeriod() {
-    const collection = this._periodStore;
-    if (!collection) return;
-    const kind = this._periodKind(collection.start, collection.end);
-    const now = new Date();
+  _currentPeriodRange(startValue, endValue, nowValue = new Date()) {
+    const sourceStart = new Date(startValue);
+    const sourceEnd = new Date(endValue);
+    const now = new Date(nowValue);
+    if (
+      !Number.isFinite(sourceStart.getTime())
+      || !Number.isFinite(sourceEnd.getTime())
+      || !Number.isFinite(now.getTime())
+    ) return null;
+    const kind = this._periodKind(sourceStart, sourceEnd);
     let start = new Date(now);
     let end = new Date(now);
     if (kind === "year") {
@@ -1258,12 +1270,32 @@ export class PeriodSelectorMethods {
       start.setHours(0, 0, 0, 0);
       end.setHours(23, 59, 59, 999);
     } else {
-      const duration = collection.end.getTime() - collection.start.getTime();
+      const duration = sourceEnd.getTime() - sourceStart.getTime();
       end.setHours(23, 59, 59, 999);
       start = new Date(end.getTime() - duration);
       start.setHours(0, 0, 0, 0);
     }
-    this._setPeriodSelectorRange(start, end);
+    return { start, end };
+  }
+
+  _selectCurrentPeriod() {
+    const collection = this._periodStore;
+    if (!collection) return false;
+    const range = this._currentPeriodRange(collection.start, collection.end);
+    if (!range) return false;
+    const alreadyCurrent = collection.start?.getTime?.() === range.start.getTime()
+      && collection.end?.getTime?.() === range.end.getTime()
+      && this._followCurrentPeriod
+      && !this._panelTimeRange
+      && !this._panelRollingHours;
+    if (alreadyCurrent) return false;
+    this._setPeriodSelectorRange(range.start, range.end, true);
+    return true;
+  }
+
+  _refreshCurrentPeriodIfNeeded() {
+    if (!this._followCurrentPeriod || this._panelRollingHours) return false;
+    return this._selectCurrentPeriod();
   }
 
   _selectCurrentOrRollingPeriod(button = null) {
@@ -1546,6 +1578,7 @@ export class PeriodSelectorMethods {
     const original = {
       range: this._panelTimeRange ? { ...this._panelTimeRange } : null,
       rollingHours: this._panelRollingHours,
+      followCurrentPeriod: this._followCurrentPeriod,
       dayStart: new Date(period.dayStart),
     };
     let presetRange = null;
@@ -1624,8 +1657,9 @@ export class PeriodSelectorMethods {
       if (previewFrame) cancelAnimationFrame(previewFrame);
       this._panelTimeRangePreview = true;
       this._setPanelRollingHours(original.rollingHours);
+      this._followCurrentPeriod = original.followCurrentPeriod;
       this._panelTimeRange = original.range ? { ...original.range } : null;
-      this._applyPanelTimeRangePeriod(original.dayStart, true);
+      this._applyPanelTimeRangePeriod(original.dayStart, true, false, false, true);
       this._panelTimeRangePreview = false;
     };
     const remove = () => {
@@ -1702,11 +1736,15 @@ export class PeriodSelectorMethods {
       : null;
     const rollingChanged = this._panelRollingHours !== rolling;
     this._setPanelRollingHours(rolling);
+    this._followCurrentPeriod = false;
     if (!changed && !rollingChanged && !(dayStart instanceof Date)) return true;
     if (changed) this._panelTimeRange = next;
     return this._applyPanelTimeRangePeriod(
       dayStart instanceof Date ? dayStart : period.dayStart,
       Boolean(rolling),
+      false,
+      false,
+      changed || rollingChanged,
     );
   }
 
@@ -1743,7 +1781,13 @@ export class PeriodSelectorMethods {
       start: start.getHours() * 60 + start.getMinutes(),
       end: end.getHours() * 60 + end.getMinutes(),
     };
-    const applied = this._applyPanelTimeRangePeriod(start, true, true, deferRefresh);
+    const applied = this._applyPanelTimeRangePeriod(
+      start,
+      true,
+      true,
+      deferRefresh,
+      true,
+    );
     this._setPanelRollingHours(hours);
     return applied;
   }
@@ -1761,6 +1805,7 @@ export class PeriodSelectorMethods {
     const period = this._panelDayPeriod();
     if (!this._periodStore || !period || ![-1, 1].includes(direction)) return false;
     if (!this._panelTimeRange) return this._shiftPanelDay(direction);
+    this._followCurrentPeriod = false;
     this._pausePanelRollingRange();
     const { start, end } = this._panelTimeRange;
     const duration = (end - start + 1440) % 1440;
@@ -1784,6 +1829,7 @@ export class PeriodSelectorMethods {
     forceRefresh = false,
     quiet = false,
     deferRefresh = false,
+    publishRangeState = false,
   ) {
     const collection = this._periodStore;
     if (!collection || !(dayStart instanceof Date)) return false;
@@ -1803,9 +1849,12 @@ export class PeriodSelectorMethods {
     }
     const changed = collection.start?.getTime?.() !== start.getTime()
       || collection.end?.getTime?.() !== end.getTime();
+    const publishPeriod = changed || publishRangeState;
     if (quiet) {
-      if (changed) {
+      if (publishPeriod) {
         collection.setPeriod(start, end);
+      }
+      if (changed) {
         this._syncGraphCardsToPeriod(collection);
       }
       this._updateGraphHourOptionsInPlace?.();
@@ -1816,7 +1865,11 @@ export class PeriodSelectorMethods {
     this._beginGraphDataSourceCycle();
     if (changed) {
       this._beginPeriodInteractionLoading();
+    }
+    if (publishPeriod) {
       collection.setPeriod(start, end);
+    }
+    if (changed) {
       this._syncGraphCardsToPeriod(collection);
     }
     // Existing SGCC cards already follow this period store, so keep them
@@ -1835,6 +1888,7 @@ export class PeriodSelectorMethods {
     const period = this._panelDayPeriod();
     if (!this._periodStore || !period || ![-1, 1].includes(direction)) return false;
     const start = new Date(period.dayStart);
+    this._followCurrentPeriod = false;
     this._setPanelRollingHours(null);
     start.setDate(start.getDate() + direction);
     this._closePanelTimeRangeDialog?.();
@@ -2247,6 +2301,7 @@ export class PeriodSelectorMethods {
     this._finishPeriodInteractionLoading();
     this._closePanelTimeRangeDialog?.();
     this._setPanelRollingHours(null);
+    this._followCurrentPeriod = true;
     this._pendingRollingCompareRestore = null;
     this._panelTimeRange = null;
     this._comparisonState = null;

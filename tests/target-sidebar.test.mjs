@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { StorageMethods } from "../custom_components/advanced_history/frontend/storage.js";
+import { panelStyles } from "../custom_components/advanced_history/frontend/styles.js";
 import { TargetPickerMethods } from "../custom_components/advanced_history/frontend/target-picker.js";
 
 test("target sidebars require Home Assistant 2026.9 unless legacy layout is selected", () => {
@@ -363,11 +364,27 @@ test("populated native axis chips override the inner label weight", async () => 
     values.get("--md-assist-chip-label-text-weight"),
     "var(--ha-font-weight-bold,700)",
   );
+  assert.equal(
+    values.get("--ha-chip-label-weight"),
+    "var(--ha-font-weight-bold,700)",
+  );
   assert.equal(assistChip.active, true);
   assert.equal(assistChip.updates, 1);
 
   await TargetPickerMethods.prototype._syncTargetSidebarChipWeight.call({}, chip, false);
   assert.equal(values.has("--md-assist-chip-label-text-weight"), false);
+  assert.equal(values.has("--ha-chip-label-weight"), false);
+});
+
+test("populated axis chips set current and legacy public foreground tokens", () => {
+  assert.match(
+    panelStyles,
+    /--ha-assist-chip-label-text-color:var\(--advanced-history-axis-chip-foreground\)/,
+  );
+  assert.match(
+    panelStyles,
+    /--md-assist-chip-label-text-color:var\(--advanced-history-axis-chip-foreground\)/,
+  );
 });
 
 test("only the secondary filter-pane header is mirrored", async () => {

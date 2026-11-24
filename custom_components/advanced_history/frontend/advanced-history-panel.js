@@ -63,6 +63,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._panelRollingResumeHours = null;
     this._panelRollingTimer = null;
     this._pendingRollingCompareRestore = null;
+    this._followCurrentPeriod = false;
     this._panelTimeRangePreview = false;
     this._pendingPeriodRestore = null;
     this._currentSnapshot = null;
@@ -110,6 +111,9 @@ export class AdvancedHistoryPanel extends HTMLElement {
     this._persistPanelsOnPageHide = () => this._persistPanelTabs();
     this._refreshAliasOnVisibility = () => {
       if (document.visibilityState === "visible") {
+        if (this._followCurrentPeriod && !this._panelRollingHours) {
+          this._selectCurrentPeriod?.();
+        }
         this._scheduleExternalBookmarkRefresh?.();
       }
     };
@@ -117,6 +121,12 @@ export class AdvancedHistoryPanel extends HTMLElement {
 
   set hass(value) {
     this._hass = value;
+    if (
+      value
+      && (typeof document === "undefined" || document.visibilityState === "visible")
+    ) {
+      this._refreshCurrentPeriodIfNeeded?.();
+    }
     if (this._nativeTargetPicker) {
       this._nativeTargetPicker.hass = this._targetPickerHass();
       this._syncNativeTargetVisibility("primary");
@@ -295,6 +305,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
       if (!this.isConnected) return;
       if (!this._periodUnsubscribe) this._render();
       if (this._panelRollingHours) this._refreshPanelRollingRange();
+      else if (this._followCurrentPeriod) this._selectCurrentPeriod?.();
       this._scheduleExternalBookmarkRefresh?.();
     });
   }
@@ -494,7 +505,7 @@ export class AdvancedHistoryPanel extends HTMLElement {
         <ha-menu-button id="menu"></ha-menu-button><div class="app-title"><h1>${this._escape(title)}</h1>${displayVersion ? `<span class="app-version">v${this._escape(displayVersion)}</span>` : ""}</div>
         ${this._renderPanelTabs()}
         <span class="spacer"></span>
-        ${this._desktopPanelLayoutAvailable() ? `<button id="add-panel" class="icon-button desktop-panel-only" title="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" aria-label="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" ${this._panelTabs.length >= this.maxTabs ? "disabled" : ""}><ha-icon icon="mdi:plus"></ha-icon></button>` : ""}
+        ${this._desktopPanelLayoutAvailable() ? `<button id="add-panel" class="icon-button desktop-panel-only" title="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" aria-label="${this._escape(this._panelTabsDependencySupported() ? addPanel : addPanelRequiresVersion)}" ${this._regularPanelTabCount() >= this.maxTabs ? "disabled" : ""}><ha-icon icon="mdi:plus"></ha-icon></button>` : ""}
         <button id="bookmarks" class="icon-button" title="${this._escape(bookmarks)}"><ha-icon icon="mdi:bookmark-multiple-outline"></ha-icon></button>
         <button id="chart-history" class="icon-button" title="${this._escape(chartHistory)}"><ha-icon icon="mdi:history"></ha-icon></button>
         <button id="undo" class="icon-button" title="${this._escape(undo)}"><ha-icon icon="mdi:undo"></ha-icon></button>

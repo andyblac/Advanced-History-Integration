@@ -32,6 +32,10 @@ export class PanelTabsMethods {
       || `panel-${Date.now()}-${Math.random().toString(36).slice(2)}`;
   }
 
+  _regularPanelTabCount() {
+    return this._panelTabs.filter((tab) => tab.kind !== "more_info").length;
+  }
+
   _migratePersistedPanelTabs(stored) {
     // Older tab records may contain the retired per-panel Energy collection
     // key. The local period store now uses the stable tab id directly.
@@ -133,11 +137,20 @@ export class PanelTabsMethods {
         this._panelTabsPersistenceSuppressed = true;
         return false;
       }
+      let regularCount = 0;
+      let hasMoreInfo = false;
       const tabs = stored.tabs.filter((tab) => (
         typeof tab?.id === "string"
         && tab.state?.snapshot?.targets
         && tab.state?.snapshot?.chart
-      )).slice(0, this.maxTabs);
+      )).filter((tab) => {
+        if (tab.kind === "more_info") {
+          if (hasMoreInfo) return false;
+          hasMoreInfo = true;
+          return true;
+        }
+        return regularCount++ < this.maxTabs;
+      });
       if (!tabs.length) {
         this._panelTabsPersistenceSuppressed = true;
         return false;
@@ -272,7 +285,7 @@ export class PanelTabsMethods {
   }
 
   _addPanelTab() {
-    if (!this._desktopPanelTabsEnabled() || this._panelTabs.length >= this.maxTabs) return;
+    if (!this._desktopPanelTabsEnabled() || this._regularPanelTabCount() >= this.maxTabs) return;
     this._saveActivePanelTab();
     const id = this._panelTabId();
     const tab = {
@@ -294,7 +307,7 @@ export class PanelTabsMethods {
       this._applySnapshot(this._clone(pending.snapshot), false, true);
       return true;
     }
-    if (this._panelTabs.length >= this.maxTabs) {
+    if (!pending.moreInfo && this._regularPanelTabCount() >= this.maxTabs) {
       this._saveTargets();
       this.dispatchEvent(new CustomEvent("hass-notification", {
         detail: { message: this._customLocalize("panel_limit_reached") },
@@ -306,16 +319,20 @@ export class PanelTabsMethods {
 
     this._panelTabsStorageInspected = true;
     this._saveActivePanelTab();
-    const id = this._panelTabId();
+    const existing = pending.moreInfo
+      ? this._panelTabs.find((tab) => tab.kind === "more_info")
+      : null;
     const state = this._blankPanelTabState();
     state.snapshot = this._clone(pending.snapshot);
     state.current_snapshot = this._clone(pending.snapshot);
     const tab = {
-      id,
-      name: String(pending.name || "").trim().slice(0, 40),
+      id: existing?.id || this._panelTabId(),
+      name: pending.moreInfo ? "More-Info" : String(pending.name || "").trim().slice(0, 40),
+      ...(pending.moreInfo ? { kind: "more_info" } : {}),
       state,
     };
-    this._panelTabs.push(tab);
+    if (existing) this._panelTabs[this._panelTabs.indexOf(existing)] = tab;
+    else this._panelTabs.push(tab);
     this._activePanelTabId = tab.id;
     this._restorePanelTab(tab);
     this._persistPanelTabs();
