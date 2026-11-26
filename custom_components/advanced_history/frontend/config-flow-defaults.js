@@ -1,4 +1,4 @@
-import { CARD_DEFAULT_MODULE_URLS, CARD_TAG } from "./constants.js";
+import { CARD_DEFAULT_MODULE_URLS, CARD_RESOURCE_MATCH, CARD_TAG } from "./constants.js";
 import { openCardEditorDialog } from "./card-editor-dialog.js";
 import { customLocalize, loadTranslations } from "./translations.js";
 
@@ -154,8 +154,24 @@ export async function ensureCardLoaded(hass, configuredModuleUrl = "") {
   if (customElements.get(CARD_TAG)) return;
   const configured = configuredModuleUrl
     || hass?.panels?.["advanced-history"]?.config?.card_module_url;
-  const candidates = configured ? [configured] : CARD_DEFAULT_MODULE_URLS;
-  for (const url of candidates) {
+  const candidates = configured ? [configured] : [];
+  if (!configured) {
+    try {
+      // Match the panel loader: HACS updates the registered URL's version
+      // marker, while the unversioned fallback can still serve a cached card.
+      const resources = await hass?.callWS?.({ type: "lovelace/resources" });
+      for (const resource of Array.isArray(resources) ? resources : []) {
+        const url = resource?.url;
+        if (typeof url === "string" && url.toLowerCase().includes(CARD_RESOURCE_MATCH)) {
+          candidates.push(url);
+        }
+      }
+    } catch (error) {
+      console.debug("Advanced History: dashboard resources could not be inspected", error);
+    }
+    candidates.push(...CARD_DEFAULT_MODULE_URLS);
+  }
+  for (const url of new Set(candidates)) {
     try {
       await import(/* @vite-ignore */ url);
       if (customElements.get(CARD_TAG)) return;
